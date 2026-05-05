@@ -183,3 +183,18 @@ Both modes share:
 - **Adapter declares capability.** `MarkbookAdapter.hasControls?: boolean` controls whether the entry generator imports `setupControls` and emits the wiring. React: `true`. Vue / WC: not yet — Vue could honour it (v0.7 has args support, just not the controls UI); WC's slot model would fight the form.
 
 **Consequences:** Existing stories work unchanged — they don't export `args`, the controls placeholder is hidden by CSS. Adding controls to a story is purely additive. The entry generator stays simple — it doesn't need a TS-AST step for the new features. The runtime cost is small: a few extra namespace imports + a `setupControls` call per story-with-args. Embed and package bundles also pick up `args` / `parameters` for free (the namespace import propagates), so portable stories render with the right initial props out of context — though the embed mode doesn't include controls UI (no host-page placeholder). Package mode exports `args` / `argTypes` / `parameters` from the published index so a consumer who wants controls can wire their own UI to the package's `mount(el, opts)`.
+
+---
+
+## ADR-0016 — Dark mode via `[data-theme]` + CSS custom properties + Shiki dual output
+
+**Context:** Markbook needs a dark mode that doesn't fork the build, doesn't flash on first paint, and lets consumers override the palette without rebuilding the CSS. Shiki bakes colours into HTML at build time, so the naive approach (one theme string at build) doesn't allow runtime switching.
+
+**Decision:**
+
+- **Token surface = `--mb-*` CSS variables.** Already in place since the Starlight refresh. v0.8 adds an `[data-theme="dark"]` ruleset that overrides each variable; everything in the chrome (header / sidebar / story / controls / search / props table / TOC) reads from variables, so flipping `data-theme` repaints without touching markup. Both rulesets set `color-scheme` so native form widgets (Pagefind UI input, controls panel inputs) follow the theme.
+- **Shiki dual output.** `code.ts` calls `codeToHtml(code, { themes: { light, dark }, defaultColor: false })`. The HTML carries `--shiki-light` / `--shiki-dark` on each token; a single CSS rule pair selects the right colour based on `[data-theme]`. No rebuild on toggle; the JS bundle stays the same shape.
+- **Inline boot script in `<head>`, before `<style>`.** Runs synchronously and sets `document.documentElement.dataset.theme` from `localStorage` (or `prefers-color-scheme` on first visit) before paint, eliminating FOUC. The same script delegates click handling on `[data-markbook-theme-toggle]` from `document`, so the toggle button can appear anywhere in the page (or be added later by user CSS) and still work.
+- **Theme is the consumer's override point.** The `--mb-*` tokens are documented as the public theming API. A consumer who wants their own brand can ship a small `theme.css` redefining `:root` (or scoping under a custom `[data-theme="brand"]`) — no fork of `BASE_CSS` needed.
+
+**Consequences:** Dark mode shipped without a JS framework or theme provider — pure CSS variables + a 600-byte boot script. The Shiki dual-theme output is slightly larger than single-theme (~10–15% growth from extra custom properties on every span) — acceptable for the flexibility. The `color-mix(in srgb, var(--mb-accent) 22%, transparent)` rule on the search highlight requires Chrome 111+ / Firefox 113+ / Safari 16.2+ (March 2023+); for older browsers the highlight loses its accent tint but stays legible. Future themes (e.g. high-contrast, sepia) plug in by adding more `[data-theme="..."]` rulesets — no schema or parser change required.
