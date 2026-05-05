@@ -163,7 +163,7 @@ export async function parseMarkdown(
             : '';
           slot.parent.children[slot.index] = {
             type: 'html',
-            value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div>${codeBlock}</div>`,
+            value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
           } as never;
         } else if (slot.kind === 'props') {
           slot.parent.children[slot.index] = {

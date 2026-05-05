@@ -2,6 +2,11 @@ import { createApp, defineComponent, h, type App, type Component, type VNode } f
 
 const apps = new WeakMap<Element, App>();
 
+export interface StoryParameters {
+  layout?: 'centered' | 'fullscreen' | 'padded';
+  background?: string;
+}
+
 interface MountOptions {
   /**
    * Decorators applied outer-to-inner: `[A, B]` produces
@@ -10,11 +15,22 @@ interface MountOptions {
    */
   decorators?: Component[];
   isolation?: 'shadow';
+  /** Initial / current props passed to the story component as root props. */
+  args?: Record<string, unknown>;
+  /** Per-story display parameters applied to the placeholder element. */
+  parameters?: StoryParameters;
 }
+
+const LAYOUT_CLASSES = [
+  'markbook-story--centered',
+  'markbook-story--fullscreen',
+  'markbook-story--padded',
+];
 
 export function mount(el: Element | null, story: unknown, opts?: MountOptions): void {
   if (!el) return;
 
+  applyParameters(el, opts?.parameters);
   const target = resolveMountTarget(el, opts);
 
   const existing = apps.get(target);
@@ -25,9 +41,17 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
       ? wrapWithDecorators(story as Component, opts.decorators)
       : (story as Component);
 
-  const app = createApp(root);
+  const app = opts?.args ? createApp(root, opts.args) : createApp(root);
   app.mount(target);
   apps.set(target, app);
+}
+
+function applyParameters(el: Element, params: StoryParameters | undefined): void {
+  if (!params) return;
+  const host = el as HTMLElement;
+  for (const cls of LAYOUT_CLASSES) host.classList.remove(cls);
+  if (params.layout) host.classList.add(`markbook-story--${params.layout}`);
+  if (params.background !== undefined) host.style.background = params.background;
 }
 
 function wrapWithDecorators(story: Component, decorators: Component[]): Component {

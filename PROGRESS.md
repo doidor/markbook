@@ -144,3 +144,21 @@ Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 
 **Why:** The codebase had no automated tests until now — every regression had to be caught by visually inspecting demo builds. The Vitest suite captures the pure-logic features (parser directives, template substitution, slug derivation, nav sorting) that would silently break first under refactoring; demos still validate the integration. The embed-host workspace was the missing piece for v0.5 / v0.5.1: the auto-generated `dist/embed/index.html` sandbox lives *inside* the demo's dist and proves the bundle works against itself, but doesn't show what an *external* consumer's host page actually looks like — embed-host fills that gap with concrete copy-pasteable HTML for both modes.
 
 **Next:** v0.7 — per-story parameters + interactive prop controls.
+
+---
+
+## 2026-05-05 — v0.7 per-story parameters + interactive prop controls
+
+**What changed:** Three opt-in story-file exports — `parameters`, `args`, `argTypes` — plus a controls UI generator in the React adapter.
+
+1. **`parameters`** (all 3 adapters). A story can export `parameters: { layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. Each adapter's `mount` applies them to the placeholder element before mounting (toggles a `markbook-story--<layout>` class, sets `style.background`). New CSS rules cover the three layout presets.
+2. **`args`** (React + Vue). A story can export `args: object` (initial prop values) and write its default export as a render function `(args) => …`. The adapter passes args to the renderer (`createElement(story, args)` for React, `createApp(story, args)` for Vue). Re-mounting with mutated args triggers React reconciliation / Vue re-render — props update without unmounting, so component state is preserved.
+3. **Interactive controls** (React only for v0.7). New `setupControls(controlsEl, args, argTypes, onChange)` exported from `@markbook/adapter-react`. Builds DOM controls (text / number / checkbox / select) into a placeholder `<div data-markbook-controls="<id>">` that's now emitted next to every story. The entry generator wires up the controls when a story exports `args`. Optional `argTypes` controls input type per key; otherwise the type is inferred from the runtime arg value.
+
+The entry generator switched to `import * as story_<i>_mod` so `args` / `argTypes` / `parameters` can be read at runtime without TS-AST work. Rollup's `MISSING_EXPORT` warning is silenced via `onwarn` in build / embed / package — namespace imports of optional exports are intentional. `MarkbookAdapter.hasControls?: boolean` (React `true`, Vue / WC `false`) determines whether the entry generator imports `setupControls` and emits the wiring. **ADR-0015** captures the design.
+
+Demo: `examples/react-demo/docs/components/Button/Interactive.stories.tsx` exposes all 6 Pixie Button props (`variant`, `size`, `disabled`, `loading`, `fullWidth`, `children`) as interactive controls with `parameters: { layout: 'centered' }`. The other 18 Pixie stories don't export `args` and render unchanged — the controls placeholder stays hidden via `:empty { display: none }`.
+
+**Why:** Props tables document a component's API; **interactive controls let readers feel it**. Combined with `parameters`, story authors can opt into Storybook-style ergonomics without giving up Markbook's "one story per file, default export is the render" simplicity. Crucially additive: existing stories work unchanged.
+
+**Next:** v0.8 — dark mode + theme tokens. Then v1.0 freeze.

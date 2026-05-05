@@ -1,10 +1,6 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.6** — adapters expose a `decorators[]` array (replacing the single `wrapper`) for stacked global providers; the React + Vue adapters honour it, and embed / package bundles inline the same stack for portability (see `PROGRESS.md` for details).
-
-## v0.7 — Per-story metadata, parameters, and prop controls
-
-Optional `parameters` export on stories (background, viewport, layout). Interactive prop controls layered on the existing props table (toggle `disabled`, change `variant`, etc., with the rendered story re-mounting on each change).
+Forward-looking work, ordered by priority. The current state is **v0.7** — stories may export `args`, `argTypes`, and `parameters`; React's adapter renders interactive prop controls below each story; all adapters honour `parameters` (layout, background); embed + package bundles inline args/parameters for portability (see `PROGRESS.md` for details).
 
 ## v0.8 — Dark mode + theme tokens
 

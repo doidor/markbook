@@ -115,6 +115,10 @@ async function bundleEmbedOne(
       minify: 'esbuild',
       rollupOptions: {
         external: () => false,
+        onwarn(warning, warn) {
+          if (warning.code === 'MISSING_EXPORT') return;
+          warn(warning);
+        },
       },
     },
     logLevel: 'warn',
@@ -166,6 +170,10 @@ async function bundlePackageOne(
       minify: 'esbuild',
       rollupOptions: {
         external: peerDeps,
+        onwarn(warning, warn) {
+          if (warning.code === 'MISSING_EXPORT') return;
+          warn(warning);
+        },
       },
     },
     logLevel: 'warn',
@@ -276,15 +284,15 @@ function buildEntryImports(
   });
   let storyRel = path.relative(entryDir, story.absStoryFile).replace(/\\/g, '/');
   if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
-  if (story.exportName === 'default') {
-    lines.push(`import Story from ${JSON.stringify(storyRel)};`);
-  } else {
-    lines.push(`import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`);
-  }
-  return { imports: lines.join('\n'), storyRef: 'Story', decoratorRefs };
+  lines.push(`import * as storyModule from ${JSON.stringify(storyRel)};`);
+  const storyRef =
+    story.exportName === 'default'
+      ? 'storyModule.default'
+      : `storyModule[${JSON.stringify(story.exportName)}]`;
+  return { imports: lines.join('\n'), storyRef, decoratorRefs };
 }
 
-function buildMountOptsLiteral(
+function buildMountOptsExpr(
   decoratorRefs: string[],
   isolation: BundleIsolation | undefined,
 ): string {
@@ -293,7 +301,9 @@ function buildMountOptsLiteral(
     fields.push(`decorators: [${decoratorRefs.join(', ')}]`);
   }
   if (isolation) fields.push(`isolation: ${JSON.stringify(isolation)}`);
-  return fields.length > 0 ? `, { ${fields.join(', ')} }` : '';
+  fields.push(`args: storyModule.args`);
+  fields.push(`parameters: storyModule.parameters`);
+  return `{ ${fields.join(', ')} }`;
 }
 
 function generateEmbedEntry(
@@ -309,14 +319,14 @@ function generateEmbedEntry(
     decoratorPaths,
     entryDir,
   );
-  const optsArg = buildMountOptsLiteral(decoratorRefs, isolation);
+  const optsExpr = buildMountOptsExpr(decoratorRefs, isolation);
 
   return `${imports}
 
 const SLUG = ${JSON.stringify(story.slug)};
 const targets = document.querySelectorAll('[data-markbook-embed="' + SLUG + '"]');
 for (const el of targets) {
-  adapterMount(el, ${storyRef}${optsArg});
+  adapterMount(el, ${storyRef}, ${optsExpr});
 }
 `;
 }
@@ -334,19 +344,19 @@ function generatePackageEntry(
     decoratorPaths,
     entryDir,
   );
-  const baseOpts = buildMountOptsLiteral(decoratorRefs, isolation);
-
-  // Allow callers to override / extend opts (their opts win).
-  const optsExpr = baseOpts
-    ? `Object.assign({}${baseOpts.replace(/^,\s*/, ', ')}, opts || {})`
-    : `opts || {}`;
+  const baseOpts = buildMountOptsExpr(decoratorRefs, isolation);
 
   return `${imports}
 
 export const story = ${storyRef};
+export const args = storyModule.args;
+export const argTypes = storyModule.argTypes;
+export const parameters = storyModule.parameters;
+
+const BASE_OPTS = ${baseOpts};
 
 export function mount(el, opts) {
-  return adapterMount(el, ${storyRef}, ${optsExpr});
+  return adapterMount(el, ${storyRef}, Object.assign({}, BASE_OPTS, opts || {}));
 }
 
 export default mount;

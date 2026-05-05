@@ -17,6 +17,13 @@ export interface MarkbookAdapter {
    * Embed-mode bundles ignore this — they always inline everything.
    */
   packagePeerDeps?: string[];
+  /**
+   * When `true`, the adapter exports `setupControls(controlsEl, args, argTypes,
+   * onChange)` from its main entry, and the entry generator wires interactive
+   * prop controls per story whose source exports `args`. Currently only the
+   * React adapter sets this.
+   */
+  hasControls?: boolean;
 }
 
 export interface MarkbookConfig {

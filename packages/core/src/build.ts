@@ -44,6 +44,7 @@ export interface BuildContext {
   siteDescription: string | undefined;
   adapterPackageName: string;
   adapterPlugins: unknown[];
+  hasControls: boolean;
 }
 
 export function makeLoadTemplate(
@@ -91,6 +92,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     siteDescription,
     adapterPackageName: config.adapter.packageName,
     adapterPlugins,
+    hasControls: !!config.adapter.hasControls,
   };
 }
 
@@ -157,6 +159,7 @@ async function writePages(
       ctx.adapterPackageName,
       path.dirname(entryAbs),
       ctx.decoratorPaths,
+      ctx.hasControls,
     );
     const html = generateHtml(
       page,
@@ -188,7 +191,13 @@ export async function build(config: MarkbookConfig): Promise<void> {
     build: {
       outDir: ctx.outDir,
       emptyOutDir: true,
-      rollupOptions: { input: htmlInputs },
+      rollupOptions: {
+        input: htmlInputs,
+        onwarn(warning, warn) {
+          if (warning.code === 'MISSING_EXPORT') return;
+          warn(warning);
+        },
+      },
     },
     logLevel: 'warn',
     configFile: false,
@@ -397,11 +406,18 @@ function generateEntry(
   adapterPkg: string,
   entryDir: string,
   decoratorPaths: string[],
+  hasControls: boolean,
 ): string {
   if (stories.length === 0) return 'export {};\n';
 
   const importLines: string[] = [];
   const decoratorRefs: string[] = [];
+
+  importLines.push(
+    hasControls
+      ? `import { mount, setupControls } from ${JSON.stringify(adapterPkg)};`
+      : `import { mount } from ${JSON.stringify(adapterPkg)};`,
+  );
 
   decoratorPaths.forEach((p, i) => {
     let rel = path.relative(entryDir, p).replace(/\\/g, '/');
@@ -414,24 +430,37 @@ function generateEntry(
     const abs = path.resolve(pageDir, s.src);
     let rel = path.relative(entryDir, abs).replace(/\\/g, '/');
     if (!rel.startsWith('.')) rel = `./${rel}`;
-    if (s.exportName === 'default') {
-      importLines.push(`import story_${i} from ${JSON.stringify(rel)};`);
-    } else {
-      importLines.push(`import { ${s.exportName} as story_${i} } from ${JSON.stringify(rel)};`);
-    }
+    importLines.push(`import * as story_${i}_mod from ${JSON.stringify(rel)};`);
   });
 
-  const optsArg = decoratorRefs.length > 0 ? `, { decorators: [${decoratorRefs.join(', ')}] }` : '';
-  const mounts = stories.map(
-    (s, i) =>
-      `mount(document.querySelector('[data-markbook-story="${s.id}"]'), story_${i}${optsArg});`,
-  );
+  const setups = stories.map((s, i) => {
+    const exportRef =
+      s.exportName === 'default'
+        ? `story_${i}_mod.default`
+        : `story_${i}_mod[${JSON.stringify(s.exportName)}]`;
+    const decoratorsField =
+      decoratorRefs.length > 0 ? `decorators: [${decoratorRefs.join(', ')}], ` : '';
+    return `
+const story_${i} = ${exportRef};
+const args_${i} = story_${i}_mod.args ? { ...story_${i}_mod.args } : undefined;
+const argTypes_${i} = story_${i}_mod.argTypes;
+const params_${i} = story_${i}_mod.parameters;
+const el_${i} = document.querySelector('[data-markbook-story="${s.id}"]');
+${hasControls ? `const ctrl_${i} = document.querySelector('[data-markbook-controls="${s.id}"]');` : ''}
+function render_${i}() {
+  mount(el_${i}, story_${i}, { ${decoratorsField}args: args_${i}, parameters: params_${i} });
+}
+render_${i}();
+${
+  hasControls
+    ? `if (args_${i} && ctrl_${i}) {
+  setupControls(ctrl_${i}, args_${i}, argTypes_${i}, render_${i});
+}`
+    : ''
+}`;
+  });
 
-  return `import { mount } from ${JSON.stringify(adapterPkg)};
-${importLines.join('\n')}
-
-${mounts.join('\n')}
-`;
+  return `${importLines.join('\n')}\n${setups.join('\n')}\n`;
 }
 
 function generateHtml(
@@ -819,6 +848,55 @@ a:hover { text-decoration: underline; }
   align-items: center;
   justify-content: center;
   min-height: 96px;
+}
+.markbook-story.markbook-story--centered {
+  align-items: center;
+  justify-content: center;
+}
+.markbook-story.markbook-story--padded { padding: 3rem 2rem; }
+.markbook-story.markbook-story--fullscreen {
+  padding: 0;
+  min-height: 360px;
+  align-items: stretch;
+  justify-content: stretch;
+}
+.markbook-controls {
+  border-left: 1px solid var(--mb-border);
+  border-right: 1px solid var(--mb-border);
+  background: var(--mb-bg);
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: minmax(80px, max-content) 1fr;
+  gap: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+}
+.markbook-controls:empty { display: none; }
+.markbook-control { display: contents; }
+.markbook-control label {
+  font-family: var(--mb-font-mono);
+  font-size: 0.78rem;
+  color: var(--mb-fg-muted);
+  align-self: center;
+  white-space: nowrap;
+}
+.markbook-control input[type="text"],
+.markbook-control input[type="number"],
+.markbook-control select {
+  font-family: var(--mb-font-sans);
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--mb-border);
+  border-radius: 4px;
+  background: var(--mb-bg-elev);
+  color: var(--mb-fg);
+  width: 100%;
+}
+.markbook-control input[type="checkbox"] {
+  align-self: center;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  justify-self: start;
 }
 .markbook-code {
   border: 1px solid var(--mb-border);

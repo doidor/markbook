@@ -6,6 +6,11 @@ component: ../../src/pixie/Button.tsx
 componentExport: Button
 ---
 
+## Interactive
+
+:::story{src=./Button/Interactive.stories.tsx}
+:::
+
 ## Variants
 
 :::story{src=./Button/Variants.stories.tsx}

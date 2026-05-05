@@ -18,6 +18,12 @@ Stories are **portable** via `markbook bundle`:
 
 Stories share global providers (theme, i18n, router, ...) via **decorators** — an array of modules whose default exports wrap every story. Configure on the adapter, e.g. `reactAdapter({ decorators: ['./theme.tsx', './i18n.tsx'] })`. Decorators apply outer-to-inner, so the first array element becomes the outermost wrapper. The same decorator stack is inlined into embed and package mode bundles, so portable stories render identically out of context. WC stories don't have decorators (vanilla custom elements use a different composition model).
 
+A story file may also export `args`, `argTypes`, and `parameters`:
+- `parameters` — display options for the placeholder element. `{ layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. All adapters honour them.
+- `args` — initial prop values. The default export becomes a render function `(args) => …`. React + Vue adapters honour them; WC ignores.
+- `argTypes` — optional control-type metadata for each arg: `{ control: 'text' | 'number' | 'boolean' | 'select'; options?: [...] }`. If omitted, types are inferred from runtime values (boolean → checkbox, number → number input, else text).
+- React's adapter exposes a `setupControls(controlsEl, args, argTypes, onChange)` helper, and `markbook build` / `markbook dev` wire up an interactive controls panel under every story whose source exports `args`. Changing a control re-mounts with new props (state preserved through React reconciliation).
+
 Pages may also opt into a **template**: a markdown file in a templates directory that wraps the page's content with a shared shell. Opt in with `template: <name>` in frontmatter; the template uses `{{ title }}`, `{{ description }}`, `{{ content }}`, and `{{ frontmatter.x }}` substitution (no conditionals/loops — KISS). Pages without `template:` render their full markdown unchanged.
 
 The template lookup directory is configured via `templatesDir` in `markbook.config.ts`. It accepts a single string or an array of strings (relative to the project root, or absolute). When given multiple paths the loader searches them in order and picks the first `<dir>/<name>.md` that exists, so shared templates can live outside the project (e.g. a sibling `../shared/templates`) and per-project templates can override them. Default: `'templates'`. See `examples/react-demo/templates/component.md` for the canonical pattern.
