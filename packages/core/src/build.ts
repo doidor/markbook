@@ -531,11 +531,12 @@ function generateHtml(
     : '';
 
   return `<!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(page.parsed.title)} — ${escapeHtml(siteTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>${THEME_BOOT_SCRIPT}</script>
 ${pagefindLink}
 <style>${BASE_CSS}</style>
 </head>
@@ -543,6 +544,7 @@ ${pagefindLink}
 <header class="markbook-header">
   <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(siteTitle)}</a>
   ${searchSlot}
+  <button class="markbook-theme-toggle" type="button" data-markbook-theme-toggle aria-label="Toggle theme"><span class="markbook-icon-sun" aria-hidden>☀</span><span class="markbook-icon-moon" aria-hidden>☾</span></button>
 </header>
 <div class="${shellClass}">
   <aside class="markbook-sidebar">
@@ -570,6 +572,13 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Inline IIFE: read the saved theme from localStorage (or the OS preference on
+ * first visit), apply it to <html data-theme=…> before paint, and delegate
+ * clicks on the theme toggle button to flip it.
+ */
+const THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
+
 const BASE_CSS = `
 :root {
   --mb-bg: #ffffff;
@@ -589,6 +598,20 @@ const BASE_CSS = `
   --mb-sidebar-width: 240px;
   --mb-toc-width: 200px;
   --mb-header-height: 56px;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --mb-bg: #0e0e12;
+  --mb-fg: #e6e6eb;
+  --mb-fg-muted: #94949e;
+  --mb-border: #2a2a32;
+  --mb-bg-elev: #1a1a22;
+  --mb-bg-soft: #16161c;
+  --mb-accent: #8b7eff;
+  --mb-accent-fg: #ffffff;
+  --mb-link: #b6acff;
+  --mb-code-bg: #1a1a22;
+  color-scheme: dark;
 }
 *,*::before,*::after { box-sizing: border-box; }
 html, body {
@@ -618,6 +641,40 @@ a:hover { text-decoration: underline; }
 }
 .markbook-brand:hover { text-decoration: none; }
 .markbook-logo { font-size: 1.2rem; }
+.markbook-theme-toggle {
+  background: transparent;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  color: var(--mb-fg-muted);
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.markbook-theme-toggle:hover {
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
+}
+.markbook-theme-toggle .markbook-icon-sun,
+.markbook-theme-toggle .markbook-icon-moon { display: none; }
+[data-theme="dark"] .markbook-theme-toggle .markbook-icon-sun { display: inline; }
+:root:not([data-theme="dark"]) .markbook-theme-toggle .markbook-icon-moon { display: inline; }
+.markbook-content .shiki,
+.markbook-content .shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+[data-theme="dark"] .markbook-content .shiki,
+[data-theme="dark"] .markbook-content .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
 .markbook-search-ui {
   position: relative;
   width: 360px;
@@ -736,7 +793,7 @@ a:hover { text-decoration: underline; }
   opacity: 0.5;
 }
 .markbook-search-ui mark {
-  background: rgba(108, 92, 231, 0.16);
+  background: color-mix(in srgb, var(--mb-accent) 22%, transparent);
   color: var(--mb-fg);
   padding: 0 2px;
   border-radius: 2px;

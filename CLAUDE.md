@@ -18,6 +18,8 @@ Stories are **portable** via `markbook bundle`:
 
 Stories share global providers (theme, i18n, router, ...) via **decorators** — an array of modules whose default exports wrap every story. Configure on the adapter, e.g. `reactAdapter({ decorators: ['./theme.tsx', './i18n.tsx'] })`. Decorators apply outer-to-inner, so the first array element becomes the outermost wrapper. The same decorator stack is inlined into embed and package mode bundles, so portable stories render identically out of context. WC stories don't have decorators (vanilla custom elements use a different composition model).
 
+**Theming.** Each rendered page declares dark/light via `<html data-theme>`, set by an inline `<head>` script that reads `localStorage['markbook-theme']` first, falls back to `prefers-color-scheme`, and listens for clicks on `[data-markbook-theme-toggle]` to flip + persist. The colour palette is exposed entirely as `--mb-*` CSS variables (e.g. `--mb-bg`, `--mb-fg`, `--mb-accent`, `--mb-border`); a consumer can override theming by writing a small CSS file that sets these on `:root` (or scoped under `[data-theme="brand"]`). Code blocks use Shiki's dual-theme output (`themes: { light, dark }`, `defaultColor: false`) so syntax-highlighting follows `data-theme` without rebuilding.
+
 A story file may also export `args`, `argTypes`, and `parameters`:
 - `parameters` — display options for the placeholder element. `{ layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. All adapters honour them.
 - `args` — initial prop values. The default export becomes a render function `(args) => …`. React + Vue adapters honour them; WC ignores.

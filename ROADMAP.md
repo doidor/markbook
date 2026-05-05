@@ -1,10 +1,6 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.7** — stories may export `args`, `argTypes`, and `parameters`; React's adapter renders interactive prop controls below each story; all adapters honour `parameters` (layout, background); embed + package bundles inline args/parameters for portability (see `PROGRESS.md` for details).
-
-## v0.8 — Dark mode + theme tokens
-
-Toggle between light and dark via `data-theme` (already on `<html>`); add a header switch. Expose `--mb-*` CSS variables as a documented theming surface so consumers can override colours/spacing without forking the CSS.
+Forward-looking work, ordered by priority. The current state is **v0.8** — full dark-mode support with a header toggle, all colours expose as `--mb-*` CSS variables, and Shiki uses dual themes so code blocks follow `[data-theme]` automatically (see `PROGRESS.md` for details).
 
 ## v1.0 — Stable API freeze
 

@@ -29,7 +29,8 @@ export async function extractStoryCode(
   const code = source.trim();
   const codeHtml = await codeToHtml(code, {
     lang: langFor(absStoryFile),
-    theme: 'github-light',
+    themes: { light: 'github-light', dark: 'github-dark' },
+    defaultColor: false,
   });
   return { code, codeHtml };
 }

@@ -162,3 +162,19 @@ Demo: `examples/react-demo/docs/components/Button/Interactive.stories.tsx` expos
 **Why:** Props tables document a component's API; **interactive controls let readers feel it**. Combined with `parameters`, story authors can opt into Storybook-style ergonomics without giving up Markbook's "one story per file, default export is the render" simplicity. Crucially additive: existing stories work unchanged.
 
 **Next:** v0.8 — dark mode + theme tokens. Then v1.0 freeze.
+
+---
+
+## 2026-05-05 — v0.8 dark mode + theme tokens
+
+**What changed:** Three pieces:
+
+1. **Dark CSS variables.** Added `[data-theme="dark"]` ruleset alongside `:root` with dark counterparts of every `--mb-*` token (`--mb-bg`, `--mb-fg`, `--mb-fg-muted`, `--mb-border`, `--mb-bg-elev`, `--mb-bg-soft`, `--mb-accent`, `--mb-link`, `--mb-code-bg`). Both rulesets also set `color-scheme` so native form widgets (Pagefind UI's input, the controls panel inputs) follow the theme. Page styling already uses these variables, so chrome adapts automatically: header, sidebar, story preview borders, props table, controls, search dropdown, code disclosure all flip.
+2. **Shiki dual themes.** `code.ts` now calls `codeToHtml` with `themes: { light: 'github-light', dark: 'github-dark' }` + `defaultColor: false`. The output emits `--shiki-light` and `--shiki-dark` custom properties on each `<span>`; a small CSS rule pair selects the right one based on `[data-theme]`. No rebuild needed when toggling; same bundle ships both palettes.
+3. **Header toggle + boot script.** A `<button data-markbook-theme-toggle>` in the header with sun/moon icons (CSS-driven swap via `[data-theme="dark"] .markbook-icon-sun` / `:root:not([data-theme="dark"]) .markbook-icon-moon`). An inline `<head>` IIFE runs synchronously before paint: reads `localStorage['markbook-theme']`, falls back to `prefers-color-scheme: dark`, sets `<html data-theme>` accordingly, and delegates clicks on the toggle from `document` (so the script doesn't depend on DOM order). FOUC-free; the chosen theme persists across pages and is restored on revisits.
+
+`color-mix(in srgb, var(--mb-accent) 22%, transparent)` replaces the hardcoded purple-tint rgba on the search drawer's `<mark>` highlights so the alpha-blend uses whichever accent is current.
+
+**Why:** Dark mode is table stakes for modern docs sites. The `--mb-*` token surface (already in place since the Starlight refresh) made this almost free — only `code.ts` and a few CSS variables needed touching. Shiki's dual-theme support means we don't fork the build per theme.
+
+**Next:** v1.0 — stable API freeze. Lock the directive grammar (`:::story`, `:::props`), the adapter contract (`MarkbookAdapter`), the wrapper / decorator API, the embed/package output formats, the `--mb-*` theme tokens, and the story-file conventions (`args`, `argTypes`, `parameters`, frontmatter `id=`/`component:`/`template:`/`slug=`). Bump versions to 0.1.0 across the workspace.
