@@ -222,8 +222,16 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   });
 
   await server.listen();
-  server.printUrls();
-  console.log('  Watching markdown + templates for changes (Ctrl-C to stop)\n');
+
+  const localUrls = server.resolvedUrls?.local ?? [];
+  const networkUrls = server.resolvedUrls?.network ?? [];
+  console.log('');
+  console.log('  Markbook dev server ready:');
+  for (const url of localUrls) console.log(`    ➜  Local:   ${url}`);
+  for (const url of networkUrls) console.log(`    ➜  Network: ${url}`);
+  console.log('');
+  console.log('  Watching markdown + templates for changes (Ctrl-C to stop)');
+  console.log('');
 
   const watchPaths = [ctx.docsDir, ...ctx.templateDirs];
   const watcher = chokidar.watch(watchPaths, {
