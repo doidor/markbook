@@ -7,5 +7,6 @@ export default defineConfig({
   docsDir: 'docs',
   outDir: 'dist',
   templatesDir: ['_layouts'],
+  css: ['./markbook.css'],
   adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 });

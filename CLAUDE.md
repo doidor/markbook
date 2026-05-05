@@ -20,6 +20,13 @@ Stories share global providers (theme, i18n, router, ...) via **decorators** —
 
 **Theming.** Each rendered page declares dark/light via `<html data-theme>`, set by an inline `<head>` script that reads `localStorage['markbook-theme']` first, falls back to `prefers-color-scheme`, and listens for clicks on `[data-markbook-theme-toggle]` to flip + persist. The colour palette is exposed entirely as `--mb-*` CSS variables (e.g. `--mb-bg`, `--mb-fg`, `--mb-accent`, `--mb-border`); a consumer can override theming by writing a small CSS file that sets these on `:root` (or scoped under `[data-theme="brand"]`). Code blocks use Shiki's dual-theme output (`themes: { light, dark }`, `defaultColor: false`) so syntax-highlighting follows `data-theme` without rebuilding.
 
+**Customization.** Three layers, in order of escalation:
+1. `css: string | string[]` in `markbook.config.ts` — paths to CSS files inlined into every page **after** the built-in stylesheet, so `:root { --mb-accent: ... }` rules win. Drop in Tailwind output (run `tailwindcss -i ... -o tailwind.css` and list it here), Open Props, or hand-rolled brand styles. Watched by `markbook dev` — edits trigger a full reload.
+2. `disableBaseCss: true` — opts out of Markbook's chrome stylesheet entirely. The placeholder classes (`.markbook-*`) and `data-*` attributes (`data-markbook-story`, `data-markbook-embed`, `data-pagefind-body`, `data-markbook-theme-toggle`, ...) stay stable as the public DOM contract; you ship every rule.
+3. `transformHtml(html, page)` — async post-processor that runs after HTML generation and before write. Receives `{ relPath, htmlRelPath, title, frontmatter }`. Use when CSS isn't enough (rewriting header markup, injecting analytics, restructuring nav).
+
+**Stories** can use any styling tool Vite supports — they're built through the project's Vite pipeline. CSS modules (`Variants.module.css` next to `Variants.stories.tsx`) work out of the box. Tailwind / PostCSS plugins / Lightning CSS are auto-detected: Markbook sets `css.postcss: <project-root>` on every Vite config, so a `postcss.config.{js,cjs,mjs}` (or `tailwind.config.*`) at the project root is picked up by all four build modes (build, dev, embed, package). Runtime CSS-in-JS (Griffel, vanilla-extract, emotion, ...) requires no Markbook config.
+
 A story file may also export `args`, `argTypes`, and `parameters`:
 - `parameters` — display options for the placeholder element. `{ layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. All adapters honour them.
 - `args` — initial prop values. The default export becomes a render function `(args) => …`. React + Vue adapters honour them; WC ignores.

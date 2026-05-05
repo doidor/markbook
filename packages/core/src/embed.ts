@@ -103,6 +103,9 @@ async function bundleEmbedOne(
     define: {
       'process.env.NODE_ENV': '"production"',
     },
+    css: {
+      postcss: ctx.root,
+    },
     build: {
       lib: {
         entry: entryAbs,
@@ -157,6 +160,9 @@ async function bundlePackageOne(
     plugins: ctx.adapterPlugins as never,
     define: {
       'process.env.NODE_ENV': '"production"',
+    },
+    css: {
+      postcss: ctx.root,
     },
     build: {
       lib: {

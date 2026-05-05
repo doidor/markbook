@@ -45,6 +45,9 @@ export interface BuildContext {
   adapterPackageName: string;
   adapterPlugins: unknown[];
   hasControls: boolean;
+  cssPaths: string[];
+  userCss: string;
+  disableBaseCss: boolean;
 }
 
 export function makeLoadTemplate(
@@ -79,6 +82,13 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   })();
   const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) => path.resolve(root, m));
   const adapterPlugins = config.adapter.vitePlugins ? await config.adapter.vitePlugins() : [];
+  const cssPaths = (() => {
+    const raw = config.css;
+    if (!raw) return [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list.map((p) => path.resolve(root, p));
+  })();
+  const userCss = await loadUserCss(cssPaths);
 
   return {
     config,
@@ -93,7 +103,23 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     adapterPackageName: config.adapter.packageName,
     adapterPlugins,
     hasControls: !!config.adapter.hasControls,
+    cssPaths,
+    userCss,
+    disableBaseCss: !!config.disableBaseCss,
   };
+}
+
+async function loadUserCss(cssPaths: string[]): Promise<string> {
+  if (cssPaths.length === 0) return '';
+  const sources: string[] = [];
+  for (const p of cssPaths) {
+    try {
+      sources.push(await fs.readFile(p, 'utf8'));
+    } catch (err) {
+      throw new Error(`Markbook: failed to read CSS file '${p}' — ${(err as Error).message}`);
+    }
+  }
+  return sources.join('\n');
 }
 
 interface WritePagesResult {
@@ -161,13 +187,24 @@ async function writePages(
       ctx.decoratorPaths,
       ctx.hasControls,
     );
-    const html = generateHtml(
+    let html = generateHtml(
       page,
       nav,
       ctx.siteTitle,
       path.basename(entryAbs),
       opts.searchEnabled,
+      ctx.userCss,
+      ctx.disableBaseCss,
     );
+
+    if (ctx.config.transformHtml) {
+      html = await ctx.config.transformHtml(html, {
+        relPath: page.relPath,
+        htmlRelPath: page.htmlRelPath,
+        title: page.parsed.title,
+        frontmatter: page.parsed.frontmatter,
+      });
+    }
 
     await fs.writeFile(entryAbs, entryCode);
     await fs.writeFile(htmlAbs, html);
@@ -188,6 +225,9 @@ export async function build(config: MarkbookConfig): Promise<void> {
     root: ctx.tmpDir,
     base: './',
     plugins: ctx.adapterPlugins as never,
+    css: {
+      postcss: ctx.root,
+    },
     build: {
       outDir: ctx.outDir,
       emptyOutDir: true,
@@ -216,6 +256,9 @@ export async function dev(config: MarkbookConfig): Promise<void> {
     base: '/',
     appType: 'mpa',
     plugins: ctx.adapterPlugins as never,
+    css: {
+      postcss: ctx.root,
+    },
     server: {
       port: config.dev?.port,
       host: config.dev?.host,
@@ -237,19 +280,22 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   console.log('  Watching markdown + templates for changes (Ctrl-C to stop)');
   console.log('');
 
-  const watchPaths = [ctx.docsDir, ...ctx.templateDirs];
+  const watchPaths = [ctx.docsDir, ...ctx.templateDirs, ...ctx.cssPaths];
   const watcher = chokidar.watch(watchPaths, {
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
   });
 
   let regenerating = false;
-  const onMdChange = async (event: 'change' | 'add' | 'unlink', file: string) => {
-    if (!file.endsWith('.md')) return;
+  const onChange = async (event: 'change' | 'add' | 'unlink', file: string) => {
+    const isMd = file.endsWith('.md');
+    const isCss = ctx.cssPaths.includes(path.resolve(file));
+    if (!isMd && !isCss) return;
     if (regenerating) return;
     regenerating = true;
     try {
       const t0 = Date.now();
+      if (isCss) ctx.userCss = await loadUserCss(ctx.cssPaths);
       await writePages(ctx, { clean: false, searchEnabled: false });
       const dt = Date.now() - t0;
       console.log(`[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`);
@@ -267,9 +313,9 @@ export async function dev(config: MarkbookConfig): Promise<void> {
       regenerating = false;
     }
   };
-  watcher.on('change', (file) => onMdChange('change', file));
-  watcher.on('add', (file) => onMdChange('add', file));
-  watcher.on('unlink', (file) => onMdChange('unlink', file));
+  watcher.on('change', (file) => onChange('change', file));
+  watcher.on('add', (file) => onChange('add', file));
+  watcher.on('unlink', (file) => onChange('unlink', file));
 
   const shutdown = async () => {
     await watcher.close();
@@ -469,6 +515,8 @@ function generateHtml(
   siteTitle: string,
   entryBasename: string,
   searchEnabled: boolean,
+  userCss: string,
+  disableBaseCss: boolean,
 ): string {
   const fromDir = path.dirname(page.htmlRelPath);
 
@@ -538,7 +586,8 @@ function generateHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>${THEME_BOOT_SCRIPT}</script>
 ${pagefindLink}
-<style>${BASE_CSS}</style>
+${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
+${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
 </head>
 <body>
 <header class="markbook-header">

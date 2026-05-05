@@ -1,7 +1,8 @@
 import { Button } from '../../../src/pixie/Button.js';
+import styles from './Variants.module.css';
 
 export default () => (
-  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+  <div className={styles.row}>
     <Button variant="primary">Primary</Button>
     <Button variant="secondary">Secondary</Button>
     <Button variant="ghost">Ghost</Button>

@@ -52,6 +52,35 @@ export interface MarkbookConfig {
     /** Version written into generated `package.json` files. Default `'0.0.1'`. */
     packageVersion?: string;
   };
+  /**
+   * Paths (relative to project root, or absolute) of CSS files inlined into
+   * every generated page after Markbook's built-in styles. Use this to override
+   * `--mb-*` tokens, drop in Tailwind output, or add brand styles. Watched in
+   * `markbook dev` — edits trigger a full reload.
+   */
+  css?: string | string[];
+  /**
+   * When `true`, Markbook's built-in chrome stylesheet is **not** inlined. Use
+   * with `css` to take full control of the chrome's look — the placeholder
+   * element classes (`.markbook-*`) and `data-*` attributes remain stable, but
+   * you provide every rule yourself.
+   */
+  disableBaseCss?: boolean;
+  /**
+   * Optional async transform that runs against each page's fully-generated
+   * HTML. Receives the page metadata so per-page decisions are possible. Use
+   * when CSS isn't enough — inject scripts, restructure DOM, swap header
+   * markup.
+   */
+  transformHtml?: (
+    html: string,
+    page: {
+      relPath: string;
+      htmlRelPath: string;
+      title: string;
+      frontmatter: Record<string, unknown>;
+    },
+  ) => string | Promise<string>;
   adapter: MarkbookAdapter;
 }
 

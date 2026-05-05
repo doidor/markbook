@@ -1,0 +1,9 @@
+/* CSS Module — class names are scoped/hashed by Vite. */
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  border: 1px dashed var(--mb-accent, #6c5ce7);
+  border-radius: 6px;
+}
