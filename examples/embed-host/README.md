@@ -1,6 +1,6 @@
 # Embed host example
 
-A static host workspace that demonstrates the two ways to consume a Markbook story externally:
+A folder of static HTML pages that demonstrates the two ways to consume a Markbook story externally. Not a workspace package — just files served directly.
 
 | Mode | File | How |
 |---|---|---|

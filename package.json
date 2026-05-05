@@ -20,7 +20,7 @@
     "example:wc:build": "pnpm --filter @markbook/example-wc-demo build",
     "example:wc:dev": "pnpm --filter @markbook/example-wc-demo dev",
     "example:wc:bundle": "pnpm --filter @markbook/example-wc-demo exec markbook bundle",
-    "example:embed-host:serve": "pnpm --filter @markbook/example-embed-host serve"
+    "example:embed-host:serve": "python3 -m http.server 4500 --directory examples"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
