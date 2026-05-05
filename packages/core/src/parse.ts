@@ -168,15 +168,7 @@ export async function parseMarkdown(
       for (const slot of slots) {
         if (slot.kind === 'story' && slot.story) {
           const files = slot.story.codeFiles ?? [];
-          const codeBlock =
-            files.length > 0
-              ? `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary>${files
-                  .map(
-                    (f) =>
-                      `<div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div>${f.codeHtml}</div>`,
-                  )
-                  .join('')}</details>`
-              : '';
+          const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(slot.story.id, files);
           slot.parent.children[slot.index] = {
             type: 'html',
             value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
@@ -256,6 +248,26 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function renderCodeDisclosure(storyId: string, files: StoryCodeFile[]): string {
+  if (files.length === 1) {
+    const f = files[0]!;
+    return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div>${f.codeHtml}</div></details>`;
+  }
+  const tabs = files
+    .map(
+      (f, i) =>
+        `<button type="button" role="tab" id="tab-${storyId}-${i}" aria-controls="panel-${storyId}-${i}" aria-selected="${i === 0 ? 'true' : 'false'}" tabindex="${i === 0 ? '0' : '-1'}">${escapeHtml(f.label)}</button>`,
+    )
+    .join('');
+  const panels = files
+    .map(
+      (f, i) =>
+        `<div role="tabpanel" id="panel-${storyId}-${i}" aria-labelledby="tab-${storyId}-${i}"${i === 0 ? '' : ' hidden'}>${f.codeHtml}</div>`,
+    )
+    .join('');
+  return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-tabs" data-markbook-tabs="${storyId}"><div class="markbook-code-tablist" role="tablist" aria-label="Story files">${tabs}</div>${panels}</div></details>`;
 }
 
 function htmlToPlainText(html: string): string {

@@ -585,6 +585,7 @@ function generateHtml(
 <title>${escapeHtml(page.parsed.title)} — ${escapeHtml(siteTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>${THEME_BOOT_SCRIPT}</script>
+<script>${TABS_BOOT_SCRIPT}</script>
 ${pagefindLink}
 ${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
 ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
@@ -627,6 +628,8 @@ function escapeHtml(s: string): string {
  * clicks on the theme toggle button to flip it.
  */
 const THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
+
+const TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closest('[data-markbook-tabs]');if(!wrap)return;var tabs=wrap.querySelectorAll('[role="tab"]');var pid=tab.getAttribute('aria-controls');for(var i=0;i<tabs.length;i++){var t=tabs[i];t.setAttribute('aria-selected',t===tab?'true':'false');t.tabIndex=t===tab?0:-1;}var panels=wrap.querySelectorAll('[role="tabpanel"]');for(var j=0;j<panels.length;j++){panels[j].hidden=panels[j].id!==pid;}}document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(t&&t.closest('[data-markbook-tabs]'))activate(t);});document.addEventListener('keydown',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(!t||!t.closest('[data-markbook-tabs]'))return;if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();var tabs=t.parentElement.querySelectorAll('[role="tab"]');var i=Array.prototype.indexOf.call(tabs,t);var n=e.key==='ArrowRight'?(i+1)%tabs.length:(i-1+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n]);});})();`;
 
 const BASE_CSS = `
 :root {
@@ -1029,6 +1032,39 @@ a:hover { text-decoration: underline; }
   background: var(--mb-bg-soft);
   border-bottom: 1px solid var(--mb-border);
 }
+.markbook-code-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  background: var(--mb-bg-soft);
+  border-bottom: 1px solid var(--mb-border);
+  padding: 0 0.5rem;
+}
+.markbook-code-tablist [role="tab"] {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--mb-font-mono);
+  font-size: 0.75rem;
+  color: var(--mb-fg-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.markbook-code-tablist [role="tab"]:hover { color: var(--mb-fg); }
+.markbook-code-tablist [role="tab"][aria-selected="true"] {
+  color: var(--mb-fg);
+  border-bottom-color: var(--mb-accent);
+}
+.markbook-code-tablist [role="tab"]:focus-visible {
+  outline: 2px solid var(--mb-accent);
+  outline-offset: -2px;
+}
+.markbook-code-tabs [role="tabpanel"] { display: block; }
+.markbook-code-tabs [role="tabpanel"][hidden] { display: none; }
+.markbook-code-tabs pre { padding: 1rem; margin: 0; overflow-x: auto; }
 .markbook-props {
   width: 100%;
   border-collapse: collapse;
