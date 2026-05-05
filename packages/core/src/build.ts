@@ -445,7 +445,7 @@ a:hover { text-decoration: underline; }
 .markbook-search-ui {
   flex: 1;
   max-width: 360px;
-  position: relative;
+  position: relative !important;
   --pagefind-ui-scale: 1;
   --pagefind-ui-primary: var(--mb-accent);
   --pagefind-ui-text: var(--mb-fg);
@@ -488,19 +488,21 @@ a:hover { text-decoration: underline; }
   background: var(--mb-bg-elev) !important;
 }
 .markbook-search-ui .pagefind-ui__drawer {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 480px;
-  max-width: calc(100vw - 3rem);
-  max-height: 70vh;
-  overflow-y: auto;
-  background: var(--mb-bg);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  left: auto !important;
+  width: 480px !important;
+  max-width: calc(100vw - 3rem) !important;
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+  background: var(--mb-bg) !important;
+  border: 1px solid var(--mb-border) !important;
+  border-radius: var(--mb-radius) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
   padding: 0.25rem 0.5rem !important;
-  z-index: 20;
+  margin: 0 !important;
+  z-index: 20 !important;
   gap: 0 !important;
   flex-direction: column !important;
 }
