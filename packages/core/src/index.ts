@@ -1,4 +1,4 @@
-export { build } from './build.js';
+export { build, dev } from './build.js';
 export { defineConfig } from './config.js';
 export { parseMarkdown } from './parse.js';
 export { extractStoryCode } from './code.js';

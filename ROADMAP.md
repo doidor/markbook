@@ -1,12 +1,8 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.2** (v0.1 + Pagefind search — see `PROGRESS.md` for details).
+Forward-looking work, ordered by priority. The current state is **v0.3** (v0.2 + `markbook dev` with HMR — see `PROGRESS.md` for details).
 
 ---
-
-## v0.3 — `markbook dev` (Vite dev server + HMR)
-
-Reuse the entry-generation pipeline against `viteServer` instead of `viteBuild`. Authoring without HMR is the single largest current friction.
 
 ## v0.4 — Vue and web-components adapters
 

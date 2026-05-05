@@ -72,3 +72,13 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 **Why:** Search is the single biggest UX gap in a multi-page docs site. Doing it now (rather than later) means every subsequent demo / component-library experiment is searchable for free. Picking Pagefind's bundled UI over `@pagefind/default-ui` saves a dep and one moving part — the UI files come out of `writeFiles` automatically.
 
 **Next:** v0.3 — `markbook dev` with HMR. The current dev story is "edit, `pnpm example:build`, refresh" which doesn't scale beyond toy demos.
+
+---
+
+## 2026-05-05 — v0.3 `markbook dev` with HMR
+
+**What changed:** Refactored `build.ts` to extract `createContext` (path/plugin resolution) and `writePages` (glob + parse + write entries/HTML to tmpDir) — both `build` and the new `dev` reuse them. Added `dev(config)` that runs `writePages` once with `searchEnabled: false`, then starts Vite's `createServer` against tmpDir with `appType: 'mpa'` and `server.fs.allow: [root]` so it can serve story files outside tmpDir. A separate **chokidar** instance (added as a core dep) watches `docsDir` and every entry of `templatesDir`; on `.md` change/add/unlink it re-runs `writePages` and tells Vite to broadcast `full-reload` over the WS. Story `.tsx` and Pixie component changes hot-reload automatically through `@vitejs/plugin-react`. New CLI command `markbook dev` (with `--port` and `--host` flags), new `dev?: { port?, host? }` field on `MarkbookConfig`, new root `example:dev` script. The HTML generator now takes a `searchEnabled` flag — in dev mode no Pagefind link/script tags are emitted (search is build-time only), and the search slot is omitted from the header so the dev page has no broken UI / 404s. `PagefindUI` init is also defensive (`typeof PagefindUI !== 'undefined'`) for resilience.
+
+**Why:** "edit → `pnpm example:build` → refresh" worked for proving the pipeline but breaks down past a handful of pages and stories. HMR lets authoring feel like working in any modern frontend project — type a prop, see it change. Vite's `server.watcher` doesn't reliably pick up files outside its `root` (which is tmpDir, sibling to docsDir), so a dedicated chokidar is the right architectural split: **Vite watches its module graph (story `.tsx`, components); chokidar watches user content (`.md`, templates).** The two never overlap. The `searchEnabled` flag is small but matters — without it, a dev page would show a broken search input that 404s on Pagefind assets.
+
+**Next:** v0.4 — Vue and web-components adapters. The dev experience is now solid enough to dogfood multi-framework support without authoring friction.

@@ -21,6 +21,13 @@ export interface MarkbookConfig {
    * Default: `'templates'`.
    */
   templatesDir?: string | string[];
+  /** Options for `markbook dev`. */
+  dev?: {
+    /** Port to bind the dev server to. Defaults to Vite's default (5173). */
+    port?: number;
+    /** Host to bind to. */
+    host?: string;
+  };
   adapter: MarkbookAdapter;
 }
 

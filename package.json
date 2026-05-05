@@ -11,7 +11,8 @@
     "build": "pnpm -r --filter './packages/*' build",
     "test": "pnpm -r --filter './packages/*' test",
     "typecheck": "pnpm -r typecheck",
-    "example:build": "pnpm --filter @markbook/example-react-demo build"
+    "example:build": "pnpm --filter @markbook/example-react-demo build",
+    "example:dev": "pnpm --filter @markbook/example-react-demo dev"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

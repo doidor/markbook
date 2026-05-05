@@ -2,7 +2,7 @@ import { cac } from 'cac';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createJiti } from 'jiti';
-import { build, type MarkbookConfig } from '@markbook/core';
+import { build, dev, type MarkbookConfig } from '@markbook/core';
 
 const CONFIG_NAMES = [
   'markbook.config.ts',
@@ -54,6 +54,40 @@ cli
       process.exit(1);
     }
   });
+
+cli
+  .command('dev', 'Start a dev server with HMR')
+  .option('-c, --config <path>', 'Path to markbook.config.{ts,mts,js,mjs}')
+  .option('--root <path>', 'Project root (defaults to cwd)')
+  .option('--port <port>', 'Port to listen on (default: 5173)')
+  .option('--host <host>', 'Host to bind to')
+  .action(
+    async (opts: {
+      root?: string;
+      config?: string;
+      port?: string;
+      host?: string;
+    }) => {
+      try {
+        const root = path.resolve(opts.root ?? process.cwd());
+        const config = await loadConfig(root, opts.config);
+        const port = opts.port ? parseInt(opts.port, 10) : undefined;
+        await dev({
+          ...config,
+          root: config.root ?? root,
+          dev: {
+            ...config.dev,
+            ...(port !== undefined ? { port } : {}),
+            ...(opts.host !== undefined ? { host: opts.host } : {}),
+          },
+        });
+      } catch (err) {
+        console.error('✗ Markbook dev failed:');
+        console.error(err);
+        process.exit(1);
+      }
+    },
+  );
 
 cli.help();
 cli.version('0.0.0');

@@ -1,8 +1,9 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
-import { build as viteBuild } from 'vite';
+import { build as viteBuild, createServer } from 'vite';
 import * as pagefind from 'pagefind';
+import chokidar from 'chokidar';
 import { parseMarkdown } from './parse.js';
 import { extractStoryCode } from './code.js';
 import { extractComponentProps } from './props.js';
@@ -31,7 +32,21 @@ interface NavGroup {
   items: NavItem[];
 }
 
-export async function build(config: MarkbookConfig): Promise<void> {
+interface BuildContext {
+  config: MarkbookConfig;
+  root: string;
+  docsDir: string;
+  outDir: string;
+  tmpDir: string;
+  templateDirs: string[];
+  wrapperPath: string | undefined;
+  siteTitle: string;
+  siteDescription: string | undefined;
+  adapterPackageName: string;
+  adapterPlugins: unknown[];
+}
+
+async function createContext(config: MarkbookConfig): Promise<BuildContext> {
   const root = path.resolve(config.root ?? process.cwd());
   const docsDir = path.resolve(root, config.docsDir ?? 'docs');
   const outDir = path.resolve(root, config.outDir ?? 'dist');
@@ -46,18 +61,47 @@ export async function build(config: MarkbookConfig): Promise<void> {
   const wrapperPath = config.adapter.wrapperModule
     ? path.resolve(root, config.adapter.wrapperModule)
     : undefined;
+  const adapterPlugins = config.adapter.vitePlugins
+    ? await config.adapter.vitePlugins()
+    : [];
 
-  await fs.rm(tmpDir, { recursive: true, force: true });
-  await fs.mkdir(tmpDir, { recursive: true });
+  return {
+    config,
+    root,
+    docsDir,
+    outDir,
+    tmpDir,
+    templateDirs,
+    wrapperPath,
+    siteTitle,
+    siteDescription,
+    adapterPackageName: config.adapter.packageName,
+    adapterPlugins,
+  };
+}
 
-  const mdFiles = await glob('**/*.md', { cwd: docsDir, absolute: true });
+interface WritePagesResult {
+  pages: PageRecord[];
+  htmlInputs: Record<string, string>;
+}
+
+async function writePages(
+  ctx: BuildContext,
+  opts: { clean: boolean; searchEnabled: boolean },
+): Promise<WritePagesResult> {
+  if (opts.clean) {
+    await fs.rm(ctx.tmpDir, { recursive: true, force: true });
+  }
+  await fs.mkdir(ctx.tmpDir, { recursive: true });
+
+  const mdFiles = await glob('**/*.md', { cwd: ctx.docsDir, absolute: true });
   if (mdFiles.length === 0) {
-    throw new Error(`No markdown files found in ${docsDir}`);
+    throw new Error(`No markdown files found in ${ctx.docsDir}`);
   }
 
   const pages: PageRecord[] = [];
   for (const file of mdFiles.sort()) {
-    const relPath = path.relative(docsDir, file);
+    const relPath = path.relative(ctx.docsDir, file);
     const noExt = relPath.replace(/\.md$/, '');
     const htmlRelPath = `${noExt}.html`;
     const entryRelPath = `${noExt}.entry.ts`;
@@ -74,9 +118,9 @@ export async function build(config: MarkbookConfig): Promise<void> {
       resolveStoryCode: (info) =>
         extractStoryCode(info.absStoryFile, info.exportName),
       resolveProps: (info) =>
-        extractComponentProps(info.absComponentFile, info.exportName, root),
+        extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
       loadTemplate: async (name) => {
-        for (const dir of templateDirs) {
+        for (const dir of ctx.templateDirs) {
           const candidate = path.join(dir, `${name}.md`);
           try {
             return await fs.readFile(candidate, 'utf8');
@@ -84,8 +128,8 @@ export async function build(config: MarkbookConfig): Promise<void> {
             if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
           }
         }
-        const searched = templateDirs
-          .map((d) => path.relative(root, d) || d)
+        const searched = ctx.templateDirs
+          .map((d) => path.relative(ctx.root, d) || d)
           .join(', ');
         throw new Error(
           `Markbook: template '${name}' not found in: ${searched}`,
@@ -108,34 +152,46 @@ export async function build(config: MarkbookConfig): Promise<void> {
 
   const htmlInputs: Record<string, string> = {};
   for (const page of pages) {
-    const htmlAbs = path.join(tmpDir, page.htmlRelPath);
-    const entryAbs = path.join(tmpDir, page.entryRelPath);
+    const htmlAbs = path.join(ctx.tmpDir, page.htmlRelPath);
+    const entryAbs = path.join(ctx.tmpDir, page.entryRelPath);
     await fs.mkdir(path.dirname(htmlAbs), { recursive: true });
 
     const entryCode = generateEntry(
       page.parsed.stories,
       path.dirname(page.file),
-      config.adapter.packageName,
+      ctx.adapterPackageName,
       path.dirname(entryAbs),
-      wrapperPath,
+      ctx.wrapperPath,
     );
-    const html = generateHtml(page, nav, siteTitle, path.basename(entryAbs));
+    const html = generateHtml(
+      page,
+      nav,
+      ctx.siteTitle,
+      path.basename(entryAbs),
+      opts.searchEnabled,
+    );
 
     await fs.writeFile(entryAbs, entryCode);
     await fs.writeFile(htmlAbs, html);
     htmlInputs[page.fileId] = htmlAbs;
   }
 
-  const adapterPlugins = config.adapter.vitePlugins
-    ? await config.adapter.vitePlugins()
-    : [];
+  return { pages, htmlInputs };
+}
+
+export async function build(config: MarkbookConfig): Promise<void> {
+  const ctx = await createContext(config);
+  const { pages, htmlInputs } = await writePages(ctx, {
+    clean: true,
+    searchEnabled: true,
+  });
 
   await viteBuild({
-    root: tmpDir,
+    root: ctx.tmpDir,
     base: './',
-    plugins: adapterPlugins as never,
+    plugins: ctx.adapterPlugins as never,
     build: {
-      outDir,
+      outDir: ctx.outDir,
       emptyOutDir: true,
       rollupOptions: { input: htmlInputs },
     },
@@ -143,8 +199,75 @@ export async function build(config: MarkbookConfig): Promise<void> {
     configFile: false,
   });
 
-  await emitLlms(pages, outDir, siteTitle, siteDescription);
-  await runPagefind(outDir);
+  await emitLlms(pages, ctx.outDir, ctx.siteTitle, ctx.siteDescription);
+  await runPagefind(ctx.outDir);
+}
+
+export async function dev(config: MarkbookConfig): Promise<void> {
+  const ctx = await createContext(config);
+  await writePages(ctx, { clean: true, searchEnabled: false });
+
+  const server = await createServer({
+    root: ctx.tmpDir,
+    base: '/',
+    appType: 'mpa',
+    plugins: ctx.adapterPlugins as never,
+    server: {
+      port: config.dev?.port,
+      host: config.dev?.host,
+      fs: { allow: [ctx.root] },
+    },
+    logLevel: 'warn',
+    configFile: false,
+  });
+
+  await server.listen();
+  server.printUrls();
+  console.log('  Watching markdown + templates for changes (Ctrl-C to stop)\n');
+
+  const watchPaths = [ctx.docsDir, ...ctx.templateDirs];
+  const watcher = chokidar.watch(watchPaths, {
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
+  });
+
+  let regenerating = false;
+  const onMdChange = async (event: 'change' | 'add' | 'unlink', file: string) => {
+    if (!file.endsWith('.md')) return;
+    if (regenerating) return;
+    regenerating = true;
+    try {
+      const t0 = Date.now();
+      await writePages(ctx, { clean: false, searchEnabled: false });
+      const dt = Date.now() - t0;
+      console.log(
+        `[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`,
+      );
+      server.ws.send({ type: 'full-reload', path: '*' });
+    } catch (err) {
+      console.error('[markbook] regeneration failed:', err);
+      server.ws.send({
+        type: 'error',
+        err: {
+          message: (err as Error).message,
+          stack: (err as Error).stack ?? '',
+        },
+      });
+    } finally {
+      regenerating = false;
+    }
+  };
+  watcher.on('change', (file) => onMdChange('change', file));
+  watcher.on('add', (file) => onMdChange('add', file));
+  watcher.on('unlink', (file) => onMdChange('unlink', file));
+
+  const shutdown = async () => {
+    await watcher.close();
+    await server.close();
+    process.exit(0);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
 
 async function runPagefind(outDir: string): Promise<void> {
@@ -295,6 +418,7 @@ function generateHtml(
   nav: NavGroup[],
   siteTitle: string,
   entryBasename: string,
+  searchEnabled: boolean,
 ): string {
   const fromDir = path.dirname(page.htmlRelPath);
 
@@ -349,19 +473,36 @@ function generateHtml(
   const shellClass =
     tocItems.length > 0 ? 'markbook-shell' : 'markbook-shell no-toc';
 
+  const pagefindLink = searchEnabled
+    ? `<link href="${pagefindBase}/pagefind-ui.css" rel="stylesheet">`
+    : '';
+  const searchSlot = searchEnabled
+    ? '<div id="markbook-search-ui" class="markbook-search-ui"></div>'
+    : '';
+  const pagefindScripts = searchEnabled
+    ? `<script src="${pagefindBase}/pagefind-ui.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (typeof PagefindUI !== 'undefined') {
+      new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
+    }
+  });
+</script>`
+    : '';
+
   return `<!doctype html>
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(page.parsed.title)} — ${escapeHtml(siteTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="${pagefindBase}/pagefind-ui.css" rel="stylesheet">
+${pagefindLink}
 <style>${BASE_CSS}</style>
 </head>
 <body>
 <header class="markbook-header">
   <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(siteTitle)}</a>
-  <div id="markbook-search-ui" class="markbook-search-ui"></div>
+  ${searchSlot}
 </header>
 <div class="${shellClass}">
   <aside class="markbook-sidebar">
@@ -374,12 +515,7 @@ ${page.parsed.html}
   </main>
   ${tocBlock}
 </div>
-<script src="${pagefindBase}/pagefind-ui.js"></script>
-<script>
-  window.addEventListener('DOMContentLoaded', () => {
-    new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
-  });
-</script>
+${pagefindScripts}
 <script type="module" src="./${entryBasename}"></script>
 </body>
 </html>
