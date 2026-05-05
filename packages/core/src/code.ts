@@ -32,11 +32,11 @@ export async function extractStoryCode(
     if (ts.isVariableStatement(stmt)) {
       for (const decl of stmt.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && decl.name.text === exportName) {
-          return buildResult(source, stmt.getStart(sourceFile), stmt.getEnd());
+          return buildResult(absStoryFile, source, stmt.getStart(sourceFile), stmt.getEnd());
         }
       }
     } else if (ts.isFunctionDeclaration(stmt) && stmt.name?.text === exportName) {
-      return buildResult(source, stmt.getStart(sourceFile), stmt.getEnd());
+      return buildResult(absStoryFile, source, stmt.getStart(sourceFile), stmt.getEnd());
     }
   }
 
@@ -50,11 +50,22 @@ function hasExportModifier(node: ts.Node): boolean {
 }
 
 async function buildResult(
+  filePath: string,
   source: string,
   start: number,
   end: number,
 ): Promise<{ code: string; codeHtml: string }> {
   const code = source.slice(start, end).trim();
-  const codeHtml = await codeToHtml(code, { lang: 'tsx', theme: 'github-light' });
+  const codeHtml = await codeToHtml(code, {
+    lang: langFor(filePath),
+    theme: 'github-light',
+  });
   return { code, codeHtml };
+}
+
+function langFor(filePath: string): 'tsx' | 'jsx' | 'ts' | 'js' {
+  if (filePath.endsWith('.tsx')) return 'tsx';
+  if (filePath.endsWith('.jsx')) return 'jsx';
+  if (filePath.endsWith('.js')) return 'js';
+  return 'ts';
 }

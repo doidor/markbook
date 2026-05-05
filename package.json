@@ -12,7 +12,11 @@
     "test": "pnpm -r --filter './packages/*' test",
     "typecheck": "pnpm -r typecheck",
     "example:build": "pnpm --filter @markbook/example-react-demo build",
-    "example:dev": "pnpm --filter @markbook/example-react-demo dev"
+    "example:dev": "pnpm --filter @markbook/example-react-demo dev",
+    "example:vue:build": "pnpm --filter @markbook/example-vue-demo build",
+    "example:vue:dev": "pnpm --filter @markbook/example-vue-demo dev",
+    "example:wc:build": "pnpm --filter @markbook/example-wc-demo build",
+    "example:wc:dev": "pnpm --filter @markbook/example-wc-demo dev"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

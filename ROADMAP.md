@@ -1,12 +1,8 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.3** (v0.2 + `markbook dev` with HMR — see `PROGRESS.md` for details).
+Forward-looking work, ordered by priority. The current state is **v0.4** (v0.3 + Vue and web-components adapters with their own demos — see `PROGRESS.md` for details).
 
 ---
-
-## v0.4 — Vue and web-components adapters
-
-Validate the framework-agnostic claim. Mostly a matter of writing two thin packages following the **ADR-0005** browser/config split. Will reveal whether the wrapper API needs to be adapter-agnostic.
 
 ## v0.5 — Story portability (ADR-0006)
 
