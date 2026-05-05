@@ -1,0 +1,61 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--pixie-text);
+}
+
+.wrap.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.track {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.bar {
+  position: absolute;
+  inset: 0;
+  background: var(--pixie-border);
+  border-radius: var(--pixie-radius-pill);
+  transition: background var(--pixie-transition);
+}
+
+.barOn {
+  background: var(--pixie-primary);
+}
+
+.thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--pixie-bg);
+  border-radius: 50%;
+  box-shadow: var(--pixie-shadow-thumb);
+  transition: left var(--pixie-transition);
+}
+
+.thumbOn {
+  left: 16px;
+}
+
+.input:focus-visible + .bar {
+  outline: 2px solid var(--pixie-primary);
+  outline-offset: 2px;
+}

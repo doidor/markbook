@@ -1,0 +1,48 @@
+:root {
+  --pixie-primary: #6c5ce7;
+  --pixie-primary-hover: #5849d6;
+  --pixie-danger: #e63946;
+  --pixie-danger-hover: #cf2e3b;
+
+  --pixie-text: #1a1a1a;
+  --pixie-text-on-primary: #ffffff;
+  --pixie-text-muted: #5b5b66;
+
+  --pixie-bg: #ffffff;
+  --pixie-bg-soft: #f1f1f5;
+  --pixie-bg-disabled: #f7f7f9;
+  --pixie-bg-img: #eeeeee;
+
+  --pixie-border: #d6d6db;
+  --pixie-border-soft: #e6e6eb;
+
+  --pixie-radius-sm: 6px;
+  --pixie-radius-md: 8px;
+  --pixie-radius-pill: 9999px;
+
+  --pixie-shadow-elev: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --pixie-shadow-thumb: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+  --pixie-transition: 0.15s ease;
+}
+
+[data-theme="dark"] {
+  --pixie-primary: #8a7cf0;
+  --pixie-primary-hover: #a294f5;
+  --pixie-danger: #ef5c66;
+  --pixie-danger-hover: #f37e85;
+
+  --pixie-text: #e6e6eb;
+  --pixie-text-muted: #a0a0aa;
+
+  --pixie-bg: #1f1f24;
+  --pixie-bg-soft: #2a2a30;
+  --pixie-bg-disabled: #25252a;
+  --pixie-bg-img: #2a2a30;
+
+  --pixie-border: #3a3a42;
+  --pixie-border-soft: #2a2a30;
+
+  --pixie-shadow-elev: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --pixie-shadow-thumb: 0 1px 2px rgba(0, 0, 0, 0.6);
+}

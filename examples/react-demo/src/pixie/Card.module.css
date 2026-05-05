@@ -1,0 +1,28 @@
+.card {
+  background: var(--pixie-bg);
+  border: 1px solid var(--pixie-border-soft);
+  border-radius: var(--pixie-radius-md);
+  font-family: inherit;
+  color: var(--pixie-text);
+  max-width: 360px;
+}
+
+.elevated {
+  box-shadow: var(--pixie-shadow-elev);
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.padSm {
+  padding: 0.75rem;
+}
+.padMd {
+  padding: 1.25rem;
+}
+.padLg {
+  padding: 1.75rem;
+}

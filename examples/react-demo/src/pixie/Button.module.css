@@ -1,0 +1,71 @@
+.button {
+  font-family: inherit;
+  font-weight: 500;
+  border-radius: var(--pixie-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--pixie-transition),
+    color var(--pixie-transition),
+    opacity var(--pixie-transition);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--pixie-primary);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  background: var(--pixie-primary);
+  color: var(--pixie-text-on-primary);
+}
+.primary:not(:disabled):hover {
+  background: var(--pixie-primary-hover);
+}
+
+.secondary {
+  background: var(--pixie-bg-soft);
+  color: var(--pixie-text);
+  border-color: var(--pixie-border);
+}
+.secondary:not(:disabled):hover {
+  background: var(--pixie-border-soft);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--pixie-primary);
+}
+.ghost:not(:disabled):hover {
+  background: var(--pixie-bg-soft);
+}
+
+.danger {
+  background: var(--pixie-danger);
+  color: var(--pixie-text-on-primary);
+}
+.danger:not(:disabled):hover {
+  background: var(--pixie-danger-hover);
+}
+
+.sm {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+.md {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+}
+.lg {
+  padding: 0.65rem 1.2rem;
+  font-size: 1rem;
+}
+
+.fullWidth {
+  width: 100%;
+}

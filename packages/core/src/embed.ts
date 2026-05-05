@@ -1,10 +1,48 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
-import { build as viteBuild } from 'vite';
+import { build as viteBuild, type Plugin } from 'vite';
 import { parseMarkdown } from './parse.js';
 import { createContext, makeLoadTemplate, type BuildContext } from './build.js';
 import type { MarkbookConfig } from './config.js';
+
+/**
+ * Inline any CSS Vite extracted alongside a library build into the entry
+ * chunk, so each bundle stays self-contained (the host page mounts via a
+ * single `<script type="module">` and gets working styles, no separate
+ * `<link rel="stylesheet">` to remember). The injected snippet is dedup-keyed
+ * per build so multiple mounts of the same bundle insert the `<style>` once.
+ *
+ * Note: this targets `document.head`, so shadow-isolated mounts still see the
+ * styles from the host's light DOM. Shadow-scoped CSS injection is a future
+ * enhancement.
+ */
+function inlineExtractedCssPlugin(slug: string): Plugin {
+  return {
+    name: 'markbook-inline-extracted-css',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_opts, bundle) {
+      let css = '';
+      for (const [name, chunk] of Object.entries(bundle)) {
+        if (chunk.type === 'asset' && name.endsWith('.css')) {
+          css +=
+            typeof chunk.source === 'string'
+              ? chunk.source
+              : Buffer.from(chunk.source).toString('utf8');
+          delete bundle[name];
+        }
+      }
+      if (!css) return;
+      const inject = `(()=>{if(typeof document==='undefined')return;const k=${JSON.stringify(slug)};if(document.querySelector('style[data-markbook-css="'+k+'"]'))return;const s=document.createElement('style');s.setAttribute('data-markbook-css',k);s.textContent=${JSON.stringify(css)};document.head.appendChild(s);})();\n`;
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type === 'chunk' && chunk.isEntry) {
+          chunk.code = inject + chunk.code;
+        }
+      }
+    },
+  };
+}
 
 interface DiscoveredStory {
   slug: string;
@@ -99,7 +137,7 @@ async function bundleEmbedOne(
 
   await viteBuild({
     root: ctx.root,
-    plugins: ctx.adapterPlugins as never,
+    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin(story.slug)],
     define: {
       'process.env.NODE_ENV': '"production"',
     },
@@ -157,7 +195,7 @@ async function bundlePackageOne(
 
   await viteBuild({
     root: ctx.root,
-    plugins: ctx.adapterPlugins as never,
+    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin(pkgName)],
     define: {
       'process.env.NODE_ENV': '"production"',
     },

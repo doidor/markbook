@@ -1,4 +1,6 @@
-import { type ReactNode, type CSSProperties } from 'react';
+import type { ReactNode } from 'react';
+import './pixie.css';
+import styles from './Card.module.css';
 
 /** Inner padding preset. */
 export type CardPadding = 'sm' | 'md' | 'lg';
@@ -14,28 +16,19 @@ export interface CardProps {
   children: ReactNode;
 }
 
-const PAD: Record<CardPadding, string> = {
-  sm: '0.75rem',
-  md: '1.25rem',
-  lg: '1.75rem',
+const PAD_CLASS: Record<CardPadding, string> = {
+  sm: styles.padSm,
+  md: styles.padMd,
+  lg: styles.padLg,
 };
 
 export function Card({ title, padding = 'md', elevated = false, children }: CardProps) {
-  const style: CSSProperties = {
-    background: 'white',
-    border: '1px solid #e6e6eb',
-    borderRadius: 8,
-    padding: PAD[padding],
-    boxShadow: elevated ? '0 4px 16px rgba(0,0,0,0.08)' : 'none',
-    fontFamily: 'inherit',
-    color: '#1a1a1a',
-    maxWidth: 360,
-  };
+  const className = [styles.card, PAD_CLASS[padding], elevated ? styles.elevated : null]
+    .filter(Boolean)
+    .join(' ');
   return (
-    <div style={style}>
-      {title ? (
-        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 600 }}>{title}</h3>
-      ) : null}
+    <div className={className}>
+      {title ? <h3 className={styles.title}>{title}</h3> : null}
       {children}
     </div>
   );

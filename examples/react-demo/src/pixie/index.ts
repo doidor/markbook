@@ -1,3 +1,5 @@
+import './pixie.css';
+
 export { Avatar } from './Avatar.js';
 export type { AvatarProps, AvatarSize, AvatarShape } from './Avatar.js';
 export { Button } from './Button.js';

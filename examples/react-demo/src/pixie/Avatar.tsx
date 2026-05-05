@@ -1,4 +1,6 @@
-import { type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
+import './pixie.css';
+import styles from './Avatar.module.css';
 
 /** Avatar size preset. */
 export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -17,8 +19,6 @@ export interface AvatarProps {
   shape?: AvatarShape;
 }
 
-const SIZE_PX: Record<AvatarSize, number> = { sm: 24, md: 32, lg: 48, xl: 64 };
-
 function initialsOf(name: string): string {
   return name
     .split(/\s+/)
@@ -35,30 +35,13 @@ function colorFor(name: string): string {
 }
 
 export function Avatar({ name, src, size = 'md', shape = 'circle' }: AvatarProps) {
-  const px = SIZE_PX[size];
-  const style: CSSProperties = {
-    width: px,
-    height: px,
-    borderRadius: shape === 'circle' ? '50%' : 6,
-    background: src ? '#eee' : colorFor(name),
-    color: 'white',
-    fontSize: px * 0.4,
-    fontWeight: 600,
-    fontFamily: 'inherit',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    userSelect: 'none',
-    flexShrink: 0,
-  };
+  const className = [styles.avatar, styles[size], styles[shape], src ? styles.imageHost : null]
+    .filter(Boolean)
+    .join(' ');
+  const style: CSSProperties | undefined = src ? undefined : { background: colorFor(name) };
   return (
-    <div role="img" style={style} aria-label={name} title={name}>
-      {src ? (
-        <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        initialsOf(name)
-      )}
+    <div role="img" className={className} style={style} aria-label={name} title={name}>
+      {src ? <img src={src} alt={name} className={styles.image} /> : initialsOf(name)}
     </div>
   );
 }

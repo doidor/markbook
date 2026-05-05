@@ -1,4 +1,6 @@
 import { type ChangeEvent, useState } from 'react';
+import './pixie.css';
+import styles from './Switch.module.css';
 
 export interface SwitchProps {
   /** Controlled checked state. */
@@ -29,51 +31,23 @@ export function Switch({
     onChange?.(e.target.checked);
   }
 
+  const wrapClass = [styles.wrap, disabled ? styles.disabled : null].filter(Boolean).join(' ');
+  const barClass = [styles.bar, isOn ? styles.barOn : null].filter(Boolean).join(' ');
+  const thumbClass = [styles.thumb, isOn ? styles.thumbOn : null].filter(Boolean).join(' ');
+
   return (
-    <label
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        fontFamily: 'inherit',
-        fontSize: '0.9rem',
-        opacity: disabled ? 0.55 : 1,
-      }}
-    >
-      <span style={{ position: 'relative', display: 'inline-block', width: 32, height: 18 }}>
+    <label className={wrapClass}>
+      <span className={styles.track}>
         <input
           type="checkbox"
-          style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+          className={styles.input}
           checked={isControlled ? !!checked : undefined}
           defaultChecked={!isControlled ? defaultChecked : undefined}
           disabled={disabled}
           onChange={handleChange}
         />
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: isOn ? '#6c5ce7' : '#d6d6db',
-            borderRadius: 9999,
-            transition: 'background 0.15s',
-          }}
-        />
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            top: 2,
-            left: isOn ? 16 : 2,
-            width: 14,
-            height: 14,
-            background: 'white',
-            borderRadius: '50%',
-            transition: 'left 0.15s',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-          }}
-        />
+        <span aria-hidden className={barClass} />
+        <span aria-hidden className={thumbClass} />
       </span>
       {label}
     </label>

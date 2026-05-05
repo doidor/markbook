@@ -1,0 +1,49 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  flex-shrink: 0;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--pixie-text-on-primary);
+}
+
+.circle {
+  border-radius: 50%;
+}
+.square {
+  border-radius: var(--pixie-radius-sm);
+}
+
+.sm {
+  width: 24px;
+  height: 24px;
+  font-size: calc(24px * 0.4);
+}
+.md {
+  width: 32px;
+  height: 32px;
+  font-size: calc(32px * 0.4);
+}
+.lg {
+  width: 48px;
+  height: 48px;
+  font-size: calc(48px * 0.4);
+}
+.xl {
+  width: 64px;
+  height: 64px;
+  font-size: calc(64px * 0.4);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageHost {
+  background: var(--pixie-bg-img);
+}

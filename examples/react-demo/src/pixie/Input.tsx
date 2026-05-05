@@ -1,4 +1,6 @@
-import { type ChangeEvent, type CSSProperties } from 'react';
+import type { ChangeEvent } from 'react';
+import './pixie.css';
+import styles from './Input.module.css';
 
 /** HTML input type. */
 export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url';
@@ -35,37 +37,13 @@ export function Input({
   type = 'text',
   onChange,
 }: InputProps) {
-  const wrap: CSSProperties = {
-    display: 'inline-flex',
-    flexDirection: 'column',
-    gap: 4,
-    fontFamily: 'inherit',
-  };
-  const labelStyle: CSSProperties = {
-    fontSize: '0.85rem',
-    fontWeight: 500,
-    color: '#1a1a1a',
-  };
-  const inputStyle: CSSProperties = {
-    padding: '0.45rem 0.7rem',
-    fontSize: '0.9rem',
-    border: `1px solid ${error ? '#e63946' : '#d6d6db'}`,
-    borderRadius: 6,
-    fontFamily: 'inherit',
-    color: '#1a1a1a',
-    background: disabled ? '#f7f7f9' : 'white',
-    minWidth: 240,
-    outline: 'none',
-  };
-  const messageStyle: CSSProperties = {
-    fontSize: '0.78rem',
-    color: error ? '#e63946' : '#5b5b66',
-  };
+  const inputClass = [styles.input, error ? styles.error : null].filter(Boolean).join(' ');
+  const messageClass = [styles.message, error ? styles.error : null].filter(Boolean).join(' ');
   return (
-    <label style={wrap}>
-      {label ? <span style={labelStyle}>{label}</span> : null}
+    <label className={styles.wrap}>
+      {label ? <span className={styles.label}>{label}</span> : null}
       <input
-        style={inputStyle}
+        className={inputClass}
         value={value}
         defaultValue={defaultValue}
         placeholder={placeholder}
@@ -73,7 +51,7 @@ export function Input({
         type={type}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange?.(e.target.value)}
       />
-      {error || hint ? <span style={messageStyle}>{error ?? hint}</span> : null}
+      {error || hint ? <span className={messageClass}>{error ?? hint}</span> : null}
     </label>
   );
 }
