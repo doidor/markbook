@@ -14,9 +14,16 @@ interface DiscoveredStory {
   absStoryFile: string;
 }
 
+export type BundleMode = 'embed' | 'package';
+export type BundleIsolation = 'shadow';
+
 export interface BundleEmbedOptions {
   /** If set, bundle only the story with this slug. Otherwise bundles every story. */
   storyId?: string;
+  /** `'embed'` (default) or `'package'`. */
+  mode?: BundleMode;
+  /** Wrap the mount in an open shadow root so host-page CSS doesn't leak in. */
+  isolation?: BundleIsolation;
 }
 
 export async function bundleEmbed(
@@ -24,12 +31,18 @@ export async function bundleEmbed(
   opts: BundleEmbedOptions = {},
 ): Promise<void> {
   const ctx = await createContext(config);
-  const tmpDir = path.join(ctx.tmpDir, 'embed');
-  const outEmbedDir = path.join(ctx.outDir, 'embed');
+  const mode: BundleMode = opts.mode ?? 'embed';
+  const isolation = opts.isolation;
+
+  const tmpDir = path.join(ctx.tmpDir, mode);
+  const outRoot =
+    mode === 'package'
+      ? path.join(ctx.outDir, 'packages')
+      : path.join(ctx.outDir, 'embed');
 
   await fs.rm(tmpDir, { recursive: true, force: true });
   await fs.mkdir(tmpDir, { recursive: true });
-  await fs.mkdir(outEmbedDir, { recursive: true });
+  await fs.mkdir(outRoot, { recursive: true });
 
   const stories = await discoverStories(ctx);
   if (stories.length === 0) {
@@ -48,27 +61,37 @@ export async function bundleEmbed(
   }
 
   for (const story of targets) {
-    await bundleOne(ctx, story, tmpDir, outEmbedDir);
+    if (mode === 'embed') {
+      await bundleEmbedOne(ctx, story, tmpDir, outRoot, isolation);
+    } else {
+      await bundlePackageOne(ctx, story, tmpDir, outRoot, isolation);
+    }
   }
 
-  await fs.writeFile(
-    path.join(outEmbedDir, 'index.html'),
-    generateSandboxHtml(targets, ctx.siteTitle),
-  );
+  if (mode === 'embed') {
+    await fs.writeFile(
+      path.join(outRoot, 'index.html'),
+      generateSandboxHtml(targets, ctx.siteTitle),
+    );
+  }
 
+  const summary = `${targets.length} ${targets.length === 1 ? 'story' : 'stories'}`;
   console.log(
-    `✓ Bundled ${targets.length} ${targets.length === 1 ? 'story' : 'stories'} → ${path.relative(ctx.root, outEmbedDir)}`,
+    `✓ Bundled ${summary} (${mode}${isolation ? `, isolation=${isolation}` : ''}) → ${path.relative(ctx.root, outRoot)}`,
   );
-  console.log(
-    `  Sandbox: ${path.relative(ctx.root, path.join(outEmbedDir, 'index.html'))}`,
-  );
+  if (mode === 'embed') {
+    console.log(
+      `  Sandbox: ${path.relative(ctx.root, path.join(outRoot, 'index.html'))}`,
+    );
+  }
 }
 
-async function bundleOne(
+async function bundleEmbedOne(
   ctx: BuildContext,
   story: DiscoveredStory,
   tmpDir: string,
-  outEmbedDir: string,
+  outDir: string,
+  isolation: BundleIsolation | undefined,
 ): Promise<void> {
   const entryAbs = path.join(tmpDir, `${story.slug}.entry.ts`);
   const entryCode = generateEmbedEntry(
@@ -76,6 +99,7 @@ async function bundleOne(
     ctx.adapterPackageName,
     ctx.wrapperPath,
     tmpDir,
+    isolation,
   );
   await fs.writeFile(entryAbs, entryCode);
 
@@ -91,7 +115,7 @@ async function bundleOne(
         formats: ['es'],
         fileName: () => `${story.slug}.js`,
       },
-      outDir: outEmbedDir,
+      outDir,
       emptyOutDir: false,
       cssCodeSplit: false,
       minify: 'esbuild',
@@ -102,6 +126,113 @@ async function bundleOne(
     logLevel: 'warn',
     configFile: false,
   });
+}
+
+async function bundlePackageOne(
+  ctx: BuildContext,
+  story: DiscoveredStory,
+  tmpDir: string,
+  outRoot: string,
+  isolation: BundleIsolation | undefined,
+): Promise<void> {
+  const peerDeps = ctx.config.adapter.packagePeerDeps ?? [];
+  const scope = ctx.config.bundle?.packageScope;
+  const version = ctx.config.bundle?.packageVersion ?? '0.0.1';
+  const pkgName = scope ? `${scope}/${story.slug}` : story.slug;
+
+  const pkgDir = path.join(outRoot, story.slug);
+  await fs.rm(pkgDir, { recursive: true, force: true });
+  await fs.mkdir(path.join(pkgDir, 'dist'), { recursive: true });
+
+  const entryAbs = path.join(tmpDir, `${story.slug}.entry.ts`);
+  const entryCode = generatePackageEntry(
+    story,
+    ctx.adapterPackageName,
+    ctx.wrapperPath,
+    tmpDir,
+    isolation,
+  );
+  await fs.writeFile(entryAbs, entryCode);
+
+  await viteBuild({
+    root: ctx.root,
+    plugins: ctx.adapterPlugins as never,
+    define: {
+      'process.env.NODE_ENV': '"production"',
+    },
+    build: {
+      lib: {
+        entry: entryAbs,
+        formats: ['es'],
+        fileName: () => 'index.js',
+      },
+      outDir: path.join(pkgDir, 'dist'),
+      emptyOutDir: false,
+      cssCodeSplit: false,
+      minify: 'esbuild',
+      rollupOptions: {
+        external: peerDeps,
+      },
+    },
+    logLevel: 'warn',
+    configFile: false,
+  });
+
+  await fs.writeFile(
+    path.join(pkgDir, 'package.json'),
+    `${JSON.stringify(buildPackageJson(pkgName, version, peerDeps), null, 2)}\n`,
+  );
+  await fs.writeFile(
+    path.join(pkgDir, 'README.md'),
+    generatePackageReadme(pkgName, story),
+  );
+}
+
+function buildPackageJson(
+  name: string,
+  version: string,
+  peerDeps: string[],
+): Record<string, unknown> {
+  const peerDependencies: Record<string, string> = {};
+  for (const dep of peerDeps) peerDependencies[dep] = '*';
+  const out: Record<string, unknown> = {
+    name,
+    version,
+    type: 'module',
+    main: './dist/index.js',
+    exports: {
+      '.': './dist/index.js',
+    },
+    sideEffects: false,
+  };
+  if (peerDeps.length > 0) out.peerDependencies = peerDependencies;
+  return out;
+}
+
+function generatePackageReadme(
+  pkgName: string,
+  story: DiscoveredStory,
+): string {
+  return `# ${pkgName}
+
+A portable Markbook story bundled from \`${story.pageRelPath}\` (\`${story.slug}\`).
+
+## Install
+
+\`\`\`bash
+npm install ${pkgName}
+\`\`\`
+
+## Mount
+
+\`\`\`js
+import { mount } from '${pkgName}';
+
+mount(document.getElementById('here'));
+\`\`\`
+
+The default export is the story's component / factory. Re-export from \`@markbook/core\` is not bundled — only the story, the user-configured \`wrapper\`, and the adapter \`mount\` are. Framework runtimes (e.g. \`react\`, \`react-dom\`, \`vue\`) are declared as peer dependencies — bring your own.
+`;
 }
 
 async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
@@ -121,9 +252,10 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
     for (const story of parsed.stories) {
       const absStoryFile = path.resolve(path.dirname(mdFile), story.src);
       const docsRel = path.relative(ctx.docsDir, absStoryFile);
-      const slug = slugify(
+      const derivedSlug = slugify(
         docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''),
       );
+      const slug = story.slug ?? derivedSlug;
       stories.push({
         slug,
         pageRelPath: path.relative(ctx.docsDir, mdFile),
@@ -145,44 +277,100 @@ function slugify(s: string): string {
     .toLowerCase();
 }
 
+function buildEntryImports(
+  story: DiscoveredStory,
+  adapterPkg: string,
+  wrapperPath: string | undefined,
+  entryDir: string,
+): { imports: string; storyRef: string; wrapperRef: string | undefined } {
+  const lines: string[] = [
+    `import { mount as adapterMount } from ${JSON.stringify(adapterPkg)};`,
+  ];
+  let wrapperRef: string | undefined;
+  if (wrapperPath) {
+    let rel = path.relative(entryDir, wrapperPath).replace(/\\/g, '/');
+    if (!rel.startsWith('.')) rel = `./${rel}`;
+    lines.push(`import Wrapper from ${JSON.stringify(rel)};`);
+    wrapperRef = 'Wrapper';
+  }
+  let storyRel = path
+    .relative(entryDir, story.absStoryFile)
+    .replace(/\\/g, '/');
+  if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
+  if (story.exportName === 'default') {
+    lines.push(`import Story from ${JSON.stringify(storyRel)};`);
+  } else {
+    lines.push(
+      `import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`,
+    );
+  }
+  return { imports: lines.join('\n'), storyRef: 'Story', wrapperRef };
+}
+
+function buildMountOptsLiteral(
+  wrapperRef: string | undefined,
+  isolation: BundleIsolation | undefined,
+): string {
+  const fields: string[] = [];
+  if (wrapperRef) fields.push(`wrapper: ${wrapperRef}`);
+  if (isolation) fields.push(`isolation: ${JSON.stringify(isolation)}`);
+  return fields.length > 0 ? `, { ${fields.join(', ')} }` : '';
+}
+
 function generateEmbedEntry(
   story: DiscoveredStory,
   adapterPkg: string,
   wrapperPath: string | undefined,
   entryDir: string,
+  isolation: BundleIsolation | undefined,
 ): string {
-  const importLines: string[] = [
-    `import { mount } from ${JSON.stringify(adapterPkg)};`,
-  ];
+  const { imports, storyRef, wrapperRef } = buildEntryImports(
+    story,
+    adapterPkg,
+    wrapperPath,
+    entryDir,
+  );
+  const optsArg = buildMountOptsLiteral(wrapperRef, isolation);
 
-  if (wrapperPath) {
-    let rel = path.relative(entryDir, wrapperPath).replace(/\\/g, '/');
-    if (!rel.startsWith('.')) rel = `./${rel}`;
-    importLines.push(`import Wrapper from ${JSON.stringify(rel)};`);
-  }
-
-  let storyRel = path
-    .relative(entryDir, story.absStoryFile)
-    .replace(/\\/g, '/');
-  if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
-
-  if (story.exportName === 'default') {
-    importLines.push(`import Story from ${JSON.stringify(storyRel)};`);
-  } else {
-    importLines.push(
-      `import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`,
-    );
-  }
-
-  const wrapperArg = wrapperPath ? ', { wrapper: Wrapper }' : '';
-
-  return `${importLines.join('\n')}
+  return `${imports}
 
 const SLUG = ${JSON.stringify(story.slug)};
 const targets = document.querySelectorAll('[data-markbook-embed="' + SLUG + '"]');
 for (const el of targets) {
-  mount(el, Story${wrapperArg});
+  adapterMount(el, ${storyRef}${optsArg});
 }
+`;
+}
+
+function generatePackageEntry(
+  story: DiscoveredStory,
+  adapterPkg: string,
+  wrapperPath: string | undefined,
+  entryDir: string,
+  isolation: BundleIsolation | undefined,
+): string {
+  const { imports, storyRef, wrapperRef } = buildEntryImports(
+    story,
+    adapterPkg,
+    wrapperPath,
+    entryDir,
+  );
+  const baseOpts = buildMountOptsLiteral(wrapperRef, isolation);
+
+  // Allow callers to override / extend opts (their opts win).
+  const optsExpr = baseOpts
+    ? `Object.assign({}${baseOpts.replace(/^,\s*/, ', ')}, opts || {})`
+    : `opts || {}`;
+
+  return `${imports}
+
+export const story = ${storyRef};
+
+export function mount(el, opts) {
+  return adapterMount(el, ${storyRef}, ${optsExpr});
+}
+
+export default mount;
 `;
 }
 

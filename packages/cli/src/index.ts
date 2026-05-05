@@ -92,21 +92,34 @@ cli
 cli
   .command(
     'bundle [storyId]',
-    'Bundle one (or every) story as a self-mounting embeddable ESM module',
+    'Bundle one (or every) story as a portable artefact',
   )
   .option('-c, --config <path>', 'Path to markbook.config.{ts,mts,js,mjs}')
   .option('--root <path>', 'Project root (defaults to cwd)')
+  .option('--mode <mode>', 'embed (self-mounting ESM, default) | package (publishable npm)')
+  .option('--isolation <mode>', 'Wrap each mount in an open shadow root (mode: shadow)')
   .action(
     async (
       storyId: string | undefined,
-      opts: { root?: string; config?: string },
+      opts: {
+        root?: string;
+        config?: string;
+        mode?: string;
+        isolation?: string;
+      },
     ) => {
       try {
         const root = path.resolve(opts.root ?? process.cwd());
         const config = await loadConfig(root, opts.config);
+        const mode = opts.mode === 'package' ? 'package' : 'embed';
+        const isolation = opts.isolation === 'shadow' ? 'shadow' : undefined;
         await bundleEmbed(
           { ...config, root: config.root ?? root },
-          storyId ? { storyId } : {},
+          {
+            ...(storyId ? { storyId } : {}),
+            mode,
+            ...(isolation ? { isolation } : {}),
+          },
         );
       } catch (err) {
         console.error('✗ Markbook bundle failed:');

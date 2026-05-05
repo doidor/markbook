@@ -102,3 +102,21 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 **Why:** This is the most novel feature on the roadmap and the one the user flagged earliest. Embedding component stories on external pages (marketing sites, blog posts, partner docs) without an iframe means the story renders inline, inherits page typography, accepts shadow-host theming, and weighs whatever the framework requires — *no more*. The fact that the WC bundle is 1.5 KB while the Pixie/React bundle is 200 KB is the architecture working as intended: each adapter's runtime cost is paid only when used. Doing this through Vite's library mode (rather than rolling our own bundler) means we get tree-shaking, ESM output, CSS extraction, and source maps with one config object.
 
 **Next:** v0.5.1 — package mode (`--mode package` for npm-installable stories with framework as peer dep), shadow-DOM isolation (`--isolation=shadow`), and frontmatter `id:` overrides so renames don't break external embeds.
+
+---
+
+## 2026-05-05 — v0.5.1 story portability (package mode, shadow isolation, id override)
+
+**What changed:** Three features that close out ADR-0006:
+
+1. **Stable slug overrides via directive `id=`.** `parseMarkdown` now reads an optional `id` attribute off `:::story` directives into a new `StoryRef.slug` field. `embed.ts` prefers `story.slug ?? derivedSlug`. So `:::story{src=./Foo/Bar.stories.tsx id=button-primary-showcase}` always bundles to `button-primary-showcase.js` even if the file moves.
+2. **Shadow-DOM isolation.** New CLI flag `--isolation=shadow` threads through `BundleEmbedOptions.isolation` into the generated entry, which calls `mount(el, Story, { isolation: 'shadow' })`. Each adapter (`adapter-react`, `adapter-vue`, `adapter-wc`) added a `resolveMountTarget` helper that `attachShadow({ mode: 'open' })`s the host element and mounts inside (React/Vue mount inside a child div in the shadow root; WC's `innerHTML`/`appendChild` writes to the shadow root directly).
+3. **Package mode.** New CLI flag `--mode package` switches `bundleEmbed` to a different entry shape (exports `mount`, `story`, and `default`; **no** auto-mount on `data-markbook-embed`) and a different Vite build (`rollupOptions.external = adapter.packagePeerDeps`). Output goes to `dist/packages/<slug>/{package.json, dist/index.js, README.md}` and is `npm publish`-ready. Each adapter's config now declares `packagePeerDeps`: React `['react','react-dom']`, Vue `['vue']`, WC `[]`. New optional `MarkbookConfig.bundle.{packageScope, packageVersion}` for naming.
+
+Also: minor refactor — embed.ts shares `buildEntryImports` and `buildMountOptsLiteral` between the two entry generators. **ADR-0013** captures the v0.5.1 design.
+
+Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 200 KB embed), since React is now external. Shadow-DOM mode just adds a tiny `attachShadow` helper — bundle size barely moves.
+
+**Why:** With package mode, a Markbook lib can publish individual stories as npm packages whose consumers share the host's React (or Vue) instance — no React duplication, no version skew. Embed mode stays the right answer for "drop-in script tag" use cases. Shadow DOM matters whenever an external host has aggressive CSS resets that conflict with the story's component styles. The `id=` override is small but unblocks "rename without breaking embeds."
+
+**Next:** v0.6 — generalise the single `wrapper` option to a `decorators[]` array (Storybook-style ordered providers). After that, v0.7 prop controls.

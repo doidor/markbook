@@ -16,5 +16,6 @@ export function reactAdapter(opts: ReactAdapterOptions = {}): MarkbookAdapter {
     packageName: '@markbook/adapter-react',
     vitePlugins: () => reactPlugin() as unknown[],
     wrapperModule: opts.wrapper,
+    packagePeerDeps: ['react', 'react-dom'],
   };
 }

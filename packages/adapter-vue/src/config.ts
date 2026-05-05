@@ -5,5 +5,6 @@ export function vueAdapter(): MarkbookAdapter {
   return {
     packageName: '@markbook/adapter-vue',
     vitePlugins: () => [vuePlugin()] as unknown[],
+    packagePeerDeps: ['vue'],
   };
 }

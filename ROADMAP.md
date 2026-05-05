@@ -1,16 +1,6 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.5 (embed mode)** — `markbook bundle` produces self-mounting ESM modules from any story (see `PROGRESS.md` for details). Package mode + shadow-DOM isolation are still pending.
-
----
-
-## v0.5.1 — Story portability follow-ups (ADR-0006)
-
-Remaining pieces of ADR-0006 not shipped in v0.5:
-
-1. **Stories as packages** — `markbook bundle <story-id> --mode package` produces a publishable npm package directory exporting `mount(el)` (and a `<MountStory />` convenience for React), so consumers `npm i @org/story-foo` and call `mount(target)` from any framework or vanilla page. Framework runtime as a peer dep.
-2. **Shadow-DOM isolation** — `--isolation=shadow` flag wraps the mount in a shadow root so host-page CSS doesn't leak in or out.
-3. **Stable IDs via frontmatter** — currently slugs are derived from the story file path. Add a frontmatter `id:` override so users can rename files without breaking external embeds.
+Forward-looking work, ordered by priority. The current state is **v0.5.1** — `markbook bundle` supports embed + package modes, optional shadow-DOM isolation, and stable slugs via the directive `id=` attribute (see `PROGRESS.md` for details).
 
 ## v0.6 — Config-time decorators (multiple, ordered)
 

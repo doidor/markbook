@@ -10,6 +10,7 @@ const roots = new WeakMap<Element, Root>();
 
 interface MountOptions {
   wrapper?: ComponentType<{ children: ReactNode }>;
+  isolation?: 'shadow';
 }
 
 export function mount(
@@ -19,10 +20,12 @@ export function mount(
 ): void {
   if (!el) return;
 
-  let root = roots.get(el);
+  const target = resolveMountTarget(el, opts);
+
+  let root = roots.get(target);
   if (!root) {
-    root = createRoot(el);
-    roots.set(el, root);
+    root = createRoot(target);
+    roots.set(target, root);
   }
 
   let element: ReactNode;
@@ -41,4 +44,18 @@ export function mount(
   }
 
   root.render(element);
+}
+
+function resolveMountTarget(el: Element, opts?: MountOptions): Element {
+  if (opts?.isolation !== 'shadow') return el;
+  const host = el as HTMLElement;
+  let shadow = host.shadowRoot;
+  if (!shadow) shadow = host.attachShadow({ mode: 'open' });
+  let container = shadow.querySelector('.markbook-shadow-host') as HTMLElement | null;
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'markbook-shadow-host';
+    shadow.appendChild(container);
+  }
+  return container;
 }

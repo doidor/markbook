@@ -14,6 +14,8 @@ export interface StoryRef {
   id: string;
   src: string;
   exportName: string;
+  /** User-provided embed slug from the directive's `id=` attribute. Stable across file moves. */
+  slug?: string;
   code?: string;
   codeHtml?: string;
 }
@@ -104,9 +106,10 @@ export async function parseMarkdown(
           const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
           const src = attrs.src;
           const exportName = attrs.export ?? 'default';
+          const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
           if (!src) return;
           const id = `${fileId}--${storyCounter++}`;
-          const story: StoryRef = { id, src, exportName };
+          const story: StoryRef = { id, src, exportName, slug: userSlug };
           stories.push(story);
           slots.push({ kind: 'story', parent, index, start, end, story });
         } else if (node.name === 'props') {

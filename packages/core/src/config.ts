@@ -7,6 +7,13 @@ export interface MarkbookAdapter {
    * Use this for global providers (theme, i18n, router, ...).
    */
   wrapperModule?: string;
+  /**
+   * In `--mode package` bundles, these dependencies stay external (declared as
+   * peer dependencies on the published package). For React: `['react',
+   * 'react-dom']`; for Vue: `['vue']`; for vanilla web components: `[]`.
+   * Embed-mode bundles ignore this — they always inline everything.
+   */
+  packagePeerDeps?: string[];
 }
 
 export interface MarkbookConfig {
@@ -27,6 +34,13 @@ export interface MarkbookConfig {
     port?: number;
     /** Host to bind to. */
     host?: string;
+  };
+  /** Options for `markbook bundle`. */
+  bundle?: {
+    /** npm scope for `--mode package` outputs. e.g. `'@my-org'`. */
+    packageScope?: string;
+    /** Version written into generated `package.json` files. Default `'0.0.1'`. */
+    packageVersion?: string;
   };
   adapter: MarkbookAdapter;
 }
