@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.markbook/
+.DS_Store
+*.log
+.vite/
+*.tsbuildinfo

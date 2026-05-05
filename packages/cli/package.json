@@ -1,0 +1,24 @@
+{
+  "name": "markbook",
+  "version": "0.0.0",
+  "description": "Markbook CLI — build static documentation sites from markdown + component stories",
+  "type": "module",
+  "bin": {
+    "markbook": "./bin/markbook.js"
+  },
+  "files": ["dist", "bin"],
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b -w",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@markbook/core": "workspace:*",
+    "cac": "^6.7.14",
+    "jiti": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@markbook/example-react-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "markbook build",
+    "dev": "markbook dev"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@markbook/adapter-react": "workspace:*",
+    "@markbook/core": "workspace:*",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "markbook": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}
