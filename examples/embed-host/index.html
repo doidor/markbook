@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Markbook embed examples</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --fg: #1a1a1a; --muted: #5b5b66; --border: #e6e6eb; --soft: #fafafa; --accent: #4a3aff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1rem 1.5rem; color: var(--fg); line-height: 1.55; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
+  p.lede { color: var(--muted); margin: 0 0 1.5rem; }
+  ul { padding-left: 1.25rem; }
+  li { margin: 0.25rem 0; }
+  code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: var(--soft); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+  pre { background: var(--soft); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; border: 1px solid var(--border); }
+  pre code { background: transparent; padding: 0; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<h1>Markbook embed examples</h1>
+<p class="lede">Two ways to consume a Markbook story externally — both demos use the Pixie <code>Button / Variants</code> story from <code>examples/react-demo</code>.</p>
+
+<ul>
+  <li><a href="./embed.html">Embed mode</a> — drop in a <code>&lt;script type="module"&gt;</code> tag. Self-contained ESM, no host-side build.</li>
+  <li><a href="./package.html">Package mode</a> — npm-style import via importmap, framework provided by the host (~3.5 KB story bundle).</li>
+</ul>
+
+<h2>Setup</h2>
+<p>Generate the bundles from the React demo first:</p>
+<pre><code># Embed mode (all 19 Pixie stories)
+pnpm example:bundle
+
+# Package mode (one story for now)
+pnpm --filter @markbook/example-react-demo exec markbook bundle \
+    components-button-variants --mode package</code></pre>
+
+<h2>Serve</h2>
+<pre><code>pnpm example:embed-host:serve   # http://localhost:4500/embed-host/</code></pre>
+<p>The serve script roots Python's <code>http.server</code> at <code>examples/</code> so the host can resolve <code>../react-demo/dist/...</code> paths.</p>
+</body>
+</html>

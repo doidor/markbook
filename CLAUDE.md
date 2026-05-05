@@ -63,8 +63,11 @@ examples/
 
 - `pnpm install` — install workspace
 - `pnpm build` — build all packages
+- `pnpm test` — run `@markbook/core` Vitest unit tests (parse, template, code, build helpers, embed slug)
 - `pnpm typecheck` — type-check all packages
 - `pnpm example:build` — build the React demo
+- `pnpm example:bundle` — bundle React demo stories as embeddable ESM
+- `pnpm example:embed-host:serve` — serve the embed-host workspace at `http://localhost:4500/embed-host/` (demonstrates both embed and package mode consumption)
 
 ## Style
 

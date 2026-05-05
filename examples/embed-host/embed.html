@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Markbook embed mode demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --fg: #1a1a1a; --muted: #5b5b66; --border: #e6e6eb; --soft: #fafafa; --accent: #4a3aff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1rem 1.5rem; color: var(--fg); line-height: 1.55; }
+  nav { font-size: 0.85rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
+  p { margin: 0.5rem 0 1rem; }
+  p.lede { color: var(--muted); }
+  code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: var(--soft); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+  pre { background: var(--soft); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; border: 1px solid var(--border); }
+  pre code { background: transparent; padding: 0; }
+  .demo { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .demo .mount { padding: 1.25rem; background: var(--soft); border-radius: 6px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><a href="./">← All examples</a></nav>
+
+<h1>Embed mode</h1>
+<p class="lede">A Markbook story embedded externally with two lines of HTML — no iframe, no host-side build.</p>
+
+<h2>Setup</h2>
+<pre><code>cd examples/react-demo
+markbook bundle</code></pre>
+<p>Generates <code>../react-demo/dist/embed/components-button-variants.js</code>. Each bundle is a self-contained ESM module with React, Pixie's Button, and the decorator stack inlined (~200 KB minified).</p>
+
+<h2>Markup</h2>
+<pre><code>&lt;div data-markbook-embed="components-button-variants"&gt;&lt;/div&gt;
+&lt;script type="module" src="…/components-button-variants.js"&gt;&lt;/script&gt;</code></pre>
+<p>The script auto-mounts on every matching <code>&lt;div&gt;</code> at <code>DOMContentLoaded</code>.</p>
+
+<h2>Live</h2>
+<div class="demo">
+  <div class="mount" data-markbook-embed="components-button-variants"></div>
+</div>
+
+<script type="module" src="../react-demo/dist/embed/components-button-variants.js"></script>
+</body>
+</html>

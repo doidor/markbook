@@ -268,7 +268,7 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
   return stories;
 }
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s
     .replace(/[\\/]/g, '-')
     .replace(/[^a-zA-Z0-9-]+/g, '-')

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Markbook package mode demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --fg: #1a1a1a; --muted: #5b5b66; --border: #e6e6eb; --soft: #fafafa; --accent: #4a3aff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1rem 1.5rem; color: var(--fg); line-height: 1.55; }
+  nav { font-size: 0.85rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
+  p { margin: 0.5rem 0 1rem; }
+  p.lede { color: var(--muted); }
+  code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: var(--soft); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+  pre { background: var(--soft); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; border: 1px solid var(--border); }
+  pre code { background: transparent; padding: 0; }
+  .demo { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .demo .mount { padding: 1.25rem; background: var(--soft); border-radius: 6px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><a href="./">← All examples</a></nav>
+
+<h1>Package mode</h1>
+<p class="lede">The same story consumed via npm-style imports. The host provides React; the package brings the story + adapter mount + decorator stack.</p>
+
+<h2>Setup</h2>
+<pre><code>cd examples/react-demo
+markbook bundle components-button-variants --mode package</code></pre>
+<p>Generates <code>../react-demo/dist/packages/components-button-variants/</code> — a publishable npm package directory:</p>
+<pre><code>components-button-variants/
+├── package.json    (peer deps: react, react-dom)
+├── README.md
+└── dist/
+    └── index.js   (~3.5 KB, React is external)</code></pre>
+
+<h2>Markup</h2>
+<pre><code>&lt;script type="importmap"&gt;
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "components-button-variants": "…/dist/index.js"
+  }
+}
+&lt;/script&gt;
+&lt;div id="here"&gt;&lt;/div&gt;
+&lt;script type="module"&gt;
+  import { mount } from 'components-button-variants';
+  mount(document.getElementById('here'));
+&lt;/script&gt;</code></pre>
+<p>In a real consumer project, replace the importmap with <code>npm install components-button-variants</code> + a bundler (Vite/Webpack/etc.) that resolves the bare specifiers normally.</p>
+
+<h2>Live</h2>
+<div class="demo">
+  <div class="mount" id="package-mount"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "components-button-variants": "../react-demo/dist/packages/components-button-variants/dist/index.js"
+  }
+}
+</script>
+<script type="module">
+  import { mount } from 'components-button-variants';
+  mount(document.getElementById('package-mount'));
+</script>
+</body>
+</html>

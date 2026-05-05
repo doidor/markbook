@@ -21,13 +21,13 @@ interface PageRecord {
   parsed: ParsedPage;
 }
 
-interface NavItem {
+export interface NavItem {
   id: string;
   title: string;
   htmlRelPath: string;
 }
 
-interface NavGroup {
+export interface NavGroup {
   label: string | null;
   items: NavItem[];
 }
@@ -332,7 +332,7 @@ function buildNav(pages: PageRecord[]): NavGroup[] {
   return groups;
 }
 
-function sortIndexFirst(items: NavItem[]): NavItem[] {
+export function sortIndexFirst(items: NavItem[]): NavItem[] {
   return items.slice().sort((a, b) => {
     const aIdx = isIndexHref(a.htmlRelPath);
     const bIdx = isIndexHref(b.htmlRelPath);
@@ -342,7 +342,7 @@ function sortIndexFirst(items: NavItem[]): NavItem[] {
   });
 }
 
-function isIndexHref(href: string): boolean {
+export function isIndexHref(href: string): boolean {
   return href === 'index.html' || href.endsWith('/index.html');
 }
 
@@ -399,7 +399,7 @@ function formatLinkText(page: PageRecord): string {
   return dir ? `${dir}/${page.parsed.title}` : page.parsed.title;
 }
 
-function capitalize(s: string): string {
+export function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 

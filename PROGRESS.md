@@ -130,3 +130,17 @@ Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 
 **Why:** Real component libraries need stacked providers — theme + i18n + router + analytics is normal. The single `wrapper` slot couldn't express ordering and forced users into nesting providers manually inside one wrapper component. The `decorators[]` array is Storybook's idiom and reads naturally — the first entry is the outermost. The cross-mode consistency (decorators inlined into embed and package bundles too) is what makes portable stories render identically out of context.
 
 **Next:** v0.7 — per-story `parameters` (background, viewport, layout) plus interactive prop controls layered on the existing props table.
+
+---
+
+## 2026-05-05 — Vitest unit tests + embed-host example workspace
+
+**What changed:** Two pieces of validation infrastructure that were missing.
+
+**Tests.** Added Vitest as a devDep to `@markbook/core`, wrote 37 tests across 5 files co-located with the modules they cover: `template.test.ts` (substitution, dot paths, missing keys, non-string values), `parse.test.ts` (frontmatter, story directives, `id=` slug override, `export=` default, headings + slugs, template-application, plainMarkdown stripping, props placeholder, title fallback to first H1), `code.test.ts` (missing-file null, full-source + Shiki output, `.ts` vs `.tsx` lang), `build.test.ts` (`capitalize`, `isIndexHref`, `sortIndexFirst` including nested-index handling and non-mutation), `embed.test.ts` (`slugify` — slashes, special chars, dash collapsing, Windows backslashes). Internals needed for tests are now exported (`sortIndexFirst`, `isIndexHref`, `capitalize`, `NavItem`, `NavGroup`, `slugify`). `tsconfig.json` excludes `*.test.ts` from `tsc -b` output. Root script `pnpm test` runs the suite — completes in ~1 s.
+
+**Embed-host example.** New `examples/embed-host/` workspace with three static HTML pages — `index.html` (landing with workflow docs), `embed.html` (`<script type="module">` + placeholder div consuming the React demo's embed bundle), `package.html` (importmap + `import { mount }` + manual call consuming the package bundle, with React/ReactDOM pulled from esm.sh). Served via `pnpm example:embed-host:serve` (Python http.server rooted at `examples/` so the host pages can resolve `../react-demo/dist/{embed,packages}/...` paths). README walks the user through the workflow.
+
+**Why:** The codebase had no automated tests until now — every regression had to be caught by visually inspecting demo builds. The Vitest suite captures the pure-logic features (parser directives, template substitution, slug derivation, nav sorting) that would silently break first under refactoring; demos still validate the integration. The embed-host workspace was the missing piece for v0.5 / v0.5.1: the auto-generated `dist/embed/index.html` sandbox lives *inside* the demo's dist and proves the bundle works against itself, but doesn't show what an *external* consumer's host page actually looks like — embed-host fills that gap with concrete copy-pasteable HTML for both modes.
+
+**Next:** v0.7 — per-story parameters + interactive prop controls.

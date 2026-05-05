@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm -r --filter './packages/*' build",
-    "test": "pnpm -r --filter './packages/*' test",
+    "test": "pnpm -r --filter '@markbook/core' test",
     "typecheck": "pnpm -r typecheck",
     "example:build": "pnpm --filter @markbook/example-react-demo build",
     "example:dev": "pnpm --filter @markbook/example-react-demo dev",
@@ -19,7 +19,8 @@
     "example:vue:bundle": "pnpm --filter @markbook/example-vue-demo exec markbook bundle",
     "example:wc:build": "pnpm --filter @markbook/example-wc-demo build",
     "example:wc:dev": "pnpm --filter @markbook/example-wc-demo dev",
-    "example:wc:bundle": "pnpm --filter @markbook/example-wc-demo exec markbook bundle"
+    "example:wc:bundle": "pnpm --filter @markbook/example-wc-demo exec markbook bundle",
+    "example:embed-host:serve": "pnpm --filter @markbook/example-embed-host serve"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

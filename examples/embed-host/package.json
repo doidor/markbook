@@ -1,0 +1,9 @@
+{
+  "name": "@markbook/example-embed-host",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 4500 --directory .."
+  }
+}
