@@ -377,7 +377,7 @@ ${page.parsed.html}
 <script src="${pagefindBase}/pagefind-ui.js"></script>
 <script>
   window.addEventListener('DOMContentLoaded', () => {
-    new PagefindUI({ element: '#markbook-search-ui', showSubResults: true, resetStyles: false });
+    new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
   });
 </script>
 <script type="module" src="./${entryBasename}"></script>
@@ -445,38 +445,138 @@ a:hover { text-decoration: underline; }
 .markbook-search-ui {
   flex: 1;
   max-width: 360px;
-  --pagefind-ui-scale: 0.875;
+  position: relative;
+  --pagefind-ui-scale: 1;
   --pagefind-ui-primary: var(--mb-accent);
   --pagefind-ui-text: var(--mb-fg);
-  --pagefind-ui-background: var(--mb-bg-elev);
+  --pagefind-ui-background: var(--mb-bg);
   --pagefind-ui-border: var(--mb-border);
+  --pagefind-ui-tag: var(--mb-bg-elev);
+  --pagefind-ui-border-width: 1px;
   --pagefind-ui-border-radius: var(--mb-radius);
   --pagefind-ui-font: var(--mb-font-sans);
 }
-.markbook-search-ui .pagefind-ui__form { position: relative; }
 .markbook-search-ui .pagefind-ui__search-input {
-  height: 32px;
-  font-size: 0.85rem;
-  font-family: var(--mb-font-sans);
-  background: var(--mb-bg-elev);
-  color: var(--mb-fg);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  width: 100%;
+  height: 36px !important;
+  padding: 0 36px 0 32px !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  background: var(--mb-bg-elev) !important;
+  color: var(--mb-fg) !important;
+  border-color: var(--mb-border) !important;
+}
+.markbook-search-ui .pagefind-ui__form::before {
+  width: 14px !important;
+  height: 14px !important;
+  top: 11px !important;
+  left: 11px !important;
+  opacity: 0.5 !important;
+}
+.markbook-search-ui .pagefind-ui__search-clear {
+  height: 30px !important;
+  top: 3px !important;
+  right: 3px !important;
+  padding: 0 0.6rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: var(--mb-fg-muted) !important;
+  background: transparent !important;
+  border-radius: 4px !important;
+}
+.markbook-search-ui .pagefind-ui__search-clear:hover {
+  color: var(--mb-fg) !important;
+  background: var(--mb-bg-elev) !important;
 }
 .markbook-search-ui .pagefind-ui__drawer {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + 8px);
   right: 0;
-  left: 0;
+  width: 480px;
+  max-width: calc(100vw - 3rem);
   max-height: 70vh;
   overflow-y: auto;
   background: var(--mb-bg);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  padding: 0.75rem;
+  padding: 0.25rem 0.5rem !important;
   z-index: 20;
+  gap: 0 !important;
+  flex-direction: column !important;
+}
+.markbook-search-ui .pagefind-ui__results-area {
+  min-width: 0 !important;
+  margin-top: 0 !important;
+}
+.markbook-search-ui .pagefind-ui__message {
+  height: auto !important;
+  padding: 0.5rem 0.5rem !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  color: var(--mb-fg-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 !important;
+}
+.markbook-search-ui .pagefind-ui__results { padding: 0 !important; }
+.markbook-search-ui .pagefind-ui__result {
+  padding: 0.6rem 0.5rem !important;
+  border-top: 1px solid var(--mb-border) !important;
+  gap: 0 !important;
+}
+.markbook-search-ui .pagefind-ui__result:last-of-type { border-bottom: none !important; }
+.markbook-search-ui .pagefind-ui__result-thumb { display: none !important; }
+.markbook-search-ui .pagefind-ui__result-inner {
+  flex: 1;
+  margin-top: 0 !important;
+  gap: 0 !important;
+}
+.markbook-search-ui .pagefind-ui__result-title {
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  margin: 0 0 0.2rem !important;
+}
+.markbook-search-ui .pagefind-ui__result-excerpt {
+  font-size: 0.8rem !important;
+  color: var(--mb-fg-muted) !important;
+  line-height: 1.5 !important;
+  min-width: 0 !important;
+  margin-top: 0 !important;
+}
+.markbook-search-ui .pagefind-ui__result-link {
+  color: var(--mb-fg) !important;
+  text-decoration: none !important;
+}
+.markbook-search-ui .pagefind-ui__result-link:hover { color: var(--mb-link) !important; }
+.markbook-search-ui .pagefind-ui__result-nested {
+  padding-left: 0.875rem !important;
+  padding-top: 0.4rem !important;
+}
+.markbook-search-ui .pagefind-ui__result-nested .pagefind-ui__result-link::before {
+  font-size: 0.85em;
+  opacity: 0.5;
+}
+.markbook-search-ui mark {
+  background: rgba(108, 92, 231, 0.16) !important;
+  color: var(--mb-fg) !important;
+  padding: 0 2px !important;
+  border-radius: 2px !important;
+  font-weight: 500 !important;
+}
+.markbook-search-ui .pagefind-ui__button {
+  height: 32px !important;
+  padding: 0 1rem !important;
+  font-size: 0.85rem !important;
+  margin: 0.5rem 0 !important;
+  font-weight: 500 !important;
+  background: var(--mb-bg-elev) !important;
+  border-color: var(--mb-border) !important;
+  color: var(--mb-fg) !important;
+}
+.markbook-search-ui .pagefind-ui__button:hover {
+  background: var(--mb-border) !important;
+  border-color: var(--mb-border) !important;
+  color: var(--mb-fg) !important;
 }
 .markbook-shell {
   display: grid;

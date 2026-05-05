@@ -156,7 +156,7 @@ export async function parseMarkdown(
       for (const slot of slots) {
         if (slot.kind === 'story' && slot.story) {
           const codeBlock = slot.story.codeHtml
-            ? `<details class="markbook-code"><summary>Show code</summary>${slot.story.codeHtml}</details>`
+            ? `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary>${slot.story.codeHtml}</details>`
             : '';
           slot.parent.children[slot.index] = {
             type: 'html',
