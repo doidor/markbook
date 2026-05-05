@@ -8,20 +8,20 @@ componentExport: Avatar
 
 ## Initials
 
-:::story{src=./Avatar.stories.tsx export=Initials}
+:::story{src=./Avatar/Initials.stories.tsx}
 :::
 
 ## With image
 
-:::story{src=./Avatar.stories.tsx export=WithImage}
+:::story{src=./Avatar/WithImage.stories.tsx}
 :::
 
 ## Sizes
 
-:::story{src=./Avatar.stories.tsx export=Sizes}
+:::story{src=./Avatar/Sizes.stories.tsx}
 :::
 
 ## Square shape
 
-:::story{src=./Avatar.stories.tsx export=Square}
+:::story{src=./Avatar/Square.stories.tsx}
 :::

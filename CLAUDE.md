@@ -8,7 +8,7 @@ A lightweight Storybook alternative. Authors write Markdown; stories live in adj
 
 Pages may also embed:
 - A **props table** generated from a TypeScript component file via `react-docgen-typescript`. Set `component:` and optionally `componentExport:` in frontmatter; place a `:::props\n:::` directive where the table should render. The same table appears in the per-page `llms/<path>.txt`.
-- A **code disclosure** under every rendered story, automatically. Source is extracted from the referenced `.stories.tsx` export via the TypeScript compiler API and highlighted with Shiki. The same code is embedded as a fenced `tsx` block in `llms/<path>.txt`.
+- A **code disclosure** under every rendered story showing the **whole story file** (imports + export) Shiki-highlighted. The convention is **one story per file**: each story lives in its own `.stories.{tsx,ts}` (typically grouped under a `<Component>/` folder next to the page) and uses `export default`, so directives can be just `:::story{src=./Foo/Bar.stories.tsx}` with no `export=` attribute. The same source is embedded as a fenced code block in `llms/<path>.txt`.
 
 Pages may also opt into a **template**: a markdown file in a templates directory that wraps the page's content with a shared shell. Opt in with `template: <name>` in frontmatter; the template uses `{{ title }}`, `{{ description }}`, `{{ content }}`, and `{{ frontmatter.x }}` substitution (no conditionals/loops — KISS). Pages without `template:` render their full markdown unchanged.
 

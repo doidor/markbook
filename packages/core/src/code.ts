@@ -1,12 +1,20 @@
 import fs from 'node:fs/promises';
-import ts from 'typescript';
 import { codeToHtml } from 'shiki';
 
 const sourceCache = new Map<string, string>();
 
+/**
+ * Read the full source of the story file and highlight it. The convention is
+ * one story per file (with a `default` export, or a named export referenced
+ * via the directive's `export=` attribute) so the entire file IS the story —
+ * users see the imports and any helpers alongside the story body.
+ *
+ * `exportName` is accepted for API compatibility with the generated entry's
+ * import statement but is not used to slice the source.
+ */
 export async function extractStoryCode(
   absStoryFile: string,
-  exportName: string,
+  _exportName: string,
 ): Promise<{ code: string; codeHtml: string } | null> {
   let source = sourceCache.get(absStoryFile);
   if (!source) {
@@ -18,46 +26,9 @@ export async function extractStoryCode(
     }
   }
 
-  const sourceFile = ts.createSourceFile(
-    absStoryFile,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    absStoryFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-
-  for (const stmt of sourceFile.statements) {
-    if (!hasExportModifier(stmt)) continue;
-
-    if (ts.isVariableStatement(stmt)) {
-      for (const decl of stmt.declarationList.declarations) {
-        if (ts.isIdentifier(decl.name) && decl.name.text === exportName) {
-          return buildResult(absStoryFile, source, stmt.getStart(sourceFile), stmt.getEnd());
-        }
-      }
-    } else if (ts.isFunctionDeclaration(stmt) && stmt.name?.text === exportName) {
-      return buildResult(absStoryFile, source, stmt.getStart(sourceFile), stmt.getEnd());
-    }
-  }
-
-  return null;
-}
-
-function hasExportModifier(node: ts.Node): boolean {
-  if (!ts.canHaveModifiers(node)) return false;
-  const mods = ts.getModifiers(node);
-  return mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
-}
-
-async function buildResult(
-  filePath: string,
-  source: string,
-  start: number,
-  end: number,
-): Promise<{ code: string; codeHtml: string }> {
-  const code = source.slice(start, end).trim();
+  const code = source.trim();
   const codeHtml = await codeToHtml(code, {
-    lang: langFor(filePath),
+    lang: langFor(absStoryFile),
     theme: 'github-light',
   });
   return { code, codeHtml };

@@ -8,25 +8,25 @@ componentExport: Button
 
 ## Variants
 
-:::story{src=./Button.stories.tsx export=Variants}
+:::story{src=./Button/Variants.stories.tsx}
 :::
 
 ## Sizes
 
-:::story{src=./Button.stories.tsx export=Sizes}
+:::story{src=./Button/Sizes.stories.tsx}
 :::
 
 ## Loading
 
-:::story{src=./Button.stories.tsx export=Loading}
+:::story{src=./Button/Loading.stories.tsx}
 :::
 
 ## Disabled
 
-:::story{src=./Button.stories.tsx export=Disabled}
+:::story{src=./Button/Disabled.stories.tsx}
 :::
 
 ## Full width
 
-:::story{src=./Button.stories.tsx export=FullWidth}
+:::story{src=./Button/FullWidth.stories.tsx}
 :::

@@ -9,10 +9,10 @@ A `<click-counter>` custom element implemented in plain TypeScript. Each story i
 
 ## Default
 
-:::story{src=./Counter.stories.ts export=Default}
+:::story{src=./Counter/Default.stories.ts}
 :::
 
 ## A row of three
 
-:::story{src=./Counter.stories.ts export=Multiple}
+:::story{src=./Counter/Multiple.stories.ts}
 :::

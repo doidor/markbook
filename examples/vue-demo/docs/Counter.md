@@ -9,15 +9,15 @@ A small Vue 3 component built with the composition API and a render function. Ea
 
 ## Default
 
-:::story{src=./Counter.stories.ts export=Default}
+:::story{src=./Counter/Default.stories.ts}
 :::
 
 ## Starting at 10
 
-:::story{src=./Counter.stories.ts export=StartingAt10}
+:::story{src=./Counter/StartingAt10.stories.ts}
 :::
 
 ## Step of 5
 
-:::story{src=./Counter.stories.ts export=StepOfFive}
+:::story{src=./Counter/StepOfFive.stories.ts}
 :::

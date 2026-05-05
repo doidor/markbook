@@ -8,15 +8,15 @@ componentExport: Switch
 
 ## Off
 
-:::story{src=./Switch.stories.tsx export=Off}
+:::story{src=./Switch/Off.stories.tsx}
 :::
 
 ## On
 
-:::story{src=./Switch.stories.tsx export=On}
+:::story{src=./Switch/On.stories.tsx}
 :::
 
 ## Disabled
 
-:::story{src=./Switch.stories.tsx export=Disabled}
+:::story{src=./Switch/Disabled.stories.tsx}
 :::

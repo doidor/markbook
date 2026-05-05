@@ -8,15 +8,15 @@ componentExport: Card
 
 ## Basic
 
-:::story{src=./Card.stories.tsx export=Basic}
+:::story{src=./Card/Basic.stories.tsx}
 :::
 
 ## Elevated
 
-:::story{src=./Card.stories.tsx export=Elevated}
+:::story{src=./Card/Elevated.stories.tsx}
 :::
 
 ## Padding sizes
 
-:::story{src=./Card.stories.tsx export=PaddingSizes}
+:::story{src=./Card/PaddingSizes.stories.tsx}
 :::

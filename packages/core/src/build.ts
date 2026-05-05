@@ -316,13 +316,29 @@ function buildNav(pages: PageRecord[]): NavGroup[] {
   }
   const groups: NavGroup[] = [];
   if (groupMap.has(null)) {
-    groups.push({ label: null, items: groupMap.get(null)! });
+    groups.push({ label: null, items: sortIndexFirst(groupMap.get(null)!) });
   }
   const named = [...groupMap.entries()]
     .filter(([k]) => k !== null)
     .sort(([a], [b]) => (a as string).localeCompare(b as string));
-  for (const [k, v] of named) groups.push({ label: k as string, items: v });
+  for (const [k, v] of named) {
+    groups.push({ label: k as string, items: sortIndexFirst(v) });
+  }
   return groups;
+}
+
+function sortIndexFirst(items: NavItem[]): NavItem[] {
+  return items.slice().sort((a, b) => {
+    const aIdx = isIndexHref(a.htmlRelPath);
+    const bIdx = isIndexHref(b.htmlRelPath);
+    if (aIdx && !bIdx) return -1;
+    if (!aIdx && bIdx) return 1;
+    return 0;
+  });
+}
+
+function isIndexHref(href: string): boolean {
+  return href === 'index.html' || href.endsWith('/index.html');
 }
 
 async function emitLlms(
@@ -403,9 +419,13 @@ function generateEntry(
     const abs = path.resolve(pageDir, s.src);
     let rel = path.relative(entryDir, abs).replace(/\\/g, '/');
     if (!rel.startsWith('.')) rel = `./${rel}`;
-    importLines.push(
-      `import { ${s.exportName} as story_${i} } from ${JSON.stringify(rel)};`,
-    );
+    if (s.exportName === 'default') {
+      importLines.push(`import story_${i} from ${JSON.stringify(rel)};`);
+    } else {
+      importLines.push(
+        `import { ${s.exportName} as story_${i} } from ${JSON.stringify(rel)};`,
+      );
+    }
   });
 
   const wrapperArg = wrapperPath ? ', { wrapper: Wrapper }' : '';
