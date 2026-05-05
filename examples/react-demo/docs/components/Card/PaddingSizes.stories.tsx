@@ -1,7 +1,8 @@
 import { Card } from '../../../src/pixie/Card.js';
+import styles from './PaddingSizes.module.css';
 
 export default () => (
-  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+  <div className={styles.row}>
     <Card title="sm" padding="sm">
       Tight
     </Card>

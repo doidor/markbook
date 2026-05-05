@@ -10,14 +10,24 @@ import rehypeSlug from 'rehype-slug';
 import { visit } from 'unist-util-visit';
 import { applyTemplate } from './template.js';
 
+export interface StoryCodeFile {
+  label: string;
+  lang: string;
+  code: string;
+  codeHtml: string;
+}
+
 export interface StoryRef {
   id: string;
   src: string;
   exportName: string;
   /** User-provided embed slug from the directive's `id=` attribute. Stable across file moves. */
   slug?: string;
-  code?: string;
-  codeHtml?: string;
+  /**
+   * Story source plus any CSS files it imports directly. The first entry is
+   * always the story file itself.
+   */
+  codeFiles?: StoryCodeFile[];
 }
 
 export interface HeadingRef {
@@ -41,7 +51,7 @@ export interface ParseOptions {
   resolveStoryCode?: (info: {
     absStoryFile: string;
     exportName: string;
-  }) => Promise<{ code: string; codeHtml: string } | null>;
+  }) => Promise<{ files: StoryCodeFile[] } | null>;
   resolveProps?: (info: {
     absComponentFile: string;
     exportName?: string;
@@ -129,8 +139,7 @@ export async function parseMarkdown(
                 exportName: story.exportName,
               });
               if (result) {
-                story.code = result.code;
-                story.codeHtml = result.codeHtml;
+                story.codeFiles = result.files;
               }
             })(),
           );
@@ -158,9 +167,16 @@ export async function parseMarkdown(
 
       for (const slot of slots) {
         if (slot.kind === 'story' && slot.story) {
-          const codeBlock = slot.story.codeHtml
-            ? `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary>${slot.story.codeHtml}</details>`
-            : '';
+          const files = slot.story.codeFiles ?? [];
+          const codeBlock =
+            files.length > 0
+              ? `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary>${files
+                  .map(
+                    (f) =>
+                      `<div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div>${f.codeHtml}</div>`,
+                  )
+                  .join('')}</details>`
+              : '';
           slot.parent.children[slot.index] = {
             type: 'html',
             value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
@@ -220,8 +236,10 @@ function buildPlainMarkdown(
   let cursor = 0;
   for (const slot of sorted) {
     out += content.slice(cursor, slot.start);
-    if (slot.kind === 'story' && slot.story?.code) {
-      out += `\`\`\`tsx\n${slot.story.code}\n\`\`\``;
+    if (slot.kind === 'story' && slot.story?.codeFiles?.length) {
+      out += slot.story.codeFiles
+        .map((f) => `**\`${f.label}\`**\n\n\`\`\`${f.lang}\n${f.code}\n\`\`\``)
+        .join('\n\n');
     } else if (slot.kind === 'props' && propsTableMarkdown) {
       out += propsTableMarkdown;
     }
@@ -229,6 +247,15 @@ function buildPlainMarkdown(
   }
   out += content.slice(cursor);
   return out.replace(/\n{3,}/g, '\n\n');
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function htmlToPlainText(html: string): string {

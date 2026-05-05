@@ -1020,6 +1020,15 @@ a:hover { text-decoration: underline; }
 .markbook-code summary:hover { color: var(--mb-fg); }
 .markbook-code[open] summary { border-bottom: 1px solid var(--mb-border); }
 .markbook-code pre { padding: 1rem; margin: 0; overflow-x: auto; }
+.markbook-code-file + .markbook-code-file { border-top: 1px solid var(--mb-border); }
+.markbook-code-file-label {
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
+  font-family: var(--mb-font-mono);
+  color: var(--mb-fg-muted);
+  background: var(--mb-bg-soft);
+  border-bottom: 1px solid var(--mb-border);
+}
 .markbook-props {
   width: 100%;
   border-collapse: collapse;
