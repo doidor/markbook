@@ -2,11 +2,14 @@ export interface MarkbookAdapter {
   packageName: string;
   vitePlugins?: () => unknown[] | Promise<unknown[]>;
   /**
-   * Path (relative to project root) of a module whose default export is a
-   * component that receives `{ children }` and wraps every story before mount.
-   * Use this for global providers (theme, i18n, router, ...).
+   * Paths (relative to project root, or absolute) of decorator modules.
+   * Each module's default export must be a component that receives
+   * `{ children }` (or a default slot, for Vue) and wraps the story before
+   * mount. Decorators are applied **outer-to-inner**: `[A, B]` produces
+   * `<A><B><Story /></B></A>`. Use this for stacked global providers (theme,
+   * i18n, router, ...).
    */
-  wrapperModule?: string;
+  decoratorModules?: string[];
   /**
    * In `--mode package` bundles, these dependencies stay external (declared as
    * peer dependencies on the published package). For React: `['react',

@@ -120,3 +120,13 @@ Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 
 **Why:** With package mode, a Markbook lib can publish individual stories as npm packages whose consumers share the host's React (or Vue) instance — no React duplication, no version skew. Embed mode stays the right answer for "drop-in script tag" use cases. Shadow DOM matters whenever an external host has aggressive CSS resets that conflict with the story's component styles. The `id=` override is small but unblocks "rename without breaking embeds."
 
 **Next:** v0.6 — generalise the single `wrapper` option to a `decorators[]` array (Storybook-style ordered providers). After that, v0.7 prop controls.
+
+---
+
+## 2026-05-05 — v0.6 decorator arrays
+
+**What changed:** Renamed `MarkbookAdapter.wrapperModule?: string` → `decoratorModules?: string[]` (clean break — nothing published yet). The React adapter's option `reactAdapter({ wrapper })` is now `reactAdapter({ decorators: [...] })`. Mount applies decorators outer-to-inner: `decorators: [A, B]` produces `<A><B><Story /></B></A>` (intuitive reading order — the first listed is the outermost wrapper). The Vue adapter gained matching support: a private `wrapWithDecorators` helper builds a Vue component tree that nests `h(Decorator, null, { default: () => child })` over the story; web components stay without decorators (slots are a different mechanism). `build.ts` and `embed.ts` thread `decoratorPaths: string[]` through the build context, generating one `import Decorator<i>` per path and passing `decorators: [Decorator0, Decorator1, ...]` to mount. Both the regular page entries and the embed/package entries use the same generation path. Validated end-to-end with a tiny `examples/react-demo/preview.tsx` decorator that wraps every story in `<div data-markbook-decorator="preview">` — the attribute appears in the regular static build (in a shared chunk Vite split out), the embed bundle, and the package bundle. **ADR-0014** captures the design.
+
+**Why:** Real component libraries need stacked providers — theme + i18n + router + analytics is normal. The single `wrapper` slot couldn't express ordering and forced users into nesting providers manually inside one wrapper component. The `decorators[]` array is Storybook's idiom and reads naturally — the first entry is the outermost. The cross-mode consistency (decorators inlined into embed and package bundles too) is what makes portable stories render identically out of context.
+
+**Next:** v0.7 — per-story `parameters` (background, viewport, layout) plus interactive prop controls layered on the existing props table.

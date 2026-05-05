@@ -39,7 +39,7 @@ export interface BuildContext {
   outDir: string;
   tmpDir: string;
   templateDirs: string[];
-  wrapperPath: string | undefined;
+  decoratorPaths: string[];
   siteTitle: string;
   siteDescription: string | undefined;
   adapterPackageName: string;
@@ -78,9 +78,9 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     const list = Array.isArray(raw) ? raw : [raw];
     return list.map((d) => path.resolve(root, d));
   })();
-  const wrapperPath = config.adapter.wrapperModule
-    ? path.resolve(root, config.adapter.wrapperModule)
-    : undefined;
+  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) =>
+    path.resolve(root, m),
+  );
   const adapterPlugins = config.adapter.vitePlugins
     ? await config.adapter.vitePlugins()
     : [];
@@ -92,7 +92,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     outDir,
     tmpDir,
     templateDirs,
-    wrapperPath,
+    decoratorPaths,
     siteTitle,
     siteDescription,
     adapterPackageName: config.adapter.packageName,
@@ -166,7 +166,7 @@ async function writePages(
       path.dirname(page.file),
       ctx.adapterPackageName,
       path.dirname(entryAbs),
-      ctx.wrapperPath,
+      ctx.decoratorPaths,
     );
     const html = generateHtml(
       page,
@@ -408,17 +408,19 @@ function generateEntry(
   pageDir: string,
   adapterPkg: string,
   entryDir: string,
-  wrapperPath: string | undefined,
+  decoratorPaths: string[],
 ): string {
   if (stories.length === 0) return 'export {};\n';
 
   const importLines: string[] = [];
+  const decoratorRefs: string[] = [];
 
-  if (wrapperPath) {
-    let rel = path.relative(entryDir, wrapperPath).replace(/\\/g, '/');
+  decoratorPaths.forEach((p, i) => {
+    let rel = path.relative(entryDir, p).replace(/\\/g, '/');
     if (!rel.startsWith('.')) rel = `./${rel}`;
-    importLines.push(`import Wrapper from ${JSON.stringify(rel)};`);
-  }
+    importLines.push(`import Decorator${i} from ${JSON.stringify(rel)};`);
+    decoratorRefs.push(`Decorator${i}`);
+  });
 
   stories.forEach((s, i) => {
     const abs = path.resolve(pageDir, s.src);
@@ -433,10 +435,13 @@ function generateEntry(
     }
   });
 
-  const wrapperArg = wrapperPath ? ', { wrapper: Wrapper }' : '';
+  const optsArg =
+    decoratorRefs.length > 0
+      ? `, { decorators: [${decoratorRefs.join(', ')}] }`
+      : '';
   const mounts = stories.map(
     (s, i) =>
-      `mount(document.querySelector('[data-markbook-story="${s.id}"]'), story_${i}${wrapperArg});`,
+      `mount(document.querySelector('[data-markbook-story="${s.id}"]'), story_${i}${optsArg});`,
   );
 
   return `import { mount } from ${JSON.stringify(adapterPkg)};

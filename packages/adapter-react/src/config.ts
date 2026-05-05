@@ -3,19 +3,20 @@ import type { MarkbookAdapter } from '@markbook/core';
 
 export interface ReactAdapterOptions {
   /**
-   * Path (relative to project root) of a `.tsx`/`.ts`/`.jsx`/`.js` module
-   * whose default export is a component receiving `{ children }` and wrapping
-   * every story before mount. Use this for global providers — theme, i18n,
-   * router, etc.
+   * Paths (relative to project root, or absolute) of decorator modules. Each
+   * module's default export is a React component that receives `{ children }`
+   * and wraps the story before mount. Decorators are applied outer-to-inner:
+   * `['./theme.tsx', './i18n.tsx']` produces `<Theme><I18n><Story /></I18n></Theme>`.
+   * Use for stacked global providers.
    */
-  wrapper?: string;
+  decorators?: string[];
 }
 
 export function reactAdapter(opts: ReactAdapterOptions = {}): MarkbookAdapter {
   return {
     packageName: '@markbook/adapter-react',
     vitePlugins: () => reactPlugin() as unknown[],
-    wrapperModule: opts.wrapper,
+    decoratorModules: opts.decorators,
     packagePeerDeps: ['react', 'react-dom'],
   };
 }

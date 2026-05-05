@@ -8,5 +8,5 @@ export default defineConfig({
   docsDir: 'docs',
   outDir: 'dist',
   templatesDir: ['_layouts'],
-  adapter: reactAdapter(),
+  adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 });

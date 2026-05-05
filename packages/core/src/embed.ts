@@ -97,7 +97,7 @@ async function bundleEmbedOne(
   const entryCode = generateEmbedEntry(
     story,
     ctx.adapterPackageName,
-    ctx.wrapperPath,
+    ctx.decoratorPaths,
     tmpDir,
     isolation,
   );
@@ -148,7 +148,7 @@ async function bundlePackageOne(
   const entryCode = generatePackageEntry(
     story,
     ctx.adapterPackageName,
-    ctx.wrapperPath,
+    ctx.decoratorPaths,
     tmpDir,
     isolation,
   );
@@ -280,19 +280,19 @@ function slugify(s: string): string {
 function buildEntryImports(
   story: DiscoveredStory,
   adapterPkg: string,
-  wrapperPath: string | undefined,
+  decoratorPaths: string[],
   entryDir: string,
-): { imports: string; storyRef: string; wrapperRef: string | undefined } {
+): { imports: string; storyRef: string; decoratorRefs: string[] } {
   const lines: string[] = [
     `import { mount as adapterMount } from ${JSON.stringify(adapterPkg)};`,
   ];
-  let wrapperRef: string | undefined;
-  if (wrapperPath) {
-    let rel = path.relative(entryDir, wrapperPath).replace(/\\/g, '/');
+  const decoratorRefs: string[] = [];
+  decoratorPaths.forEach((p, i) => {
+    let rel = path.relative(entryDir, p).replace(/\\/g, '/');
     if (!rel.startsWith('.')) rel = `./${rel}`;
-    lines.push(`import Wrapper from ${JSON.stringify(rel)};`);
-    wrapperRef = 'Wrapper';
-  }
+    lines.push(`import Decorator${i} from ${JSON.stringify(rel)};`);
+    decoratorRefs.push(`Decorator${i}`);
+  });
   let storyRel = path
     .relative(entryDir, story.absStoryFile)
     .replace(/\\/g, '/');
@@ -304,15 +304,17 @@ function buildEntryImports(
       `import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`,
     );
   }
-  return { imports: lines.join('\n'), storyRef: 'Story', wrapperRef };
+  return { imports: lines.join('\n'), storyRef: 'Story', decoratorRefs };
 }
 
 function buildMountOptsLiteral(
-  wrapperRef: string | undefined,
+  decoratorRefs: string[],
   isolation: BundleIsolation | undefined,
 ): string {
   const fields: string[] = [];
-  if (wrapperRef) fields.push(`wrapper: ${wrapperRef}`);
+  if (decoratorRefs.length > 0) {
+    fields.push(`decorators: [${decoratorRefs.join(', ')}]`);
+  }
   if (isolation) fields.push(`isolation: ${JSON.stringify(isolation)}`);
   return fields.length > 0 ? `, { ${fields.join(', ')} }` : '';
 }
@@ -320,17 +322,17 @@ function buildMountOptsLiteral(
 function generateEmbedEntry(
   story: DiscoveredStory,
   adapterPkg: string,
-  wrapperPath: string | undefined,
+  decoratorPaths: string[],
   entryDir: string,
   isolation: BundleIsolation | undefined,
 ): string {
-  const { imports, storyRef, wrapperRef } = buildEntryImports(
+  const { imports, storyRef, decoratorRefs } = buildEntryImports(
     story,
     adapterPkg,
-    wrapperPath,
+    decoratorPaths,
     entryDir,
   );
-  const optsArg = buildMountOptsLiteral(wrapperRef, isolation);
+  const optsArg = buildMountOptsLiteral(decoratorRefs, isolation);
 
   return `${imports}
 
@@ -345,17 +347,17 @@ for (const el of targets) {
 function generatePackageEntry(
   story: DiscoveredStory,
   adapterPkg: string,
-  wrapperPath: string | undefined,
+  decoratorPaths: string[],
   entryDir: string,
   isolation: BundleIsolation | undefined,
 ): string {
-  const { imports, storyRef, wrapperRef } = buildEntryImports(
+  const { imports, storyRef, decoratorRefs } = buildEntryImports(
     story,
     adapterPkg,
-    wrapperPath,
+    decoratorPaths,
     entryDir,
   );
-  const baseOpts = buildMountOptsLiteral(wrapperRef, isolation);
+  const baseOpts = buildMountOptsLiteral(decoratorRefs, isolation);
 
   // Allow callers to override / extend opts (their opts win).
   const optsExpr = baseOpts

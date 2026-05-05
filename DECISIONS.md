@@ -152,3 +152,18 @@ Both modes share:
 - **Shadow root strategy.** For React/Vue we mount inside a `<div class="markbook-shadow-host">` *child* of the shadow root (because `createRoot(shadowRoot)` and `app.mount(shadowRoot)` both need an element, not a `ShadowRoot`). For WC the shadow root itself is the target since `innerHTML`/`appendChild` work on `ShadowRoot`. Mode is `'open'` so devtools can still inspect.
 
 **Consequences:** Each new adapter now has three things to declare: `packageName`, `vitePlugins` (optional), `packagePeerDeps` (optional). The `mount` contract picks up `isolation` for free if the adapter calls a copy-pasted `resolveMountTarget`. Package-mode bundles dropped from ~200 KB (embed-mode React) to ~3.5 KB (just adapter + story + wrapper, externalising React) — proving the externals strategy works. `--mode package` doesn't generate a sandbox HTML (vs embed mode) because the consumer mounts manually; the README explains the API instead. **Open**: CSS handling for stories that import `.css` files is still manual — the bundler will emit a sibling `<slug>.css` but the consumer must link it; auto-inject is a future enhancement.
+
+---
+
+## ADR-0014 — Decorator arrays replace the single wrapper, outer-to-inner
+
+**Context:** ADR-0005 split the React adapter so the user could pass a single `wrapper` module (e.g. `FluentProvider`). Real libraries stack multiple providers — theme, i18n, router, analytics — and need control over their order. The single-slot API forced users to nest manually in one file, hiding the ordering and making composition awkward. We need a Storybook-style `decorators[]` API that scales.
+
+**Decision:**
+
+- **Rename `MarkbookAdapter.wrapperModule?: string` → `decoratorModules?: string[]`.** The renaming is a clean break (no published packages); we don't keep a back-compat alias. Users with the old API change one line: `wrapper: './x'` → `decorators: ['./x']`.
+- **Outer-to-inner ordering.** `decorators: [A, B]` produces `<A><B><Story /></B></A>`. Implementations iterate the array in reverse and wrap as they go — the last entry wraps the story first (innermost), each previous entry wraps that result. Reads naturally: list outermost first.
+- **Per-adapter implementation, shared opt name.** Each adapter's `mount(el, story, opts)` accepts `opts.decorators?: ComponentType<{children}>[]` (React) or `Component[]` (Vue). Web components don't get decorators in v0.6 — `<slot>`-based composition exists but the typical use case (theme providers) doesn't have a clean WC mapping; revisit if needed.
+- **One generation path for all four modes.** Regular `build`, `dev`, `embed`, and `package` all generate the same shape: import each decorator once, pass them as a literal array to `mount`. The shared `buildEntryImports` helper in `embed.ts` returns `decoratorRefs: string[]`; `build.ts`'s `generateEntry` does the same. This guarantees portable bundles render identically to the in-Markbook page — they share the decorator stack.
+
+**Consequences:** Adding a global provider is one line per layer. Order is explicit and the array becomes a public API contract — adding new providers in the middle of the stack changes the rendered tree, so users should think about ordering. Decorators are *adapter-specific components* (a React decorator can't be used as a Vue decorator), but the option *name* is shared, so docs and CLI flags don't fork per adapter. Vue's `wrapWithDecorators` builds a `defineComponent` wrapping tree using `h(Decorator, null, { default: () => child })` — Vue decorators must accept a default slot, just as React decorators must accept `children`. The same per-adapter story-portability constraint as ADR-0011 applies: a Vue decorator can't be hoisted into a React project.

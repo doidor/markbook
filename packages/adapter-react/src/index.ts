@@ -9,7 +9,12 @@ import {
 const roots = new WeakMap<Element, Root>();
 
 interface MountOptions {
-  wrapper?: ComponentType<{ children: ReactNode }>;
+  /**
+   * Decorators applied outer-to-inner: `[A, B]` produces
+   * `<A><B><Story /></B></A>`. Each must be a component that receives
+   * `{ children }`.
+   */
+  decorators?: ComponentType<{ children: ReactNode }>[];
   isolation?: 'shadow';
 }
 
@@ -39,8 +44,10 @@ export function mount(
     );
   }
 
-  if (opts?.wrapper) {
-    element = createElement(opts.wrapper, null, element);
+  if (opts?.decorators && opts.decorators.length > 0) {
+    for (let i = opts.decorators.length - 1; i >= 0; i--) {
+      element = createElement(opts.decorators[i]!, null, element);
+    }
   }
 
   root.render(element);

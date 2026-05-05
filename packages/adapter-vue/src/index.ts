@@ -1,12 +1,29 @@
-import { createApp, type App, type Component } from 'vue';
+import {
+  createApp,
+  defineComponent,
+  h,
+  type App,
+  type Component,
+  type VNode,
+} from 'vue';
 
 const apps = new WeakMap<Element, App>();
 
 interface MountOptions {
+  /**
+   * Decorators applied outer-to-inner: `[A, B]` produces
+   * `<A><B><Story /></B></A>`. Each must be a Vue component with a default
+   * slot.
+   */
+  decorators?: Component[];
   isolation?: 'shadow';
 }
 
-export function mount(el: Element | null, story: unknown, opts?: MountOptions): void {
+export function mount(
+  el: Element | null,
+  story: unknown,
+  opts?: MountOptions,
+): void {
   if (!el) return;
 
   const target = resolveMountTarget(el, opts);
@@ -14,9 +31,31 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
   const existing = apps.get(target);
   if (existing) existing.unmount();
 
-  const app = createApp(story as Component);
+  const root =
+    opts?.decorators && opts.decorators.length > 0
+      ? wrapWithDecorators(story as Component, opts.decorators)
+      : (story as Component);
+
+  const app = createApp(root);
   app.mount(target);
   apps.set(target, app);
+}
+
+function wrapWithDecorators(story: Component, decorators: Component[]): Component {
+  return defineComponent({
+    name: 'MarkbookDecorated',
+    setup() {
+      return () => {
+        let node: VNode = h(story);
+        for (let i = decorators.length - 1; i >= 0; i--) {
+          const Decorator = decorators[i]!;
+          const child = node;
+          node = h(Decorator, null, { default: () => child });
+        }
+        return node;
+      };
+    },
+  });
 }
 
 function resolveMountTarget(el: Element, opts?: MountOptions): Element {

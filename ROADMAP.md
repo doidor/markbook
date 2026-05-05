@@ -1,10 +1,6 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.5.1** — `markbook bundle` supports embed + package modes, optional shadow-DOM isolation, and stable slugs via the directive `id=` attribute (see `PROGRESS.md` for details).
-
-## v0.6 — Config-time decorators (multiple, ordered)
-
-Generalise the single `wrapper` option (added in v0.1) to a `decorators` array (Storybook-style). Useful once users want layered wrappers (theme + i18n + router, etc.).
+Forward-looking work, ordered by priority. The current state is **v0.6** — adapters expose a `decorators[]` array (replacing the single `wrapper`) for stacked global providers; the React + Vue adapters honour it, and embed / package bundles inline the same stack for portability (see `PROGRESS.md` for details).
 
 ## v0.7 — Per-story metadata, parameters, and prop controls
 
