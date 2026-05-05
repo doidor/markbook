@@ -2,7 +2,7 @@ import { cac } from 'cac';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createJiti } from 'jiti';
-import { build, dev, type MarkbookConfig } from '@markbook/core';
+import { build, bundleEmbed, dev, type MarkbookConfig } from '@markbook/core';
 
 const CONFIG_NAMES = [
   'markbook.config.ts',
@@ -83,6 +83,33 @@ cli
         });
       } catch (err) {
         console.error('✗ Markbook dev failed:');
+        console.error(err);
+        process.exit(1);
+      }
+    },
+  );
+
+cli
+  .command(
+    'bundle [storyId]',
+    'Bundle one (or every) story as a self-mounting embeddable ESM module',
+  )
+  .option('-c, --config <path>', 'Path to markbook.config.{ts,mts,js,mjs}')
+  .option('--root <path>', 'Project root (defaults to cwd)')
+  .action(
+    async (
+      storyId: string | undefined,
+      opts: { root?: string; config?: string },
+    ) => {
+      try {
+        const root = path.resolve(opts.root ?? process.cwd());
+        const config = await loadConfig(root, opts.config);
+        await bundleEmbed(
+          { ...config, root: config.root ?? root },
+          storyId ? { storyId } : {},
+        );
+      } catch (err) {
+        console.error('✗ Markbook bundle failed:');
         console.error(err);
         process.exit(1);
       }

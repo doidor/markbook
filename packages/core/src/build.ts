@@ -32,7 +32,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-interface BuildContext {
+export interface BuildContext {
   config: MarkbookConfig;
   root: string;
   docsDir: string;
@@ -46,7 +46,27 @@ interface BuildContext {
   adapterPlugins: unknown[];
 }
 
-async function createContext(config: MarkbookConfig): Promise<BuildContext> {
+export function makeLoadTemplate(
+  templateDirs: string[],
+  root: string,
+): (name: string) => Promise<string> {
+  return async (name: string) => {
+    for (const dir of templateDirs) {
+      const candidate = path.join(dir, `${name}.md`);
+      try {
+        return await fs.readFile(candidate, 'utf8');
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      }
+    }
+    const searched = templateDirs
+      .map((d) => path.relative(root, d) || d)
+      .join(', ');
+    throw new Error(`Markbook: template '${name}' not found in: ${searched}`);
+  };
+}
+
+export async function createContext(config: MarkbookConfig): Promise<BuildContext> {
   const root = path.resolve(config.root ?? process.cwd());
   const docsDir = path.resolve(root, config.docsDir ?? 'docs');
   const outDir = path.resolve(root, config.outDir ?? 'dist');
@@ -119,22 +139,7 @@ async function writePages(
         extractStoryCode(info.absStoryFile, info.exportName),
       resolveProps: (info) =>
         extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
-      loadTemplate: async (name) => {
-        for (const dir of ctx.templateDirs) {
-          const candidate = path.join(dir, `${name}.md`);
-          try {
-            return await fs.readFile(candidate, 'utf8');
-          } catch (err) {
-            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-          }
-        }
-        const searched = ctx.templateDirs
-          .map((d) => path.relative(ctx.root, d) || d)
-          .join(', ');
-        throw new Error(
-          `Markbook: template '${name}' not found in: ${searched}`,
-        );
-      },
+      loadTemplate: makeLoadTemplate(ctx.templateDirs, ctx.root),
     });
     pages.push({
       file,

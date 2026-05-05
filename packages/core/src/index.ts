@@ -1,4 +1,6 @@
 export { build, dev } from './build.js';
+export { bundleEmbed } from './embed.js';
+export type { BundleEmbedOptions } from './embed.js';
 export { defineConfig } from './config.js';
 export { parseMarkdown } from './parse.js';
 export { extractStoryCode } from './code.js';

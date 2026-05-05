@@ -1,19 +1,16 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.4** (v0.3 + Vue and web-components adapters with their own demos — see `PROGRESS.md` for details).
+Forward-looking work, ordered by priority. The current state is **v0.5 (embed mode)** — `markbook bundle` produces self-mounting ESM modules from any story (see `PROGRESS.md` for details). Package mode + shadow-DOM isolation are still pending.
 
 ---
 
-## v0.5 — Story portability (ADR-0006)
+## v0.5.1 — Story portability follow-ups (ADR-0006)
 
-Two related capabilities for embedding stories outside the Markbook site:
+Remaining pieces of ADR-0006 not shipped in v0.5:
 
-1. **Embeddable bundle** — `markbook bundle <story-id>` produces a self-contained `dist/embed/<story-id>.js` (+ optional `.css`) that auto-mounts when scripted into any HTML page via a `<div data-markbook-embed="<story-id>">` placeholder. **No iframe.**
-2. **Stories as packages** — `markbook bundle <story-id> --mode package` produces a publishable npm package directory exporting `mount(el)` (and a `<MountStory />` convenience for React), so consumers `npm i @org/story-foo` and call `mount(target)` from any framework or vanilla page.
-
-Both modes share an isolation strategy (optional `--isolation=shadow` for shadow-DOM containment so host-page CSS doesn't leak in or out). The package mode treats the framework runtime as a peer dep; the embed mode bundles it.
-
-See `DECISIONS.md` § ADR-0006 for the architecture.
+1. **Stories as packages** — `markbook bundle <story-id> --mode package` produces a publishable npm package directory exporting `mount(el)` (and a `<MountStory />` convenience for React), so consumers `npm i @org/story-foo` and call `mount(target)` from any framework or vanilla page. Framework runtime as a peer dep.
+2. **Shadow-DOM isolation** — `--isolation=shadow` flag wraps the mount in a shadow root so host-page CSS doesn't leak in or out.
+3. **Stable IDs via frontmatter** — currently slugs are derived from the story file path. Add a frontmatter `id:` override so users can rename files without breaking external embeds.
 
 ## v0.6 — Config-time decorators (multiple, ordered)
 
