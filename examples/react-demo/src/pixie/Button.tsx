@@ -57,7 +57,7 @@ export function Button({
     transition: 'opacity 0.15s, background 0.15s',
   };
   return (
-    <button style={style} disabled={disabled || loading} onClick={onClick}>
+    <button type="button" style={style} disabled={disabled || loading} onClick={onClick}>
       {loading ? '…' : children}
     </button>
   );

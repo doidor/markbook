@@ -38,12 +38,14 @@ export interface ParsedPage {
 
 export interface ParseOptions {
   pageFile: string;
-  resolveStoryCode?: (
-    info: { absStoryFile: string; exportName: string },
-  ) => Promise<{ code: string; codeHtml: string } | null>;
-  resolveProps?: (
-    info: { absComponentFile: string; exportName?: string },
-  ) => Promise<{ tableHtml: string; tableMarkdown: string } | null>;
+  resolveStoryCode?: (info: {
+    absStoryFile: string;
+    exportName: string;
+  }) => Promise<{ code: string; codeHtml: string } | null>;
+  resolveProps?: (info: {
+    absComponentFile: string;
+    exportName?: string;
+  }) => Promise<{ tableHtml: string; tableMarkdown: string } | null>;
   /** Returns the raw text of a template file given its `<name>` (no extension). */
   loadTemplate?: (name: string) => Promise<string>;
 }
@@ -80,9 +82,7 @@ export async function parseMarkdown(
       ? path.resolve(pageDir, frontmatter.component)
       : undefined;
   const componentExport =
-    typeof frontmatter.componentExport === 'string'
-      ? frontmatter.componentExport
-      : undefined;
+    typeof frontmatter.componentExport === 'string' ? frontmatter.componentExport : undefined;
 
   const stories: StoryRef[] = [];
   const headings: HeadingRef[] = [];
@@ -169,8 +169,7 @@ export async function parseMarkdown(
           slot.parent.children[slot.index] = {
             type: 'html',
             value:
-              propsTableHtml ??
-              '<!-- markbook props table: no `component:` set in frontmatter -->',
+              propsTableHtml ?? '<!-- markbook props table: no `component:` set in frontmatter -->',
           } as never;
         }
       }
@@ -196,8 +195,7 @@ export async function parseMarkdown(
   const plainText = htmlToPlainText(html);
   const plainMarkdown = buildPlainMarkdown(content, slots, propsTableMarkdown).trim();
 
-  const fmTitle =
-    typeof frontmatter.title === 'string' ? frontmatter.title : undefined;
+  const fmTitle = typeof frontmatter.title === 'string' ? frontmatter.title : undefined;
   const h1Text = headings.find((h) => h.level === 1)?.text;
   const title = fmTitle ?? h1Text ?? fileId;
 

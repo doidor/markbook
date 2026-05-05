@@ -25,9 +25,9 @@ describe('applyTemplate', () => {
   });
 
   it('stringifies numbers and booleans', () => {
-    expect(
-      applyTemplate('', { count: 42, enabled: true }, '{{ count }}/{{ enabled }}'),
-    ).toBe('42/true');
+    expect(applyTemplate('', { count: 42, enabled: true }, '{{ count }}/{{ enabled }}')).toBe(
+      '42/true',
+    );
   });
 
   it('JSON-stringifies object values', () => {

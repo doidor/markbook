@@ -59,9 +59,7 @@ export function makeLoadTemplate(
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       }
     }
-    const searched = templateDirs
-      .map((d) => path.relative(root, d) || d)
-      .join(', ');
+    const searched = templateDirs.map((d) => path.relative(root, d) || d).join(', ');
     throw new Error(`Markbook: template '${name}' not found in: ${searched}`);
   };
 }
@@ -78,12 +76,8 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     const list = Array.isArray(raw) ? raw : [raw];
     return list.map((d) => path.resolve(root, d));
   })();
-  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) =>
-    path.resolve(root, m),
-  );
-  const adapterPlugins = config.adapter.vitePlugins
-    ? await config.adapter.vitePlugins()
-    : [];
+  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) => path.resolve(root, m));
+  const adapterPlugins = config.adapter.vitePlugins ? await config.adapter.vitePlugins() : [];
 
   return {
     config,
@@ -126,17 +120,13 @@ async function writePages(
     const htmlRelPath = `${noExt}.html`;
     const entryRelPath = `${noExt}.entry.ts`;
     const txtRelPath = `${noExt}.txt`;
-    const fileId = noExt
-      .replace(/[\\/]/g, '__')
-      .replace(/[^a-z0-9_]/gi, '_');
+    const fileId = noExt.replace(/[\\/]/g, '__').replace(/[^a-z0-9_]/gi, '_');
     const segments = relPath.split(/[\\/]/);
-    const groupKey =
-      segments.length > 1 && segments[0] ? capitalize(segments[0]) : null;
+    const groupKey = segments.length > 1 && segments[0] ? capitalize(segments[0]) : null;
     const source = await fs.readFile(file, 'utf8');
     const parsed = await parseMarkdown(source, fileId, {
       pageFile: file,
-      resolveStoryCode: (info) =>
-        extractStoryCode(info.absStoryFile, info.exportName),
+      resolveStoryCode: (info) => extractStoryCode(info.absStoryFile, info.exportName),
       resolveProps: (info) =>
         extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
       loadTemplate: makeLoadTemplate(ctx.templateDirs, ctx.root),
@@ -253,9 +243,7 @@ export async function dev(config: MarkbookConfig): Promise<void> {
       const t0 = Date.now();
       await writePages(ctx, { clean: false, searchEnabled: false });
       const dt = Date.now() - t0;
-      console.log(
-        `[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`,
-      );
+      console.log(`[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`);
       server.ws.send({ type: 'full-reload', path: '*' });
     } catch (err) {
       console.error('[markbook] regeneration failed:', err);
@@ -429,16 +417,11 @@ function generateEntry(
     if (s.exportName === 'default') {
       importLines.push(`import story_${i} from ${JSON.stringify(rel)};`);
     } else {
-      importLines.push(
-        `import { ${s.exportName} as story_${i} } from ${JSON.stringify(rel)};`,
-      );
+      importLines.push(`import { ${s.exportName} as story_${i} } from ${JSON.stringify(rel)};`);
     }
   });
 
-  const optsArg =
-    decoratorRefs.length > 0
-      ? `, { decorators: [${decoratorRefs.join(', ')}] }`
-      : '';
+  const optsArg = decoratorRefs.length > 0 ? `, { decorators: [${decoratorRefs.join(', ')}] }` : '';
   const mounts = stories.map(
     (s, i) =>
       `mount(document.querySelector('[data-markbook-story="${s.id}"]'), story_${i}${optsArg});`,
@@ -468,9 +451,7 @@ function generateHtml(
   };
 
   const homeItem = nav.find((g) => g.label === null)?.items[0];
-  const homeHref = homeItem
-    ? resolveHref(homeItem.htmlRelPath)
-    : resolveHref('index.html');
+  const homeHref = homeItem ? resolveHref(homeItem.htmlRelPath) : resolveHref('index.html');
 
   const pagefindBase = (() => {
     let rel = path.relative(fromDir, 'pagefind').replace(/\\/g, '/');
@@ -488,28 +469,20 @@ function generateHtml(
           return `<li><a href="${href}"${active ? ' class="active" aria-current="page"' : ''}>${escapeHtml(n.title)}</a></li>`;
         })
         .join('');
-      const heading = group.label
-        ? `<h2>${escapeHtml(group.label)}</h2>`
-        : '';
+      const heading = group.label ? `<h2>${escapeHtml(group.label)}</h2>` : '';
       return `<div class="markbook-nav-group">${heading}<ul>${itemsHtml}</ul></div>`;
     })
     .join('');
 
-  const tocItems = page.parsed.headings.filter(
-    (h) => h.level === 2 || h.level === 3,
-  );
+  const tocItems = page.parsed.headings.filter((h) => h.level === 2 || h.level === 3);
   const tocHtml = tocItems
-    .map(
-      (h) =>
-        `<li class="toc-h${h.level}"><a href="#${h.slug}">${escapeHtml(h.text)}</a></li>`,
-    )
+    .map((h) => `<li class="toc-h${h.level}"><a href="#${h.slug}">${escapeHtml(h.text)}</a></li>`)
     .join('');
   const tocBlock =
     tocItems.length > 0
       ? `<aside class="markbook-toc"><h3>On this page</h3><ul>${tocHtml}</ul></aside>`
       : '';
-  const shellClass =
-    tocItems.length > 0 ? 'markbook-shell' : 'markbook-shell no-toc';
+  const shellClass = tocItems.length > 0 ? 'markbook-shell' : 'markbook-shell no-toc';
 
   const pagefindLink = searchEnabled
     ? `<link href="${pagefindBase}/pagefind-ui.css" rel="stylesheet">`

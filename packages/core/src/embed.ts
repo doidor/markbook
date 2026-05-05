@@ -36,9 +36,7 @@ export async function bundleEmbed(
 
   const tmpDir = path.join(ctx.tmpDir, mode);
   const outRoot =
-    mode === 'package'
-      ? path.join(ctx.outDir, 'packages')
-      : path.join(ctx.outDir, 'embed');
+    mode === 'package' ? path.join(ctx.outDir, 'packages') : path.join(ctx.outDir, 'embed');
 
   await fs.rm(tmpDir, { recursive: true, force: true });
   await fs.mkdir(tmpDir, { recursive: true });
@@ -51,9 +49,7 @@ export async function bundleEmbed(
     );
   }
 
-  const targets = opts.storyId
-    ? stories.filter((s) => s.slug === opts.storyId)
-    : stories;
+  const targets = opts.storyId ? stories.filter((s) => s.slug === opts.storyId) : stories;
   if (targets.length === 0) {
     throw new Error(
       `Markbook bundle: no story with id '${opts.storyId}'. Available: ${stories.map((s) => s.slug).join(', ')}`,
@@ -80,9 +76,7 @@ export async function bundleEmbed(
     `✓ Bundled ${summary} (${mode}${isolation ? `, isolation=${isolation}` : ''}) → ${path.relative(ctx.root, outRoot)}`,
   );
   if (mode === 'embed') {
-    console.log(
-      `  Sandbox: ${path.relative(ctx.root, path.join(outRoot, 'index.html'))}`,
-    );
+    console.log(`  Sandbox: ${path.relative(ctx.root, path.join(outRoot, 'index.html'))}`);
   }
 }
 
@@ -182,10 +176,7 @@ async function bundlePackageOne(
     path.join(pkgDir, 'package.json'),
     `${JSON.stringify(buildPackageJson(pkgName, version, peerDeps), null, 2)}\n`,
   );
-  await fs.writeFile(
-    path.join(pkgDir, 'README.md'),
-    generatePackageReadme(pkgName, story),
-  );
+  await fs.writeFile(path.join(pkgDir, 'README.md'), generatePackageReadme(pkgName, story));
 }
 
 function buildPackageJson(
@@ -209,10 +200,7 @@ function buildPackageJson(
   return out;
 }
 
-function generatePackageReadme(
-  pkgName: string,
-  story: DiscoveredStory,
-): string {
+function generatePackageReadme(pkgName: string, story: DiscoveredStory): string {
   return `# ${pkgName}
 
 A portable Markbook story bundled from \`${story.pageRelPath}\` (\`${story.slug}\`).
@@ -241,10 +229,7 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
   const mdFiles = await glob('**/*.md', { cwd: ctx.docsDir, absolute: true });
   for (const mdFile of mdFiles.sort()) {
     const source = await fs.readFile(mdFile, 'utf8');
-    const fileId = path
-      .relative(ctx.docsDir, mdFile)
-      .replace(/\.md$/, '')
-      .replace(/[\\/]/g, '__');
+    const fileId = path.relative(ctx.docsDir, mdFile).replace(/\.md$/, '').replace(/[\\/]/g, '__');
     const parsed = await parseMarkdown(source, fileId, {
       pageFile: mdFile,
       loadTemplate,
@@ -252,9 +237,7 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
     for (const story of parsed.stories) {
       const absStoryFile = path.resolve(path.dirname(mdFile), story.src);
       const docsRel = path.relative(ctx.docsDir, absStoryFile);
-      const derivedSlug = slugify(
-        docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''),
-      );
+      const derivedSlug = slugify(docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''));
       const slug = story.slug ?? derivedSlug;
       stories.push({
         slug,
@@ -283,9 +266,7 @@ function buildEntryImports(
   decoratorPaths: string[],
   entryDir: string,
 ): { imports: string; storyRef: string; decoratorRefs: string[] } {
-  const lines: string[] = [
-    `import { mount as adapterMount } from ${JSON.stringify(adapterPkg)};`,
-  ];
+  const lines: string[] = [`import { mount as adapterMount } from ${JSON.stringify(adapterPkg)};`];
   const decoratorRefs: string[] = [];
   decoratorPaths.forEach((p, i) => {
     let rel = path.relative(entryDir, p).replace(/\\/g, '/');
@@ -293,16 +274,12 @@ function buildEntryImports(
     lines.push(`import Decorator${i} from ${JSON.stringify(rel)};`);
     decoratorRefs.push(`Decorator${i}`);
   });
-  let storyRel = path
-    .relative(entryDir, story.absStoryFile)
-    .replace(/\\/g, '/');
+  let storyRel = path.relative(entryDir, story.absStoryFile).replace(/\\/g, '/');
   if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
   if (story.exportName === 'default') {
     lines.push(`import Story from ${JSON.stringify(storyRel)};`);
   } else {
-    lines.push(
-      `import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`,
-    );
+    lines.push(`import { ${story.exportName} as Story } from ${JSON.stringify(storyRel)};`);
   }
   return { imports: lines.join('\n'), storyRef: 'Story', decoratorRefs };
 }
@@ -376,10 +353,7 @@ export default mount;
 `;
 }
 
-function generateSandboxHtml(
-  stories: DiscoveredStory[],
-  siteTitle: string,
-): string {
+function generateSandboxHtml(stories: DiscoveredStory[], siteTitle: string): string {
   const cards = stories
     .map(
       (s) => `

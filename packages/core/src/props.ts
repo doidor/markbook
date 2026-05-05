@@ -20,7 +20,7 @@ export async function extractComponentProps(
       shouldExtractLiteralValuesFromEnum: true,
       shouldRemoveUndefinedFromOptional: true,
       propFilter: (prop: { parent?: { fileName: string } }) =>
-        !prop.parent || !prop.parent.fileName.includes('node_modules'),
+        !prop.parent?.fileName.includes('node_modules'),
     };
     parser = tsConfigPath ? withCustomConfig(tsConfigPath, opts) : withDefaultConfig(opts);
     parserCache.set(cacheKey, parser);
@@ -34,9 +34,7 @@ export async function extractComponentProps(
   }
   if (!components || components.length === 0) return null;
 
-  const target = exportName
-    ? components.find((c) => c.displayName === exportName)
-    : components[0];
+  const target = exportName ? components.find((c) => c.displayName === exportName) : components[0];
   if (!target) return null;
 
   const props = Object.values(target.props);

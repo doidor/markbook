@@ -53,13 +53,9 @@ export function Avatar({ name, src, size = 'md', shape = 'circle' }: AvatarProps
     flexShrink: 0,
   };
   return (
-    <div style={style} aria-label={name} title={name}>
+    <div role="img" style={style} aria-label={name} title={name}>
       {src ? (
-        <img
-          src={src}
-          alt={name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
         initialsOf(name)
       )}

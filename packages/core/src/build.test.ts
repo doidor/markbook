@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  capitalize,
-  isIndexHref,
-  sortIndexFirst,
-  type NavItem,
-} from './build.js';
+import { capitalize, isIndexHref, sortIndexFirst, type NavItem } from './build.js';
 
 const item = (id: string, htmlRelPath: string): NavItem => ({
   id,
@@ -44,11 +39,7 @@ describe('sortIndexFirst', () => {
   });
 
   it('moves a top-level index page to the front', () => {
-    const items = [
-      item('b', 'b.html'),
-      item('idx', 'index.html'),
-      item('a', 'a.html'),
-    ];
+    const items = [item('b', 'b.html'), item('idx', 'index.html'), item('a', 'a.html')];
     const sorted = sortIndexFirst(items);
     expect(sorted[0]?.htmlRelPath).toBe('index.html');
     expect(sorted[1]?.htmlRelPath).toBe('b.html');
@@ -56,13 +47,8 @@ describe('sortIndexFirst', () => {
   });
 
   it('moves a nested index (components/index.html) to the front of its group', () => {
-    const items = [
-      item('b', 'components/b.html'),
-      item('i', 'components/index.html'),
-    ];
-    expect(sortIndexFirst(items)[0]?.htmlRelPath).toBe(
-      'components/index.html',
-    );
+    const items = [item('b', 'components/b.html'), item('i', 'components/index.html')];
+    expect(sortIndexFirst(items)[0]?.htmlRelPath).toBe('components/index.html');
   });
 
   it('does not mutate the input array', () => {

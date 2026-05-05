@@ -1,11 +1,4 @@
-import {
-  createApp,
-  defineComponent,
-  h,
-  type App,
-  type Component,
-  type VNode,
-} from 'vue';
+import { createApp, defineComponent, h, type App, type Component, type VNode } from 'vue';
 
 const apps = new WeakMap<Element, App>();
 
@@ -19,11 +12,7 @@ interface MountOptions {
   isolation?: 'shadow';
 }
 
-export function mount(
-  el: Element | null,
-  story: unknown,
-  opts?: MountOptions,
-): void {
+export function mount(el: Element | null, story: unknown, opts?: MountOptions): void {
   if (!el) return;
 
   const target = resolveMountTarget(el, opts);

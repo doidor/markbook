@@ -6,7 +6,10 @@
   "bin": {
     "markbook": "./bin/markbook.js"
   },
-  "files": ["dist", "bin"],
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -b -w",

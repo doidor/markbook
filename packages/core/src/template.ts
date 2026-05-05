@@ -16,18 +16,13 @@ export function applyTemplate(
   frontmatter: Record<string, unknown>,
   templateBody: string,
 ): string {
-  return templateBody.replace(
-    /\{\{\s*([\w.]+)\s*\}\}/g,
-    (_match, key: string) => {
-      if (key === 'content') return content;
-      if (key.startsWith('frontmatter.')) {
-        return stringify(
-          getDotPath(frontmatter, key.slice('frontmatter.'.length)),
-        );
-      }
-      return stringify(frontmatter[key]);
-    },
-  );
+  return templateBody.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, key: string) => {
+    if (key === 'content') return content;
+    if (key.startsWith('frontmatter.')) {
+      return stringify(getDotPath(frontmatter, key.slice('frontmatter.'.length)));
+    }
+    return stringify(frontmatter[key]);
+  });
 }
 
 function getDotPath(obj: unknown, dotPath: string): unknown {

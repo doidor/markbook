@@ -15,7 +15,9 @@
       "import": "./dist/config.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -b -w",

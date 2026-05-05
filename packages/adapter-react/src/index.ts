@@ -1,10 +1,5 @@
 import { createRoot, type Root } from 'react-dom/client';
-import {
-  createElement,
-  isValidElement,
-  type ComponentType,
-  type ReactNode,
-} from 'react';
+import { createElement, isValidElement, type ComponentType, type ReactNode } from 'react';
 
 const roots = new WeakMap<Element, Root>();
 
@@ -18,11 +13,7 @@ interface MountOptions {
   isolation?: 'shadow';
 }
 
-export function mount(
-  el: Element | null,
-  story: unknown,
-  opts?: MountOptions,
-): void {
+export function mount(el: Element | null, story: unknown, opts?: MountOptions): void {
   if (!el) return;
 
   const target = resolveMountTarget(el, opts);
@@ -39,9 +30,7 @@ export function mount(
   } else if (isValidElement(story)) {
     element = story;
   } else {
-    throw new Error(
-      'Markbook: story export must be a function component or a React element',
-    );
+    throw new Error('Markbook: story export must be a function component or a React element');
   }
 
   if (opts?.decorators && opts.decorators.length > 0) {

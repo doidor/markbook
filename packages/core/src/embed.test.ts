@@ -7,9 +7,7 @@ describe('slugify', () => {
   });
 
   it('replaces slashes with dashes (path → kebab)', () => {
-    expect(slugify('components/Button/Variants')).toBe(
-      'components-button-variants',
-    );
+    expect(slugify('components/Button/Variants')).toBe('components-button-variants');
   });
 
   it('strips non-alphanumeric chars', () => {
@@ -25,9 +23,7 @@ describe('slugify', () => {
   });
 
   it('handles backslashes (Windows-style paths)', () => {
-    expect(slugify('components\\Button\\Variants')).toBe(
-      'components-button-variants',
-    );
+    expect(slugify('components\\Button\\Variants')).toBe('components-button-variants');
   });
 
   it('preserves digits', () => {

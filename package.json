@@ -11,6 +11,10 @@
     "build": "pnpm -r --filter './packages/*' build",
     "test": "pnpm -r --filter '@markbook/core' test",
     "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "format": "biome format . --write",
+    "prepare": "husky",
     "example:build": "pnpm --filter @markbook/example-react-demo build",
     "example:dev": "pnpm --filter @markbook/example-react-demo dev",
     "example:bundle": "pnpm --filter @markbook/example-react-demo exec markbook bundle",
@@ -23,6 +27,8 @@
     "example:embed-host:serve": "python3 -m http.server 4500 --directory examples"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "husky": "^9.1.7",
     "typescript": "^5.6.3"
   }
 }

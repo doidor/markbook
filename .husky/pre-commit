@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Markbook pre-commit hook: lint → typecheck → tests, fail-fast.
+
+pnpm lint && pnpm typecheck && pnpm test
