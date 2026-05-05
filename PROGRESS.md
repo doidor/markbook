@@ -62,3 +62,13 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 **Why:** The user wanted "templates anywhere". Single-string `templatesDir` already covered "any location" via `path.resolve`, but array form unlocks **shared + override** layouts: a project can list a global shared dir first and a per-project override second (or vice versa), and a missing template falls through with a useful error.
 
 **Next:** Pagefind (v0.2). No design follow-up needed — this was a small, clean extension to the v0.1 templates feature.
+
+---
+
+## 2026-05-05 — v0.2 Pagefind search
+
+**What changed:** Added Pagefind to `@markbook/core` deps and a `runPagefind(outDir)` step in `build.ts` that runs after Vite + llms emission. Uses the Node API (`pagefind.createIndex` → `addDirectory` → `writeFiles`) — no shell-out. The HTML template now (a) links `pagefind-ui.css` from the head, (b) replaces the old disabled search input with `<div id="markbook-search-ui">` in the header, (c) adds a `<script src="pagefind/pagefind-ui.js">` + an inline init that calls `new PagefindUI({ element: '#markbook-search-ui', showSubResults: true, resetStyles: false })`, and (d) marks `<article data-pagefind-body>` so only page content is indexed (nav and TOC are excluded). All paths are relative so subdir pages (`components/Button.html`) correctly point at `../pagefind/`. CSS overrides the `--pagefind-ui-*` variables to map Pagefind's UI onto the existing `--mb-*` theme tokens. **ADR-0009** captures the choices.
+
+**Why:** Search is the single biggest UX gap in a multi-page docs site. Doing it now (rather than later) means every subsequent demo / component-library experiment is searchable for free. Picking Pagefind's bundled UI over `@pagefind/default-ui` saves a dep and one moving part — the UI files come out of `writeFiles` automatically.
+
+**Next:** v0.3 — `markbook dev` with HMR. The current dev story is "edit, `pnpm example:build`, refresh" which doesn't scale beyond toy demos.

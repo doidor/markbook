@@ -1,12 +1,8 @@
 # Markbook roadmap
 
-Forward-looking work, ordered by priority. The current state is **v0.1** (smoke + Pixie demo + code blocks + props tables + Starlight-style layout — see `PROGRESS.md` for details).
+Forward-looking work, ordered by priority. The current state is **v0.2** (v0.1 + Pagefind search — see `PROGRESS.md` for details).
 
 ---
-
-## v0.2 — Search via Pagefind (ADR-0004)
-
-Run Pagefind against `dist/` after the Vite build; inject the Pagefind UI into the page shell. Required for any practical-sized component library.
 
 ## v0.3 — `markbook dev` (Vite dev server + HMR)
 

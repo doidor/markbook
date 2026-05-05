@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
 import { build as viteBuild } from 'vite';
+import * as pagefind from 'pagefind';
 import { parseMarkdown } from './parse.js';
 import { extractStoryCode } from './code.js';
 import { extractComponentProps } from './props.js';
@@ -143,6 +144,33 @@ export async function build(config: MarkbookConfig): Promise<void> {
   });
 
   await emitLlms(pages, outDir, siteTitle, siteDescription);
+  await runPagefind(outDir);
+}
+
+async function runPagefind(outDir: string): Promise<void> {
+  const create = await pagefind.createIndex({});
+  const errs = (create as { errors?: string[] }).errors;
+  if (errs && errs.length > 0) {
+    throw new Error(`Pagefind createIndex: ${errs.join(', ')}`);
+  }
+  const index = (create as { index?: unknown }).index;
+  if (!index) throw new Error('Pagefind: failed to create index');
+
+  const idx = index as {
+    addDirectory: (opts: { path: string }) => Promise<{ errors?: string[] }>;
+    writeFiles: (opts: { outputPath: string }) => Promise<{ errors?: string[] }>;
+  };
+
+  const addRes = await idx.addDirectory({ path: outDir });
+  if (addRes.errors && addRes.errors.length > 0) {
+    throw new Error(`Pagefind addDirectory: ${addRes.errors.join(', ')}`);
+  }
+  const writeRes = await idx.writeFiles({
+    outputPath: path.join(outDir, 'pagefind'),
+  });
+  if (writeRes.errors && writeRes.errors.length > 0) {
+    throw new Error(`Pagefind writeFiles: ${writeRes.errors.join(', ')}`);
+  }
 }
 
 function buildNav(pages: PageRecord[]): NavGroup[] {
@@ -282,6 +310,13 @@ function generateHtml(
     ? resolveHref(homeItem.htmlRelPath)
     : resolveHref('index.html');
 
+  const pagefindBase = (() => {
+    let rel = path.relative(fromDir, 'pagefind').replace(/\\/g, '/');
+    if (rel === '') rel = 'pagefind';
+    if (!rel.startsWith('.') && !rel.startsWith('/')) rel = `./${rel}`;
+    return rel;
+  })();
+
   const navHtml = nav
     .map((group) => {
       const itemsHtml = group.items
@@ -320,24 +355,31 @@ function generateHtml(
 <meta charset="utf-8">
 <title>${escapeHtml(page.parsed.title)} — ${escapeHtml(siteTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="${pagefindBase}/pagefind-ui.css" rel="stylesheet">
 <style>${BASE_CSS}</style>
 </head>
 <body>
 <header class="markbook-header">
   <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(siteTitle)}</a>
-  <input class="markbook-search" type="search" placeholder="Search (Pagefind, v0.2)" disabled aria-label="Search">
+  <div id="markbook-search-ui" class="markbook-search-ui"></div>
 </header>
 <div class="${shellClass}">
   <aside class="markbook-sidebar">
     <nav class="markbook-nav" aria-label="Site">${navHtml}</nav>
   </aside>
   <main class="markbook-main">
-    <article class="markbook-content">
+    <article class="markbook-content" data-pagefind-body>
 ${page.parsed.html}
     </article>
   </main>
   ${tocBlock}
 </div>
+<script src="${pagefindBase}/pagefind-ui.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    new PagefindUI({ element: '#markbook-search-ui', showSubResults: true, resetStyles: false });
+  });
+</script>
 <script type="module" src="./${entryBasename}"></script>
 </body>
 </html>
@@ -400,18 +442,42 @@ a:hover { text-decoration: underline; }
 }
 .markbook-brand:hover { text-decoration: none; }
 .markbook-logo { font-size: 1.2rem; }
-.markbook-search {
+.markbook-search-ui {
   flex: 1;
-  max-width: 320px;
+  max-width: 360px;
+  --pagefind-ui-scale: 0.875;
+  --pagefind-ui-primary: var(--mb-accent);
+  --pagefind-ui-text: var(--mb-fg);
+  --pagefind-ui-background: var(--mb-bg-elev);
+  --pagefind-ui-border: var(--mb-border);
+  --pagefind-ui-border-radius: var(--mb-radius);
+  --pagefind-ui-font: var(--mb-font-sans);
+}
+.markbook-search-ui .pagefind-ui__form { position: relative; }
+.markbook-search-ui .pagefind-ui__search-input {
   height: 32px;
-  padding: 0 0.75rem;
   font-size: 0.85rem;
+  font-family: var(--mb-font-sans);
   background: var(--mb-bg-elev);
-  color: var(--mb-fg-muted);
+  color: var(--mb-fg);
   border: 1px solid var(--mb-border);
   border-radius: var(--mb-radius);
+  width: 100%;
 }
-.markbook-search:disabled { cursor: not-allowed; }
+.markbook-search-ui .pagefind-ui__drawer {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--mb-bg);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem;
+  z-index: 20;
+}
 .markbook-shell {
   display: grid;
   grid-template-columns: var(--mb-sidebar-width) 1fr var(--mb-toc-width);
