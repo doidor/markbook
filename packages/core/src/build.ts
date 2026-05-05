@@ -443,9 +443,10 @@ a:hover { text-decoration: underline; }
 .markbook-brand:hover { text-decoration: none; }
 .markbook-logo { font-size: 1.2rem; }
 .markbook-search-ui {
-  flex: 1;
-  max-width: 360px;
-  position: relative !important;
+  position: relative;
+  width: 360px;
+  max-width: 50vw;
+  margin-left: auto;
   --pagefind-ui-scale: 1;
   --pagefind-ui-primary: var(--mb-accent);
   --pagefind-ui-text: var(--mb-fg);
@@ -457,128 +458,128 @@ a:hover { text-decoration: underline; }
   --pagefind-ui-font: var(--mb-font-sans);
 }
 .markbook-search-ui .pagefind-ui__search-input {
-  height: 36px !important;
-  padding: 0 36px 0 32px !important;
-  font-size: 0.875rem !important;
-  font-weight: 400 !important;
-  background: var(--mb-bg-elev) !important;
-  color: var(--mb-fg) !important;
-  border-color: var(--mb-border) !important;
+  height: 36px;
+  padding: 0 36px 0 32px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  background: var(--mb-bg-elev);
+  color: var(--mb-fg);
+  border-color: var(--mb-border);
 }
 .markbook-search-ui .pagefind-ui__form::before {
-  width: 14px !important;
-  height: 14px !important;
-  top: 11px !important;
-  left: 11px !important;
-  opacity: 0.5 !important;
+  width: 14px;
+  height: 14px;
+  top: 11px;
+  left: 11px;
+  opacity: 0.5;
 }
 .markbook-search-ui .pagefind-ui__search-clear {
-  height: 30px !important;
-  top: 3px !important;
-  right: 3px !important;
-  padding: 0 0.6rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 500 !important;
-  color: var(--mb-fg-muted) !important;
-  background: transparent !important;
-  border-radius: 4px !important;
+  height: 30px;
+  top: 3px;
+  right: 3px;
+  padding: 0 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--mb-fg-muted);
+  background: transparent;
+  border-radius: 4px;
 }
 .markbook-search-ui .pagefind-ui__search-clear:hover {
-  color: var(--mb-fg) !important;
-  background: var(--mb-bg-elev) !important;
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
 }
 .markbook-search-ui .pagefind-ui__drawer {
-  position: absolute !important;
-  top: calc(100% + 8px) !important;
-  right: 0 !important;
-  left: auto !important;
-  width: 480px !important;
-  max-width: calc(100vw - 3rem) !important;
-  max-height: 70vh !important;
-  overflow-y: auto !important;
-  background: var(--mb-bg) !important;
-  border: 1px solid var(--mb-border) !important;
-  border-radius: var(--mb-radius) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
-  padding: 0.25rem 0.5rem !important;
-  margin: 0 !important;
-  z-index: 20 !important;
-  gap: 0 !important;
-  flex-direction: column !important;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  width: 480px;
+  max-width: min(calc(100vw - 3rem), 600px);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--mb-bg);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 0.25rem 0.5rem;
+  margin: 0;
+  z-index: 20;
+  gap: 0;
+  flex-direction: column;
 }
 .markbook-search-ui .pagefind-ui__results-area {
-  min-width: 0 !important;
-  margin-top: 0 !important;
+  min-width: 0;
+  margin-top: 0;
 }
 .markbook-search-ui .pagefind-ui__message {
-  height: auto !important;
-  padding: 0.5rem 0.5rem !important;
-  font-size: 0.7rem !important;
-  font-weight: 600 !important;
-  color: var(--mb-fg-muted) !important;
+  height: auto;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--mb-fg-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin: 0 !important;
+  margin: 0;
 }
-.markbook-search-ui .pagefind-ui__results { padding: 0 !important; }
+.markbook-search-ui .pagefind-ui__results { padding: 0; }
 .markbook-search-ui .pagefind-ui__result {
-  padding: 0.6rem 0.5rem !important;
-  border-top: 1px solid var(--mb-border) !important;
-  gap: 0 !important;
+  padding: 0.6rem 0.5rem;
+  border-top: 1px solid var(--mb-border);
+  gap: 0;
 }
-.markbook-search-ui .pagefind-ui__result:last-of-type { border-bottom: none !important; }
-.markbook-search-ui .pagefind-ui__result-thumb { display: none !important; }
+.markbook-search-ui .pagefind-ui__result:last-of-type { border-bottom: none; }
+.markbook-search-ui .pagefind-ui__result-thumb { display: none; }
 .markbook-search-ui .pagefind-ui__result-inner {
   flex: 1;
-  margin-top: 0 !important;
-  gap: 0 !important;
+  margin-top: 0;
+  gap: 0;
 }
 .markbook-search-ui .pagefind-ui__result-title {
-  font-size: 0.95rem !important;
-  font-weight: 600 !important;
-  margin: 0 0 0.2rem !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.2rem;
 }
 .markbook-search-ui .pagefind-ui__result-excerpt {
-  font-size: 0.8rem !important;
-  color: var(--mb-fg-muted) !important;
-  line-height: 1.5 !important;
-  min-width: 0 !important;
-  margin-top: 0 !important;
+  font-size: 0.8rem;
+  color: var(--mb-fg-muted);
+  line-height: 1.5;
+  min-width: 0;
+  margin-top: 0;
 }
 .markbook-search-ui .pagefind-ui__result-link {
-  color: var(--mb-fg) !important;
-  text-decoration: none !important;
+  color: var(--mb-fg);
+  text-decoration: none;
 }
-.markbook-search-ui .pagefind-ui__result-link:hover { color: var(--mb-link) !important; }
+.markbook-search-ui .pagefind-ui__result-link:hover { color: var(--mb-link); }
 .markbook-search-ui .pagefind-ui__result-nested {
-  padding-left: 0.875rem !important;
-  padding-top: 0.4rem !important;
+  padding-left: 0.875rem;
+  padding-top: 0.4rem;
 }
 .markbook-search-ui .pagefind-ui__result-nested .pagefind-ui__result-link::before {
   font-size: 0.85em;
   opacity: 0.5;
 }
 .markbook-search-ui mark {
-  background: rgba(108, 92, 231, 0.16) !important;
-  color: var(--mb-fg) !important;
-  padding: 0 2px !important;
-  border-radius: 2px !important;
-  font-weight: 500 !important;
+  background: rgba(108, 92, 231, 0.16);
+  color: var(--mb-fg);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
 }
 .markbook-search-ui .pagefind-ui__button {
-  height: 32px !important;
-  padding: 0 1rem !important;
-  font-size: 0.85rem !important;
-  margin: 0.5rem 0 !important;
-  font-weight: 500 !important;
-  background: var(--mb-bg-elev) !important;
-  border-color: var(--mb-border) !important;
-  color: var(--mb-fg) !important;
+  height: 32px;
+  padding: 0 1rem;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-weight: 500;
+  background: var(--mb-bg-elev);
+  border-color: var(--mb-border);
+  color: var(--mb-fg);
 }
 .markbook-search-ui .pagefind-ui__button:hover {
-  background: var(--mb-border) !important;
-  border-color: var(--mb-border) !important;
-  color: var(--mb-fg) !important;
+  background: var(--mb-border);
+  border-color: var(--mb-border);
+  color: var(--mb-fg);
 }
 .markbook-shell {
   display: grid;
