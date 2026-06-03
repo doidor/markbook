@@ -243,3 +243,19 @@ For `markbook bundle`, fan-out stories always promote their slug to `${baseSlug}
 Test files keep importing from sibling source modules (no path change). Cross-package consumers in the workspace (adapter packages, CLI) only use the main entry — verified by grep.
 
 **Consequences:** A user writing a custom CLI around Markbook (e.g. an alternative bundler) can `import { parseMarkdown } from '@markbook/core/internal'` and accept the contract that the function may grow new options at any minor release. The split also informs README writing — `packages/core/README.md` documents only the main-entry surface, while internals are listed in `internal.ts`'s top-of-file comment for discoverability. Future API audits become a refactoring exercise rather than a breaking change: anything that should have been internal can be moved to `./internal` without bumping major.
+
+---
+
+## ADR-0020 — "Open in playground" buttons via provider POST forms (not SDKs)
+
+**Context:** Storybook ships an "Open in CodeSandbox" button that's been on every Markbook user's wishlist. Two providers are worth supporting: CodeSandbox and StackBlitz. Each has a JavaScript SDK (`@stackblitz/sdk`, no official CodeSandbox SDK that I'm aware of) and an unauthenticated POST form API. The button needs to encode the story's source plus a minimal sandbox project (package.json + index.html + an entry that mounts the story's default export).
+
+**Decision:**
+- **No SDK dependency.** Both providers expose stable POST form endpoints (`https://stackblitz.com/run` and `https://codesandbox.io/api/v1/sandboxes/define?json=1`). Markbook builds a hidden form at click time and submits — zero runtime deps, no version churn.
+- **Build descriptors at parse time, submit at click time.** `packages/core/src/playground.ts` exports `buildPlaygroundDescriptors({ storyFiles, config, ... })` which returns one `PlaygroundFormDescriptor` per configured provider. Each descriptor carries `{ action, fields: [name, value][] }`. The HTML emitter (in `build.ts`) base64-encodes the descriptor into a `data-payload` attribute on the button.
+- **Boot script** (`PLAYGROUND_BOOT_SCRIPT` in `build.ts`, ~280 bytes minified inline) delegates clicks on `[data-markbook-playground]`, decodes the payload, builds a form with `target="_blank"`, submits, removes.
+- **Config shape on `MarkbookConfig`:** `playground?: { providers: 'codesandbox' | 'stackblitz' | ['codesandbox','stackblitz']; dependencies?: Record<string, string>; stackblitzTemplate?: string } | false`. Default off; one button per provider; multiple providers ship multiple buttons side by side.
+- **React-only for v1.** Sandbox layout uses CRA template (package.json + public/index.html + src/index.tsx + the story file under src/). Vue/WC support is additive (different template + entry shape) and gated behind a future per-adapter `playgroundTemplate` hook.
+- **Sandbox payload is the story's source verbatim.** In-repo relative imports stay broken in the sandbox — documented as a known limitation in `.copilot/wiki/playground-imports-stay-broken.md`. Markbook does NOT rewrite imports or copy in-repo source files; doing so would require module-graph traversal and per-project resolution assumptions that would frequently be wrong.
+
+**Consequences:** The feature ships with one new file (`playground.ts`), one config addition, ~280 bytes of inline JS, and a small CSS block. Bundle size impact on the docs site is per-story: a base64-encoded JSON descriptor (~1–3 KB per button per story per provider). For Pixie's 20 stories × 2 providers that adds ~60–80 KB of HTML across all pages — acceptable for the feature value. The "broken imports for in-repo demos" tradeoff is real and surfaces immediately when a Pixie user clicks Open in CodeSandbox; the wiki entry tells them why and how to recover. A future `playground.inlineSourceImports` hook can address that case without rework.

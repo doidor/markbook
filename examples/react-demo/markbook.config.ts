@@ -8,5 +8,9 @@ export default defineConfig({
   outDir: 'dist',
   templatesDir: ['_layouts'],
   css: ['./markbook.css'],
+  playground: {
+    providers: ['codesandbox', 'stackblitz'],
+    dependencies: { react: '18.3.1', 'react-dom': '18.3.1' },
+  },
   adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 });

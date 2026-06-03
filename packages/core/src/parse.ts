@@ -71,6 +71,12 @@ export interface ParseOptions {
   }) => Promise<{ tableHtml: string; tableMarkdown: string } | null>;
   /** Returns the raw text of a template file given its `<name>` (no extension). */
   loadTemplate?: (name: string) => Promise<string>;
+  /**
+   * Optional hook that returns extra HTML to inject inside each story-block
+   * (e.g. "Open in playground" buttons). Called once per StoryRef after the
+   * story's `codeFiles` have been resolved. Return `''` to skip.
+   */
+  renderStoryExtras?: (story: StoryRef) => string;
 }
 
 interface BaseSlot {
@@ -291,7 +297,7 @@ export async function parseMarkdown(
       // shifted by later replacements in the same parent.
       const orderedSlots = [...slots].sort((a, b) => b.start - a.start);
       for (const slot of orderedSlots) {
-        const replacement = buildSlotReplacement(slot, propsTableHtml);
+        const replacement = buildSlotReplacement(slot, propsTableHtml, options.renderStoryExtras);
         slot.parent.children.splice(slot.index, 1, ...(replacement as never[]));
       }
     })
@@ -382,14 +388,19 @@ function parseNameList(raw: string | undefined): string[] | undefined {
  * block. Headings are real `heading` nodes so `rehype-slug` slugs them and the
  * page TOC picks them up.
  */
-function buildSlotReplacement(slot: DirectiveSlot, propsTableHtml: string | undefined): unknown[] {
+function buildSlotReplacement(
+  slot: DirectiveSlot,
+  propsTableHtml: string | undefined,
+  renderStoryExtras: ((story: StoryRef) => string) | undefined,
+): unknown[] {
   if (slot.kind === 'story') {
     const files = slot.story.codeFiles ?? [];
     const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(slot.story.id, files);
+    const extras = renderStoryExtras ? renderStoryExtras(slot.story) : '';
     return [
       {
         type: 'html',
-        value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
+        value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${extras}${codeBlock}</div>`,
       },
     ];
   }
@@ -408,6 +419,7 @@ function buildSlotReplacement(slot: DirectiveSlot, propsTableHtml: string | unde
     const text = humanizeExportName(story.exportName);
     const files = story.codeFiles ?? [];
     const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(story.id, files);
+    const extras = renderStoryExtras ? renderStoryExtras(story) : '';
     nodes.push({
       type: 'heading',
       depth: 3,
@@ -415,7 +427,7 @@ function buildSlotReplacement(slot: DirectiveSlot, propsTableHtml: string | unde
     });
     nodes.push({
       type: 'html',
-      value: `<div class="markbook-story-block" data-markbook-group="${slot.groupId}"><div class="markbook-story" data-markbook-story="${story.id}"></div><div class="markbook-controls" data-markbook-controls="${story.id}"></div>${codeBlock}</div>`,
+      value: `<div class="markbook-story-block" data-markbook-group="${slot.groupId}"><div class="markbook-story" data-markbook-story="${story.id}"></div><div class="markbook-controls" data-markbook-controls="${story.id}"></div>${extras}${codeBlock}</div>`,
     });
   }
   return nodes;

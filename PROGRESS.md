@@ -334,3 +334,27 @@ Verified: `pnpm example:embed-host:build` rebuilds 20 embed + 20 package bundles
 **Why:** `--isolation=shadow` was advertised but never actually worked for stories with extracted CSS — anyone using it got an unstyled story. The placeholder-pattern + per-adapter `injectCss` design is the smallest change that keeps the existing dedup-on-cssId behaviour for light DOM AND extends correctly to shadow scope. Pushing the injection responsibility to the adapter (rather than core) means each adapter's runtime knows where it actually mounted and which scope owns the styles — no out-of-band coordination needed. The Pixie token fix proves the same source CSS can serve both worlds without runtime transformation (which the rubber-duck specifically pushed back on as too magical).
 
 **Next:** C — "open in playground" button per story. Then E — UX polish batch (copy-code, heading permalinks, search includes story names).
+
+---
+
+## 2026-06-03 — "Open in playground" buttons (CodeSandbox + StackBlitz)
+
+**What changed:** Every rendered story-block can now ship one button per configured playground provider. Click → POST form to the provider in a new tab → reader lands in a sandbox prefilled with the story source + a minimal React project (package.json declaring `react` / `react-dom`, public/index.html, src/index.tsx that imports the story's default export and mounts it). Five pieces:
+
+1. **`packages/core/src/playground.ts`** (new). Pure functions: `buildPlaygroundDescriptors({ storyFiles, config, storyEntryFile, title })` returns one `PlaygroundFormDescriptor` per provider with `{ provider, action, fields: [name, value][], label }`. CodeSandbox encodes the whole file map under a single `parameters` field via the `?json=1` API endpoint (URL-encoded JSON, no LZ-string dep needed). StackBlitz uses one field per file/dep/title under the `project[...]` namespace.
+
+2. **`MarkbookConfig.playground`** added (`packages/core/src/config.ts`). Shape: `{ providers: 'codesandbox' | 'stackblitz' | ['codesandbox','stackblitz']; dependencies?: Record<string, string>; stackblitzTemplate?: string } | false`. Default `undefined` (no buttons). Mark as `false` to explicitly disable. Pass an array of providers to render two buttons side-by-side.
+
+3. **Parse-time wiring** (`packages/core/src/parse.ts`). `ParseOptions` grew a `renderStoryExtras?: (story: StoryRef) => string` callback. `buildSlotReplacement` calls it for every story-block (both singleton `:::story` and fan-out `:::stories`) after `codeFiles` is resolved, splicing the returned HTML between the controls slot and the code disclosure.
+
+4. **Build-time wiring** (`packages/core/src/build.ts`). `BuildContext.playground` resolves the config; `writePages` passes a `renderStoryExtras` callback that base64-encodes each descriptor into a `<button data-markbook-playground data-payload="…">`. A new 280-byte inline `PLAYGROUND_BOOT_SCRIPT` delegates clicks, decodes the payload, builds a hidden form with `target="_blank"`, submits, removes. New CSS rules for `.markbook-playground` (flex row of pills under each story).
+
+5. **Dogfood:** `examples/react-demo/markbook.config.ts` now enables `playground: { providers: ['codesandbox', 'stackblitz'], dependencies: { react: '18.3.1', 'react-dom': '18.3.1' } }`. Every rendered story on the React demo gets two buttons. Confirmed end-to-end via `pnpm example:build` — Button page shows 12 buttons (6 stories × 2 providers); Avatar's `:::stories` fan-out shows 8 buttons (4 exports × 2 providers).
+
+Tests: 7 new in `playground.test.ts` covering descriptor count per provider configuration, CodeSandbox field shape, StackBlitz field shape, default React deps fallback, custom `stackblitzTemplate`, sibling-CSS inclusion under `src/`. Total suite: 76 passing.
+
+**Known limitation, documented in `.copilot/wiki/playground-imports-stay-broken.md`:** sandboxes ship the story source verbatim. A story that imports `'../../../src/pixie/Button.js'` will produce a sandbox that fails to build because the Pixie source doesn't live there. For real-world npm-published component libraries this works as-is; for in-repo demo code (like Pixie) readers see the JSX and can rewrite imports themselves. A future `playground.inlineSourceImports` hook could close that gap by globbing in-repo source into the sandbox — not implemented, gated on actual demand.
+
+**Why:** "Open in CodeSandbox" / "Open in StackBlitz" has been on every Storybook user's wishlist forever. Providing both buttons (configurable to ship one, the other, or both) lets users pick the playground they prefer. Using the POST-form API for each provider rather than an SDK keeps dependencies at zero and bundle size impact at ~280 bytes of inline JS plus per-button base64 payloads. The conservative scope (React-only for v1) ships the feature for the canonical use case while leaving Vue/WC support as a future per-adapter `playgroundTemplate` hook — easy additive change with no rework. ADR-0020 captures the design.
+
+**Next:** E — UX polish batch (copy-code button on disclosures, hover-revealed heading permalinks, Pagefind index extended with story export names).

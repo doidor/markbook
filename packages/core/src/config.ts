@@ -81,7 +81,41 @@ export interface MarkbookConfig {
       frontmatter: Record<string, unknown>;
     },
   ) => string | Promise<string>;
+  /**
+   * "Open in playground" integration. When set, each rendered story-block
+   * gets a button that opens the story source in CodeSandbox and/or
+   * StackBlitz. React-only for now.
+   *
+   * Known limitation: story files that import in-repo modules (e.g.
+   * `'../../../src/MyComponent.js'`) produce sandboxes with broken imports.
+   * For real-world component libraries published to npm this works as-is;
+   * for in-repo demo code the resulting sandbox shows the source and lets
+   * the reader rewrite the imports themselves.
+   */
+  playground?: PlaygroundConfig | false;
   adapter: MarkbookAdapter;
+}
+
+export type PlaygroundProvider = 'codesandbox' | 'stackblitz';
+
+export interface PlaygroundConfig {
+  /**
+   * Which providers to offer buttons for. Pass a single provider for one
+   * button, or an array of two (`['codesandbox', 'stackblitz']`) for both.
+   */
+  providers: PlaygroundProvider | PlaygroundProvider[];
+  /**
+   * Dependencies declared in the generated `package.json`. For React
+   * stories, defaults to `{ react: 'latest', 'react-dom': 'latest' }` when
+   * omitted.
+   */
+  dependencies?: Record<string, string>;
+  /**
+   * StackBlitz template. Defaults to `'create-react-app'` for React stories.
+   * See https://developer.stackblitz.com/docs/platform/post-api/ for the
+   * full list.
+   */
+  stackblitzTemplate?: string;
 }
 
 export function defineConfig(config: MarkbookConfig): MarkbookConfig {

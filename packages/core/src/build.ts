@@ -8,8 +8,9 @@ import { parseMarkdown } from './parse.js';
 import { extractStoryCode, invalidateCodeCache } from './code.js';
 import { discoverStoryExports, invalidateExportsCache } from './exports.js';
 import { extractComponentProps } from './props.js';
+import { buildPlaygroundDescriptors } from './playground.js';
 import type { ParsedPage, StoryRef } from './parse.js';
-import type { MarkbookConfig } from './config.js';
+import type { MarkbookConfig, PlaygroundConfig } from './config.js';
 
 interface PageRecord {
   file: string;
@@ -49,6 +50,8 @@ export interface BuildContext {
   cssPaths: string[];
   userCss: string;
   disableBaseCss: boolean;
+  /** Resolved playground configuration. `undefined` when disabled or omitted. */
+  playground: PlaygroundConfig | undefined;
 }
 
 export function makeLoadTemplate(
@@ -107,6 +110,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     cssPaths,
     userCss,
     disableBaseCss: !!config.disableBaseCss,
+    playground: config.playground === false || !config.playground ? undefined : config.playground,
   };
 }
 
@@ -162,6 +166,9 @@ async function writePages(
       resolveProps: (info) =>
         extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
       loadTemplate: makeLoadTemplate(ctx.templateDirs, ctx.root),
+      renderStoryExtras: ctx.playground
+        ? (story) => renderPlaygroundButtons(story, ctx.playground!, file)
+        : undefined,
     });
     pages.push({
       file,
@@ -487,6 +494,48 @@ export function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Render the "Open in playground" button(s) emitted next to each story-block
+ * when `MarkbookConfig.playground` is set. Each button carries the form
+ * descriptor as a single base64-encoded JSON blob in `data-payload`; the
+ * boot script (`PLAYGROUND_BOOT_SCRIPT`) decodes on click, builds a hidden
+ * form, and submits to the provider.
+ */
+function renderPlaygroundButtons(
+  story: StoryRef,
+  config: PlaygroundConfig,
+  pageFile: string,
+): string {
+  const files = story.codeFiles ?? [];
+  if (files.length === 0) return '';
+
+  const playgroundFiles = files.map((f) => ({ path: f.label, content: f.code }));
+  const entryFile = files[0]?.label ?? 'Story.tsx';
+  const descriptors = buildPlaygroundDescriptors({
+    storyFiles: playgroundFiles,
+    config,
+    storyEntryFile: entryFile,
+    title: `${path.basename(pageFile, '.md')} — ${story.exportName}`,
+  });
+
+  const buttons = descriptors
+    .map((d) => {
+      const payload = Buffer.from(JSON.stringify(d), 'utf8').toString('base64');
+      return `<button type="button" class="markbook-playground-btn" data-markbook-playground data-payload="${payload}" title="${escapeAttr(d.label)}">${escapeText(d.label)}</button>`;
+    })
+    .join('');
+
+  return `<div class="markbook-playground">${buttons}</div>`;
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+function escapeText(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function generateEntry(
   stories: StoryRef[],
   pageDir: string,
@@ -648,6 +697,7 @@ function generateHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>${THEME_BOOT_SCRIPT}</script>
 <script>${TABS_BOOT_SCRIPT}</script>
+<script>${PLAYGROUND_BOOT_SCRIPT}</script>
 ${pagefindLink}
 ${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
 ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
@@ -692,6 +742,15 @@ function escapeHtml(s: string): string {
 const THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
 
 const TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closest('[data-markbook-tabs]');if(!wrap)return;var tabs=wrap.querySelectorAll('[role="tab"]');var pid=tab.getAttribute('aria-controls');for(var i=0;i<tabs.length;i++){var t=tabs[i];t.setAttribute('aria-selected',t===tab?'true':'false');t.tabIndex=t===tab?0:-1;}var panels=wrap.querySelectorAll('[role="tabpanel"]');for(var j=0;j<panels.length;j++){panels[j].hidden=panels[j].id!==pid;}}document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(t&&t.closest('[data-markbook-tabs]'))activate(t);});document.addEventListener('keydown',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(!t||!t.closest('[data-markbook-tabs]'))return;if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();var tabs=t.parentElement.querySelectorAll('[role="tab"]');var i=Array.prototype.indexOf.call(tabs,t);var n=e.key==='ArrowRight'?(i+1)%tabs.length:(i-1+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n]);});})();`;
+
+/**
+ * Delegated click handler for [data-markbook-playground] buttons. Each button
+ * carries a base64-encoded JSON descriptor with provider-specific form
+ * fields (action URL + named values). On click we decode, build a hidden
+ * form, append to body, submit, then remove. Posts in a new tab so the
+ * docs page is not navigated away from.
+ */
+const PLAYGROUND_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-playground]');if(!b)return;e.preventDefault();var d;try{d=JSON.parse(atob(b.getAttribute('data-payload')||''));}catch(err){console.error('markbook: malformed playground payload',err);return;}var f=document.createElement('form');f.action=d.action;f.method='POST';f.target='_blank';f.style.display='none';for(var i=0;i<d.fields.length;i++){var pair=d.fields[i];var input=document.createElement('input');input.type='hidden';input.name=pair[0];input.value=pair[1];f.appendChild(input);}document.body.appendChild(f);f.submit();f.parentNode.removeChild(f);});})();`;
 
 const BASE_CSS = `
 :root {
@@ -1042,6 +1101,36 @@ a:hover { text-decoration: underline; }
   font-size: 0.85rem;
 }
 .markbook-controls:empty { display: none; }
+.markbook-playground {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  border-left: 1px solid var(--mb-border);
+  border-right: 1px solid var(--mb-border);
+  background: var(--mb-bg);
+  padding: 0.5rem 1rem;
+}
+.markbook-playground-btn {
+  appearance: none;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-bg-soft);
+  color: var(--mb-fg-muted);
+  font-family: var(--mb-font-sans);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .12s ease, color .12s ease, background .12s ease;
+}
+.markbook-playground-btn:hover {
+  border-color: var(--mb-accent);
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
+}
+.markbook-playground-btn:focus-visible {
+  outline: 2px solid var(--mb-accent);
+  outline-offset: 2px;
+}
 .markbook-control { display: contents; }
 .markbook-control label {
   font-family: var(--mb-font-mono);
