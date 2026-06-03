@@ -11,19 +11,29 @@ Both pages render the Pixie **Button / Variants** story sourced from `examples/r
 
 ## Run
 
-1. Generate the bundles from the React demo:
-   ```
-   pnpm example:bundle
-   pnpm --filter @markbook/example-react-demo exec markbook bundle \
-       components-button-variants --mode package
-   ```
-2. Serve this directory:
-   ```
-   pnpm example:embed-host:serve   # http://localhost:4500/embed-host/
-   ```
-3. Open `http://localhost:4500/embed-host/` and click through to the embed and package demos.
+```bash
+# 1. Build the React demo, then both bundle modes (embed + package), all in one shot.
+pnpm example:embed-host:build
+
+# 2. Serve at http://localhost:4500/embed-host/
+pnpm example:embed-host:serve
+```
+
+Open `http://localhost:4500/embed-host/` and click through to either demo page.
+
+### Building one mode at a time
+
+If you only need one bundle mode:
+
+```bash
+pnpm example:bundle           # embed mode → react-demo/dist/embed/*.js
+pnpm example:bundle:package   # package mode → react-demo/dist/packages/<slug>/
+```
+
+The same `:package` suffix exists for the Vue and WC demos (`example:vue:bundle:package`, `example:wc:bundle:package`) so you can mirror this workflow in any of the three.
 
 ## Notes
 
 - The `serve` script roots Python's `http.server` at `examples/` so the host pages can reach `../react-demo/dist/{embed,packages}/...` via relative URLs.
-- The package-mode importmap pulls React from `esm.sh` so the demo doesn't need a node_modules. In a real project you'd declare React as a dependency and bundle normally.
+- The package-mode importmap pulls React from `esm.sh` so the demo doesn't need a `node_modules`. In a real project you'd declare React as a dependency and bundle normally.
+- The package mode bundle's filename is just `dist/index.js` (inside `dist/packages/<slug>/`) — the slug becomes the package name in the importmap.

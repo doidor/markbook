@@ -19,12 +19,16 @@
     "example:build": "pnpm --filter @markbook/example-react-demo build",
     "example:dev": "pnpm --filter @markbook/example-react-demo dev",
     "example:bundle": "pnpm --filter @markbook/example-react-demo exec markbook bundle",
+    "example:bundle:package": "pnpm --filter @markbook/example-react-demo exec markbook bundle --mode package",
     "example:vue:build": "pnpm --filter @markbook/example-vue-demo build",
     "example:vue:dev": "pnpm --filter @markbook/example-vue-demo dev",
     "example:vue:bundle": "pnpm --filter @markbook/example-vue-demo exec markbook bundle",
+    "example:vue:bundle:package": "pnpm --filter @markbook/example-vue-demo exec markbook bundle --mode package",
     "example:wc:build": "pnpm --filter @markbook/example-wc-demo build",
     "example:wc:dev": "pnpm --filter @markbook/example-wc-demo dev",
     "example:wc:bundle": "pnpm --filter @markbook/example-wc-demo exec markbook bundle",
+    "example:wc:bundle:package": "pnpm --filter @markbook/example-wc-demo exec markbook bundle --mode package",
+    "example:embed-host:build": "pnpm example:build && pnpm example:bundle && pnpm example:bundle:package",
     "example:embed-host:serve": "python3 -m http.server 4500 --directory examples"
   },
   "devDependencies": {
