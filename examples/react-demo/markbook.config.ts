@@ -11,6 +11,9 @@ export default defineConfig({
   playground: {
     providers: ['codesandbox', 'stackblitz'],
     dependencies: { react: '18.3.1', 'react-dom': '18.3.1' },
+    // Inline Pixie source into the sandbox so the story's
+    // `'../../../src/pixie/Button.js'` imports actually resolve.
+    inlineSourceImports: ['src/pixie/**/*'],
   },
   adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 });

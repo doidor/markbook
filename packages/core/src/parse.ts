@@ -74,9 +74,10 @@ export interface ParseOptions {
   /**
    * Optional hook that returns extra HTML to inject inside each story-block
    * (e.g. "Open in playground" buttons). Called once per StoryRef after the
-   * story's `codeFiles` have been resolved. Return `''` to skip.
+   * story's `codeFiles` have been resolved. Return `''` to skip. Can be
+   * async — file I/O is fine here.
    */
-  renderStoryExtras?: (story: StoryRef) => string;
+  renderStoryExtras?: (story: StoryRef) => string | Promise<string>;
 }
 
 interface BaseSlot {
@@ -293,11 +294,25 @@ export async function parseMarkdown(
 
       await Promise.all(tasks);
 
+      // Resolve story extras (e.g. "Open in playground" buttons) AFTER
+      // codeFiles is populated — the renderer typically needs the source.
+      // We store the result on each story so slot rendering stays sync.
+      const extrasMap = new Map<string, string>();
+      if (options.renderStoryExtras) {
+        const renderer = options.renderStoryExtras;
+        await Promise.all(
+          stories.map(async (story) => {
+            const html = await renderer(story);
+            if (html) extrasMap.set(story.id, html);
+          }),
+        );
+      }
+
       // Splice in descending source order so earlier slots' indexes are not
       // shifted by later replacements in the same parent.
       const orderedSlots = [...slots].sort((a, b) => b.start - a.start);
       for (const slot of orderedSlots) {
-        const replacement = buildSlotReplacement(slot, propsTableHtml, options.renderStoryExtras);
+        const replacement = buildSlotReplacement(slot, propsTableHtml, extrasMap);
         slot.parent.children.splice(slot.index, 1, ...(replacement as never[]));
       }
     })
@@ -410,12 +425,12 @@ function parseNameList(raw: string | undefined): string[] | undefined {
 function buildSlotReplacement(
   slot: DirectiveSlot,
   propsTableHtml: string | undefined,
-  renderStoryExtras: ((story: StoryRef) => string) | undefined,
+  extrasMap: Map<string, string>,
 ): unknown[] {
   if (slot.kind === 'story') {
     const files = slot.story.codeFiles ?? [];
     const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(slot.story.id, files);
-    const extras = renderStoryExtras ? renderStoryExtras(slot.story) : '';
+    const extras = extrasMap.get(slot.story.id) ?? '';
     return [
       {
         type: 'html',
@@ -438,7 +453,7 @@ function buildSlotReplacement(
     const text = humanizeExportName(story.exportName);
     const files = story.codeFiles ?? [];
     const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(story.id, files);
-    const extras = renderStoryExtras ? renderStoryExtras(story) : '';
+    const extras = extrasMap.get(story.id) ?? '';
     nodes.push({
       type: 'heading',
       depth: 3,

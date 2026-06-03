@@ -116,6 +116,19 @@ export interface PlaygroundConfig {
    * full list.
    */
   stackblitzTemplate?: string;
+  /**
+   * Glob patterns (relative to `MarkbookConfig.root`, or absolute) of source
+   * files eligible for inlining into the sandbox. When set, Markbook walks
+   * each story file's relative imports and — if they resolve to a file
+   * matched by one of these globs — includes the file's source in the
+   * sandbox payload (and recurses into ITS imports). Use this for monorepo
+   * setups where stories import from in-repo source that isn't published on
+   * npm. Without it, those imports stay broken in the sandbox.
+   *
+   * Each file lands at `src/<path-relative-to-root>` in the sandbox so the
+   * original relative-import paths resolve unchanged.
+   */
+  inlineSourceImports?: string[];
 }
 
 export function defineConfig(config: MarkbookConfig): MarkbookConfig {

@@ -30,10 +30,28 @@ export interface PlaygroundFormDescriptor {
 }
 
 export interface BuildPlaygroundInput {
+  /**
+   * Story file (TSX/TS/JSX/JS) and any sibling CSS imports, each at a
+   * `path` that places the file under the sandbox `src/` root. For the
+   * inlined-source flow, this is the story's `MarkbookConfig.root`-relative
+   * path; for simple cases, just the filename.
+   */
   storyFiles: PlaygroundFile[];
   config: PlaygroundConfig;
-  /** Filename of the story's main file (e.g. `Variants.stories.tsx`). */
+  /**
+   * The `storyFiles[].path` of the story entry that the generated
+   * `src/index.tsx` imports. The entry resolves `./<this path, minus
+   * extension>` relative to `src/`.
+   */
   storyEntryFile: string;
+  /**
+   * Extra source files inlined from the user's repo (resolved by walking
+   * the story's relative imports against `MarkbookConfig.playground.
+   * inlineSourceImports` globs). Each has a root-relative `path` so the
+   * file lands at exactly the location the original relative-import paths
+   * expect — no rewriting required.
+   */
+  inlinedSources?: PlaygroundFile[];
   /** Display title for the sandbox. */
   title: string;
 }
@@ -59,7 +77,12 @@ export function buildPlaygroundDescriptors(
     ? input.config.providers
     : [input.config.providers];
   const dependencies = input.config.dependencies ?? DEFAULT_REACT_DEPS;
-  const files = buildReactSandboxFiles(input.storyFiles, input.storyEntryFile, dependencies);
+  const files = buildReactSandboxFiles(
+    input.storyFiles,
+    input.inlinedSources ?? [],
+    input.storyEntryFile,
+    dependencies,
+  );
 
   return providers.map((provider) => {
     if (provider === 'codesandbox') {
@@ -74,10 +97,14 @@ export function buildPlaygroundDescriptors(
  *   - `package.json` declares the dependencies
  *   - `public/index.html` carries the mount root
  *   - `src/index.tsx` boots React and renders the story's default export
- *   - `src/<storyFile>` is the story source (and sibling CSS imports)
+ *   - `src/<storyEntryFile>` is the story source (and sibling CSS imports)
+ *   - `src/<rel-path>` for each inlined source file — placed at the same
+ *     relative-from-root location as in the user's repo so the original
+ *     relative-import paths resolve unchanged.
  */
 function buildReactSandboxFiles(
   storyFiles: PlaygroundFile[],
+  inlinedSources: PlaygroundFile[],
   storyEntryFile: string,
   dependencies: Record<string, string>,
 ): PlaygroundFile[] {
@@ -118,8 +145,21 @@ if (el) createRoot(el).render(<Story />);
     { path: 'public/index.html', content: indexHtml },
     { path: 'src/index.tsx', content: indexEntry },
   ];
+  // Story + sibling CSS go under src/<their declared path>.
   for (const f of storyFiles) {
     out.push({ path: `src/${f.path}`, content: f.content });
+  }
+  // Inlined repo source goes under src/<root-relative path>, preserving
+  // structure so the original relative-import paths from the story still
+  // resolve. e.g. story at src/docs/components/Button/X.stories.tsx +
+  // inlined component at src/src/pixie/Button.tsx — the story's existing
+  // `'../../../src/pixie/Button.js'` import resolves correctly.
+  const seen = new Set(out.map((f) => f.path));
+  for (const f of inlinedSources) {
+    const dest = `src/${f.path.replace(/\\/g, '/')}`;
+    if (seen.has(dest)) continue;
+    out.push({ path: dest, content: f.content });
+    seen.add(dest);
   }
   return out;
 }

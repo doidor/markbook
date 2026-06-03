@@ -9,6 +9,7 @@ import { extractStoryCode, invalidateCodeCache } from './code.js';
 import { discoverStoryExports, invalidateExportsCache } from './exports.js';
 import { extractComponentProps } from './props.js';
 import { buildPlaygroundDescriptors } from './playground.js';
+import { resolveInlinedSources } from './inline-sources.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig, PlaygroundConfig } from './config.js';
 
@@ -167,7 +168,7 @@ async function writePages(
         extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
       loadTemplate: makeLoadTemplate(ctx.templateDirs, ctx.root),
       renderStoryExtras: ctx.playground
-        ? (story) => renderPlaygroundButtons(story, ctx.playground!, file)
+        ? (story) => renderPlaygroundButtons(story, ctx.playground!, file, ctx.root)
         : undefined,
     });
     pages.push({
@@ -500,22 +501,58 @@ export function capitalize(s: string): string {
  * descriptor as a single base64-encoded JSON blob in `data-payload`; the
  * boot script (`PLAYGROUND_BOOT_SCRIPT`) decodes on click, builds a hidden
  * form, and submits to the provider.
+ *
+ * When `playground.inlineSourceImports` is configured, the story's relative
+ * imports are walked (transitively) and any matching source files are
+ * included in the sandbox at their original repo-relative path so existing
+ * `'../../../src/foo.js'`-style imports resolve without rewriting.
  */
-function renderPlaygroundButtons(
+async function renderPlaygroundButtons(
   story: StoryRef,
   config: PlaygroundConfig,
   pageFile: string,
-): string {
+  ctxRoot: string,
+): Promise<string> {
   const files = story.codeFiles ?? [];
   if (files.length === 0) return '';
 
-  const playgroundFiles = files.map((f) => ({ path: f.label, content: f.code }));
-  const entryFile = files[0]?.label ?? 'Story.tsx';
+  // The story file's path relative to the config root — used as the
+  // sandbox-side path so the entry can import it correctly.
+  const storyAbsPath = path.resolve(path.dirname(pageFile), story.src);
+  const storyRelPath = path.relative(ctxRoot, storyAbsPath).replace(/\\/g, '/');
+  const storyDir = path.dirname(storyRelPath);
+  const storyFileName = path.basename(storyAbsPath);
+
+  // Resolve sibling CSS imports (and the story itself) to root-relative
+  // paths so they line up with any inlined sources under the same `src/`
+  // tree in the sandbox.
+  const playgroundFiles = files.map((f, i) => {
+    const candidate = path.posix.join(storyDir, f.label);
+    return {
+      path: i === 0 ? storyRelPath : candidate,
+      content: f.code,
+    };
+  });
+
+  let inlinedSources: { path: string; content: string }[] | undefined;
+  if (config.inlineSourceImports && config.inlineSourceImports.length > 0) {
+    const inlined = await resolveInlinedSources({
+      storyAbsPath,
+      root: ctxRoot,
+      inlinePatterns: config.inlineSourceImports,
+    });
+    inlinedSources = inlined.map((f) => ({
+      path: f.relPath.replace(/\\/g, '/'),
+      content: f.content,
+    }));
+  }
+
   const descriptors = buildPlaygroundDescriptors({
     storyFiles: playgroundFiles,
+    inlinedSources,
     config,
-    storyEntryFile: entryFile,
-    title: `${path.basename(pageFile, '.md')} — ${story.exportName}`,
+    storyEntryFile: storyRelPath,
+    title: `${path.basename(pageFile, '.md')} — ${story.exportName} — ${storyFileName}`,
   });
 
   const buttons = descriptors

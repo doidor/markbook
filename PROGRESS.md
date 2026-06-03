@@ -392,3 +392,27 @@ Verified end-to-end: rebuilt the React demo and curl'd the first button's payloa
 **Why:** The playground feature was unusable as shipped — every button hit the same generic error. The `?json=1` mode was a half-remembered shortcut from older CodeSandbox docs; the actual supported encoding for the unauthenticated `/define` endpoint has been LZ-string-compressed base64 for a while now. Worth ~10 KB of dependency cost to make the feature actually work.
 
 **Next:** Nothing scheduled. The feature now ships in a working state. If `playground.inlineSourceImports` becomes a real need (so Pixie-style demos produce sandboxes that actually run), that's the natural follow-up.
+
+---
+
+## 2026-06-03 — `playground.inlineSourceImports`: in-repo sandboxes actually run
+
+**What changed:** The playground feature shipped earlier today produced sandboxes that opened but failed to build for any story that imported in-repo source (Pixie's `'../../../src/pixie/Button.js'`). New config knob `MarkbookConfig.playground.inlineSourceImports: string[]` accepts globs (resolved relative to `MarkbookConfig.root`) of files eligible for inlining. When set, Markbook walks each story file's relative imports — transitively — and any path that matches one of the globs gets included in the sandbox payload at `src/<root-relative-path>`. Pixie sandboxes now boot and render. Five pieces:
+
+1. **`packages/core/src/inline-sources.ts`** (new). `resolveInlinedSources({ storyAbsPath, root, inlinePatterns })` returns `InlinedFile[]` with `{ absPath, relPath, content }`. Walks imports via a regex-based scanner (handles `import`, `export from`, `export *`, side-effect `import 'x'`, `import type`). Resolves specifiers via Node's `.js → .ts/.tsx` swap convention and `directory → directory/index.ts` resolution. Skips bare specifiers. Gated on an eligible-set glob match so a story can't drag in arbitrary repo source.
+
+2. **`MarkbookConfig.playground.inlineSourceImports?: string[]`** added to `packages/core/src/config.ts`. Doc comment describes the layout-preserving placement convention.
+
+3. **`packages/core/src/playground.ts`** — `BuildPlaygroundInput` gained an optional `inlinedSources?: PlaygroundFile[]`. `buildReactSandboxFiles` places them all under `src/<relPath>`, deduped against the story file paths. Story + sibling CSS now also use root-relative `path` keys (`'docs/components/Button/Variants.stories.tsx'` instead of bare `'Variants.stories.tsx'`) so they line up next to inlined source under the same `src/` tree.
+
+4. **`packages/core/src/parse.ts`** — `ParseOptions.renderStoryExtras` made async-capable (returns `string | Promise<string>`). New post-tasks pass stores resolved extras keyed by story id; `buildSlotReplacement` reads from an `extrasMap` rather than calling the renderer directly.
+
+5. **`packages/core/src/build.ts`** — `renderPlaygroundButtons` is now async, takes `ctxRoot`, and calls `resolveInlinedSources` when `inlineSourceImports` is set. Computes the story's root-relative path for the sandbox layout. Bug fixed in `inline-sources.ts`: `fs.access` returned true for directories too; replaced with `fs.stat().isFile()` so the `'./stuff' → './stuff/index.tsx'` resolution doesn't falsely accept the directory.
+
+Dogfood: `examples/react-demo/markbook.config.ts` enables `inlineSourceImports: ['src/pixie/**/*']`. Verified end-to-end — the Pixie Button page's first sandbox payload was `302 → https://codesandbox.io/s/9nx8kr` (real working sandbox); decoded payload contains 7 files including `src/src/pixie/Button.tsx`, `src/src/pixie/Button.module.css`, `src/src/pixie/pixie.css` (transitively inlined from Button.tsx). The story's `'../../../src/pixie/Button.js'` resolves from `src/docs/components/Button/` to `src/src/pixie/Button.tsx`.
+
+Tests: 10 new in `inline-sources.test.ts` covering empty patterns, direct relative imports, transitive follow, the eligibility-glob gate, bare-module skipping, `.js → .tsx` resolution, extensionless `→ /index.tsx`, `export from` declarations, missing-file null-safety, story-not-in-output. Total suite: 86 passing.
+
+**Why:** The playground feature shipped this morning was technically correct but practically broken for the demo it shipped on — first-click on a Pixie Button button produced a sandbox with `Cannot find module '../../../src/pixie/Button.js'` and the user bounced. Closing that loop pays back the most per hour of any pending work — turns "neat feature with a known limitation" into "neat feature that just works." The conservative scope (relative imports only, glob-gated, no rewriting) keeps the algorithm small and predictable; the `playground-inline-source-imports.md` wiki entry documents the sandbox layout convention and the limits (no dynamic imports, no bare specifiers walked).
+
+**Next:** Nothing specific. The deferred carve-outs from earlier (Vue/WC props tables, Vue/WC controls, WC decorators, v1.0 freeze) are still waiting. Playground feature is now fully closed.
