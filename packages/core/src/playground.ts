@@ -1,3 +1,4 @@
+import LZString from 'lz-string';
 import type { PlaygroundConfig, PlaygroundProvider } from './config.js';
 
 /**
@@ -127,18 +128,23 @@ function buildCodeSandboxDescriptor(
   files: PlaygroundFile[],
   title: string,
 ): PlaygroundFormDescriptor {
-  // CodeSandbox define API accepts a JSON payload via `?json=1&parameters=…`
-  // (URL-encoded JSON instead of LZ-string-compressed base64). Using POST
-  // form submit so the payload doesn't hit URL-length limits.
+  // CodeSandbox's `/define` endpoint requires the parameters payload to be
+  // LZ-string-compressed and base64-url-encoded. The legacy `?json=1` mode
+  // (plain URL-encoded JSON) is deprecated and now returns a generic
+  // "Unable to process params" error.
   const parameters = {
     files: Object.fromEntries(files.map((f) => [f.path, { content: f.content }])),
     template: 'create-react-app-typescript',
     title,
   };
+  const compressed = LZString.compressToBase64(JSON.stringify(parameters))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
   return {
     provider: 'codesandbox',
-    action: 'https://codesandbox.io/api/v1/sandboxes/define?json=1',
-    fields: [['parameters', JSON.stringify(parameters)]],
+    action: 'https://codesandbox.io/api/v1/sandboxes/define',
+    fields: [['parameters', compressed]],
     label: 'Open in CodeSandbox',
   };
 }

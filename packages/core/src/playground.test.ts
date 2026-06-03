@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import LZString from 'lz-string';
 import { buildPlaygroundDescriptors } from './playground.js';
+
+function decodeCsbParameters(field: string): { files: Record<string, { content: string }> } {
+  const restored = field.replace(/-/g, '+').replace(/_/g, '/');
+  const json = LZString.decompressFromBase64(restored);
+  return JSON.parse(json ?? '');
+}
 
 const baseFile = {
   path: 'Variants.stories.tsx',
@@ -28,7 +35,7 @@ describe('buildPlaygroundDescriptors', () => {
     expect(out.map((d) => d.provider)).toEqual(['codesandbox', 'stackblitz']);
   });
 
-  it('CodeSandbox payload encodes file map under the `parameters` field', () => {
+  it('CodeSandbox payload encodes file map under the `parameters` field (LZ-string compressed)', () => {
     const out = buildPlaygroundDescriptors({
       storyFiles: [baseFile],
       config: { providers: 'codesandbox' },
@@ -36,16 +43,15 @@ describe('buildPlaygroundDescriptors', () => {
       title: 'Variants',
     });
     const cs = out[0]!;
-    expect(cs.action).toContain('codesandbox.io');
-    expect(cs.action).toContain('json=1');
+    expect(cs.action).toBe('https://codesandbox.io/api/v1/sandboxes/define');
     const [name, value] = cs.fields[0]!;
     expect(name).toBe('parameters');
-    const parsed = JSON.parse(value);
+    const parsed = decodeCsbParameters(value);
     expect(parsed.files['package.json']).toBeDefined();
     expect(parsed.files['public/index.html']).toBeDefined();
     expect(parsed.files['src/index.tsx']).toBeDefined();
     expect(parsed.files['src/Variants.stories.tsx']).toBeDefined();
-    expect(parsed.files['src/Variants.stories.tsx'].content).toContain('export default');
+    expect(parsed.files['src/Variants.stories.tsx']!.content).toContain('export default');
   });
 
   it('StackBlitz fields include project[template], dependencies, and one entry per file', () => {
@@ -73,8 +79,8 @@ describe('buildPlaygroundDescriptors', () => {
       storyEntryFile: baseFile.path,
       title: 'Variants',
     });
-    const parsed = JSON.parse(out[0]!.fields[0]![1]);
-    const pkg = JSON.parse(parsed.files['package.json'].content);
+    const parsed = decodeCsbParameters(out[0]!.fields[0]![1]);
+    const pkg = JSON.parse(parsed.files['package.json']!.content);
     expect(pkg.dependencies).toMatchObject({ react: 'latest', 'react-dom': 'latest' });
   });
 

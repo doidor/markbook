@@ -378,3 +378,17 @@ Tests: 7 new in `playground.test.ts` covering descriptor count per provider conf
 **Why:** Each of these is the kind of polish a reader doesn't notice when it's there but resents when it isn't. Copy-code is the most-used button on any Storybook site. Heading permalinks are how docs get shared in Slack/issues without screenshots. Cmd-K to search is muscle memory at this point — search-via-mouse-click is friction that compounds across every visit. Implementing all three as small inline boot scripts (no runtime deps, no bundled JS payload to load) keeps the cost at <1 KB of additional shipped JS per page.
 
 **Next:** No specific follow-up. The earlier deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) remain on the post-freeze list, plus a possible `playground.inlineSourceImports` hook if in-repo-imports-in-sandboxes turns out to matter.
+
+---
+
+## 2026-06-03 — Fix CodeSandbox playground: LZ-string compression required
+
+**What changed:** The CodeSandbox playground button shipped in the earlier playground commit was producing `"Unable to process params for /define"` for every story. Root cause: I'd used the legacy `?json=1` query mode (plain URL-encoded JSON), which is deprecated and no longer accepted by the live `/api/v1/sandboxes/define` endpoint. Verified by curl that even an absolute-minimal payload (single `index.js` file) returns the error with `?json=1`, while the same payload LZ-string-compressed and base64-url-encoded returns a 302 redirect to a real sandbox URL.
+
+Fix: added `lz-string` (1.5.0, ~10 KB minified) as a dependency of `@markbook/core`; `buildCodeSandboxDescriptor` in `packages/core/src/playground.ts` now compresses the JSON payload with `LZString.compressToBase64`, then URL-safe-transforms it (`+ → -`, `/ → _`, strip `=`). The form `action` reverts to `https://codesandbox.io/api/v1/sandboxes/define` (no query mode). Updated the corresponding tests in `playground.test.ts` to decode-and-assert via `LZString.decompressFromBase64`.
+
+Verified end-to-end: rebuilt the React demo and curl'd the first button's payload against the live endpoint — `302 → https://codesandbox.io/s/gq2v2x` (a working sandbox). All 76 unit tests still pass. The StackBlitz provider was unaffected (POST form fields aren't compressed).
+
+**Why:** The playground feature was unusable as shipped — every button hit the same generic error. The `?json=1` mode was a half-remembered shortcut from older CodeSandbox docs; the actual supported encoding for the unauthenticated `/define` endpoint has been LZ-string-compressed base64 for a while now. Worth ~10 KB of dependency cost to make the feature actually work.
+
+**Next:** Nothing scheduled. The feature now ships in a working state. If `playground.inlineSourceImports` becomes a real need (so Pixie-style demos produce sandboxes that actually run), that's the natural follow-up.
