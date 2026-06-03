@@ -32,11 +32,14 @@
     "example:static:dev": "pnpm --filter @markbook/example-static-demo dev",
     "example:marketing:build": "pnpm --filter @markbook/example-marketing-demo build",
     "example:marketing:dev": "pnpm --filter @markbook/example-marketing-demo dev",
+    "examples:dev": "node scripts/examples-dev.mjs",
+    "examples:build": "pnpm --filter './examples/*' --parallel build",
     "example:embed-host:build": "pnpm example:build && pnpm example:bundle && pnpm example:bundle:package",
     "example:embed-host:serve": "python3 -m http.server 4500 --directory examples"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
+    "concurrently": "^9.0.0",
     "husky": "^9.1.7",
     "typescript": "^5.6.3"
   }

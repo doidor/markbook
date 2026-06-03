@@ -771,3 +771,24 @@ The skills + wiki additions are about closing the discovery loop. The `markbook-
 - A "create a layout from a screenshot" skill (uses an LLM to walk DOM → layout). Probably better as a vendor-specific agent capability than a Markbook skill.
 - `{{ nav }}` / `{{ toc }}` placeholders if real demand surfaces (the docs-style template in the skill is currently aspirational).
 - A `<dest>/<layout-name>.html` argument in the `markbook-layout` skill that points at a remote URL → fetches and adapts. Not needed yet.
+
+## 2026-06-03 — `pnpm examples:dev` — run every example dev server in parallel
+
+**What changed:** New root scripts for spinning up every example at once:
+
+- **`pnpm examples:dev`** — starts all 5 example workspaces' `markbook dev` servers concurrently, each on its own port (5173-5177), color-coded output (`[react]`, `[vue]`, `[wc]`, `[static]`, `[marketing]`), single Ctrl-C terminates them all.
+- **`pnpm examples:build`** — builds all 5 examples in parallel via `pnpm -r --filter './examples/*' --parallel build`.
+
+The orchestrator is a tiny Node script (`scripts/examples-dev.mjs`) that uses `concurrently`'s programmatic API. It prints a clean header at startup listing every URL, then delegates to concurrently for child management. To add a new example: append to the `EXAMPLES` array in the script, pick the next free port — no other changes needed.
+
+Per-example dev scripts (`pnpm example:dev`, `pnpm example:vue:dev`, etc.) are unchanged and still bind to markbook's default port 5173 when invoked individually. Only the orchestrator overrides ports to avoid collision.
+
+Added `concurrently@^9.0.0` as a root dev-dependency.
+
+**Why:** The user asked for a one-command "start everything" flow while iterating across multiple demos. With five example workspaces, repeatedly switching between five terminal tabs gets tedious. The orchestrator collapses that into one command, one set of URLs, one Ctrl-C.
+
+The earlier `example:embed-host:serve` script remains separate because embed-host is a CONSUMER of bundled output, not a markbook site — it'd need the React demo built + bundled first, which would slow startup and confuse the workflow.
+
+**Verified:** All 5 servers boot in under 5 seconds; each returns 200; killing the orchestrator kills all children cleanly; no port conflicts.
+
+**Next:** None.

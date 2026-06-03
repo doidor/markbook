@@ -125,6 +125,14 @@ pnpm build                   # compile every @markbook/* package
 pnpm test                    # run @markbook/core's Vitest suite
 pnpm typecheck               # tsc --noEmit across the workspace
 pnpm lint                    # biome check
+
+# Run every example dev server in parallel — color-coded, one Ctrl-C
+# stops them all. URLs printed at startup. Add new examples in
+# scripts/examples-dev.mjs.
+pnpm examples:dev            # all 5 dev servers on ports 5173-5177
+pnpm examples:build          # build all 5 examples in parallel
+
+# Per-example scripts (each runs on the default port 5173 when invoked alone)
 pnpm example:dev             # React demo dev server (HMR)
 pnpm example:build           # build the React demo to dist/
 pnpm example:bundle          # bundle React demo stories as ESM embeds
