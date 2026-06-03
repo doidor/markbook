@@ -18,8 +18,13 @@ landing page with a hero, top nav, feature grids, pricing tiers, and a footer.
 | `layoutsDir: 'layouts'` + | Markbook's default HTML shell is REPLACED by `layouts/default.html`  |
 | `layout: 'default'`       | for every page. `index.md` opts into `layouts/landing.html` for the  |
 |                           | hero treatment via frontmatter `layout: landing`.                    |
-| `llmsButtons: false`      | No per-page "View / Copy as Markdown" buttons; the layout's footer   |
-|                           | exposes a single "All pages as markdown ↓" link to `/llms.txt`.      |
+| Search (default)          | Pagefind UI mounts into the `{{ search }}` slot in the top nav.      |
+|                           | The dev server runs Pagefind on the tmpDir too — search works in     |
+|                           | both `markbook dev` AND `markbook build`.                            |
+| `llms.txt` (default)      | Top-level `/llms.txt` index + per-page `/llms/<page>.txt` mirrors.   |
+|                           | The layout's footer Resources column links to `/llms.txt`; the       |
+|                           | `{{ pageActions }}` slot above each article surfaces per-page        |
+|                           | "View / Copy as Markdown" buttons. All emitted in dev too.           |
 | `title` (omitted)         | Each page provides its own title via frontmatter; the brand text     |
 |                           | "Cumulus" lives in the layouts' top-nav markup, not in `config.title`.|
 
@@ -57,7 +62,7 @@ pnpm example:marketing:dev      # dev server with watch (edits to layouts/, page
 | `{{ head }}`       | Inside `<head>`, after our own `<title>` and meta tags           |
 | `{{ bodyEnd }}`    | Just before `</body>` — Pagefind UI init lives here              |
 | `{{ search }}`     | Inside `.cumulus-topnav-search` in the top nav                   |
-| `{{ pageActions }}`| Inside `<main class="cumulus-shell">` (empty since `llmsButtons: false`) |
+| `{{ pageActions }}`| Just above each page's content article                           |
 | `{{ browserTitle }}` | Inside our own `<title>` tag                                   |
 | `{{ description }}`| Inside `<meta name="description">` and (in landing.html) the hero `<p>` |
 | `{{ title }}`      | Inside the hero `<h1>` on landing.html                           |

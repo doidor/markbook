@@ -14,13 +14,11 @@ import { defineConfig } from '@markbook/core';
  *     `<html>`/`<head>`/`<body>` shell is REPLACED by `layouts/default.html`
  *     for every page. `index.md`'s frontmatter overrides this with
  *     `layout: landing` for a hero-style treatment.
- *   - `llmsButtons: false` — no per-page "View as Markdown" buttons. The
- *     layout's footer instead exposes a single "All pages as markdown ↓"
- *     link to `/llms.txt`. Search is still wired up — the layout drops
- *     `{{ search }}` into the top nav.
  *
- * Search and llms.txt extraction are ON by default. Marketing sites can
- * opt into them just by including the right placeholders in the layout.
+ * Search, llms.txt extraction, AND per-page "View / Copy as Markdown"
+ * buttons are all ON (Markbook's defaults). The layout drops the
+ * `{{ search }}` slot into the top nav, the `{{ pageActions }}` slot above
+ * each page's content article, and a `/llms.txt` link in the footer.
  */
 export default defineConfig({
   contentDir: 'pages',
@@ -29,5 +27,4 @@ export default defineConfig({
   description: 'Cumulus — cloud infrastructure that gets out of your way.',
   disableBaseCss: true,
   css: ['./cumulus.css'],
-  llmsButtons: false,
 });

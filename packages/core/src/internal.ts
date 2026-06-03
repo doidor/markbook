@@ -41,12 +41,16 @@ export {
   humanizeExportName,
 } from './exports.js';
 
-// Build/dev plumbing — context creation, template loader, nav helpers
+// Build/dev plumbing — context creation, template loader, nav helpers,
+// llms.txt + Pagefind emitters (the last two are exported for advanced
+// pipelines that want to call them outside the bundled build()/dev()).
 export {
   createContext,
   makeLoadTemplate,
   makeLoadHtmlLayout,
   resolvePageLayout,
+  emitLlms,
+  runPagefind,
   sortIndexFirst,
   isIndexHref,
   capitalize,

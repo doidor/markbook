@@ -792,3 +792,67 @@ The earlier `example:embed-host:serve` script remains separate because embed-hos
 **Verified:** All 5 servers boot in under 5 seconds; each returns 200; killing the orchestrator kills all children cleanly; no port conflicts.
 
 **Next:** None.
+
+## 2026-06-03 — `markbook dev` now emits llms.txt + runs Pagefind; marketing demo shows page actions
+
+**What changed:** Three connected fixes for visibility-of-features in the marketing demo. The user reported "/llms.txt is not working, search and pageActions are not visible anywhere"; investigation found two engine gaps and one demo-config issue.
+
+### 1. `dev()` now emits `/llms.txt` and runs Pagefind against `tmpDir`
+
+Before: `dev()` called `writePages` with `searchEnabled: false` and never called `emitLlms` or `runPagefind`. Consequence: in dev,
+- `{{ search }}` placeholder expanded to empty (the slot wasn't even rendered, just an empty string).
+- `/llms.txt` returned 404 — the file didn't exist in `tmpDir`.
+- Pagefind JS / CSS weren't loaded → no search UI even if a layout hard-coded the slot.
+
+The "build works fine, dev doesn't" split was confusing — these are first-class Markbook features that should work in both modes. Pagefind on the 5-page Cumulus site indexes in ~80ms; on the 6-page React demo, ~150ms. Negligible vs the time the user spends iterating.
+
+After:
+- `writePages(ctx, { searchEnabled: true })` in dev — `{{ search }}` expands to the real slot, `{{ head }}` loads Pagefind CSS, `{{ bodyEnd }}` initializes the UI.
+- `emitLlms(initial.pages, ctx.tmpDir, ...)` runs immediately after the initial write, then again after every regeneration. Top-level `/llms.txt` and per-page mirrors served by Vite.
+- `runPagefind(ctx.tmpDir)` runs likewise. Vite serves the index from `/pagefind/`.
+
+Per-regeneration cost on the marketing demo (5 pages): ~80ms total for emitLlms + runPagefind on top of writePages. Console output unchanged (Pagefind is silent).
+
+Both `emitLlms` and `runPagefind` are now exported (also via `@markbook/core/internal`) for advanced consumers building their own pipelines, with TSDoc notes that they're called automatically by `build()`/`dev()`.
+
+### 2. Marketing demo: `llmsButtons: false` removed; page actions styled
+
+Earlier today I had set `llmsButtons: false` on the marketing demo with the rationale "marketing pages aren't AI prompt fodder." The user disagreed — they want the buttons visible. Removed the override (Markbook's default is `true`).
+
+Because the marketing demo also sets `disableBaseCss: true`, Markbook's built-in page-action button styling doesn't apply. Added `.markbook-page-actions` + `.markbook-page-action` styles to `cumulus.css` to fit the navy-on-coral aesthetic: pill-shaped, muted by default, accent border on hover, accent text on copy confirmation.
+
+The layout's `{{ pageActions }}` placeholder is in the same position it was before (just above the article) — now non-empty.
+
+### 3. Tests
+
+`packages/core/src/build-integration.test.ts` gained 3 new tests in a new `emitLlms — top-level llms.txt + per-page mirrors` describe block:
+- `/llms.txt` is written at the given outDir alongside `llms/<page>.txt` mirrors with the right index format + per-page descriptions.
+- `config.title` populates the H1 of `llms.txt`.
+- `writePages` alone emits per-page mirrors (used by both build and dev), but does NOT emit the top-level index (only `emitLlms` does that).
+
+Total: 161 tests in `@markbook/core` (was 158) + 21 in `markbook` CLI = **182 tests**. All green.
+
+### Documentation
+
+- `examples/marketing-demo/README.md` updated: removed the `llmsButtons: false` row, added a "Search (default)" row noting Pagefind runs in dev now, added a "llms.txt (default)" row, fixed the placeholder-position table to say `{{ pageActions }}` is "just above each page's content article" (not "empty since llmsButtons: false").
+- `markbook.config.ts` (marketing-demo) doc-comment rewritten to drop the `llmsButtons: false` rationale and add "Search, llms.txt extraction, AND per-page View/Copy as Markdown buttons are all ON".
+
+**Why:** First-class features failing silently in dev is the worst kind of bug — the user assumes their config is wrong, then debugs the layout, then debugs the build pipeline, then files a confused issue. The root cause was a misalignment between "dev should be lightweight" (the original instinct for skipping Pagefind in dev) and "dev should look like production" (what users actually need). 80ms of extra regeneration time is the right tradeoff.
+
+The `llmsButtons: false` decision had been a stylistic call I made unilaterally; the user's preference rightly overrides. The marketing demo is a SHOWCASE for Markbook's capabilities — hiding default features by default sends the wrong message to readers of the example.
+
+**Verified:**
+
+```
+$ pnpm example:marketing:dev
+$ curl http://localhost:5173/llms.txt              # HTTP 200, full index
+$ curl http://localhost:5173/pagefind/pagefind-ui.js  # HTTP 200
+$ curl http://localhost:5173/ | grep markbook-search-ui
+<div id="markbook-search-ui" class="markbook-search-ui"></div>
+$ curl http://localhost:5173/ | grep markbook-page-actions
+<div class="markbook-page-actions" role="group" ...>
+```
+
+Edit `pages/contact.md` → regenerates in ~80ms → `/llms.txt` reflects the change → Pagefind reindexes.
+
+**Next:** None. The dev/build parity gap is closed; the marketing demo's defaults match its docs.

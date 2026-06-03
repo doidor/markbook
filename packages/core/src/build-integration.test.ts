@@ -378,3 +378,62 @@ describe('writePages — markdown-only error gate', () => {
     );
   });
 });
+
+describe('emitLlms — top-level llms.txt + per-page mirrors', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('writes /llms.txt at the given outDir, alongside /llms/<page>.txt mirrors', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: The landing page\n---\n\nWelcome.',
+      'docs/about.md': '---\ntitle: About\ndescription: About us\n---\n\nWho we are.',
+    });
+    const ctx = await createContext({ root: fx.root });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitLlms } = await import('./build.js');
+    await emitLlms(pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+
+    expect(await fx.exists('llms.txt')).toBe(true);
+    expect(await fx.exists('llms/index.txt')).toBe(true);
+    expect(await fx.exists('llms/about.txt')).toBe(true);
+
+    const index = await fx.read('llms.txt');
+    expect(index).toMatch(/^# Home/);
+    expect(index).toContain('llmstxt.org');
+    expect(index).toContain('](./llms/index.txt)');
+    expect(index).toContain(': The landing page');
+    expect(index).toContain('](./llms/about.txt)');
+    expect(index).toContain(': About us');
+  });
+
+  it('uses config.title for the H1 when set; per-page descriptions still appear', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: Landing\n---\n',
+    });
+    const ctx = await createContext({ root: fx.root, title: 'My Site' });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitLlms } = await import('./build.js');
+    await emitLlms(pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+    const index = await fx.read('llms.txt');
+    expect(index).toMatch(/^# My Site/);
+  });
+
+  it('emits per-page mirrors writePages-side too (so dev "View as Markdown" works)', async () => {
+    // writePages itself emits llms/<page>.txt mirrors so the View-as-Markdown
+    // links work even before emitLlms runs. emitLlms re-emits them to the
+    // production outDir; dev() runs emitLlms against tmpDir so the index
+    // is also there.
+    fx = await setupFixture({ 'docs/index.md': '# Home\n\nBody.' });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    // Per-page mirror was written by writePages alone — without emitLlms.
+    expect(await fx.exists('llms/index.txt')).toBe(true);
+    const txt = await fx.read('llms/index.txt');
+    expect(txt).toContain('# Home');
+    expect(txt).toContain('Body.');
+    // Top-level llms.txt is NOT written by writePages alone.
+    expect(await fx.exists('llms.txt')).toBe(false);
+  });
+});

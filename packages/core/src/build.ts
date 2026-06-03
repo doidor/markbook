@@ -412,7 +412,17 @@ export async function build(config: MarkbookConfig): Promise<void> {
 
 export async function dev(config: MarkbookConfig): Promise<void> {
   const ctx = await createContext(config);
-  const initial = await writePages(ctx, { clean: true, searchEnabled: false });
+  // Search is now ON in dev too — the search slot, Pagefind CSS link, and
+  // body-end init script all render. `runPagefind(ctx.tmpDir)` below
+  // produces the index Vite serves under `/pagefind/`. Cost on a 5-page
+  // site is sub-200ms per regeneration; well worth getting search in the
+  // iteration loop.
+  const initial = await writePages(ctx, { clean: true, searchEnabled: true });
+  // Also emit `llms.txt` + per-page mirrors so the layout's "All pages as
+  // markdown" link (and any per-page `View as Markdown` button) work in
+  // dev — not just in `markbook build`.
+  await emitLlms(initial.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+  await runPagefind(ctx.tmpDir);
 
   const server = await createServer({
     root: ctx.tmpDir,
@@ -476,7 +486,9 @@ export async function dev(config: MarkbookConfig): Promise<void> {
         invalidateExportsCache(abs);
         invalidateCodeCache(abs);
       }
-      const result = await writePages(ctx, { clean: false, searchEnabled: false });
+      const result = await writePages(ctx, { clean: false, searchEnabled: true });
+      await emitLlms(result.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+      await runPagefind(ctx.tmpDir);
 
       // Add newly-referenced story files to the watcher (e.g. a markdown
       // page now points at a new `:::stories` source). Removing stale
@@ -518,7 +530,16 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   process.once('SIGTERM', shutdown);
 }
 
-async function runPagefind(outDir: string): Promise<void> {
+/**
+ * Run Pagefind across `outDir` to produce the static search index at
+ * `<outDir>/pagefind/`. Called by `build()` against the production
+ * `outDir`, and by `dev()` against `tmpDir` so the dev server's `{{ search }}`
+ * slot actually finds something.
+ *
+ * Exported for tests / advanced consumers building their own pipeline on
+ * top of `writePages`. Most consumers should just use `build()` or `dev()`.
+ */
+export async function runPagefind(outDir: string): Promise<void> {
   const create = await pagefind.createIndex({});
   const errs = (create as { errors?: string[] }).errors;
   if (errs && errs.length > 0) {
@@ -581,7 +602,16 @@ export function isIndexHref(href: string): boolean {
   return href === 'index.html' || href.endsWith('/index.html');
 }
 
-async function emitLlms(
+/**
+ * Emit the top-level `llms.txt` index plus every page's per-page mirror
+ * under `<outDir>/llms/`. Called by `build()` against the production
+ * `outDir`, and by `dev()` against `tmpDir` so the layout's
+ * `<a href="/llms.txt">` link AND the per-page "View / Copy as Markdown"
+ * buttons both work in dev — not just in `markbook build`.
+ *
+ * Exported for tests / advanced consumers.
+ */
+export async function emitLlms(
   pages: PageRecord[],
   outDir: string,
   siteTitle: string | null,
