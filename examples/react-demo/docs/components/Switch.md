@@ -2,7 +2,7 @@
 title: Switch
 description: A two-state on/off toggle.
 template: component
-component: ../../src/pixie/Switch.tsx
+component: '#pixie/Switch.tsx'
 componentExport: Switch
 ---
 

@@ -10,6 +10,7 @@ import rehypeSlug from 'rehype-slug';
 import { visit } from 'unist-util-visit';
 import { applyTemplate } from './template.js';
 import { humanizeExportName } from './exports.js';
+import { resolveSpec } from './resolve.js';
 
 export interface StoryCodeFile {
   label: string;
@@ -123,10 +124,12 @@ export async function parseMarkdown(
     content = applyTemplate(rawContent, frontmatter, templateBody);
   }
 
-  const componentPath =
-    typeof frontmatter.component === 'string'
-      ? path.resolve(pageDir, frontmatter.component)
-      : undefined;
+  const componentPath = (() => {
+    const spec = frontmatter.component;
+    if (typeof spec !== 'string') return undefined;
+    const resolved = resolveSpec(spec, pageDir);
+    return resolved ?? undefined;
+  })();
   const componentExport =
     typeof frontmatter.componentExport === 'string' ? frontmatter.componentExport : undefined;
 
@@ -190,10 +193,17 @@ export async function parseMarkdown(
             stories: [],
           };
           slots.push(slot);
+          const absStoryFile = resolveSpec(src, pageDir);
+          if (absStoryFile === null) {
+            throw new Error(
+              `Markbook: \`:::stories{src=${src}}\` could not be resolved from ${pageDir}. ` +
+                `Use a relative path (\`./\` or \`../\`) or install the bare-specifier package.`,
+            );
+          }
           pendingStoriesTasks.push({
             slot,
             src,
-            absStoryFile: path.resolve(pageDir, src),
+            absStoryFile,
             userSlug,
             only,
             exclude,
@@ -261,7 +271,8 @@ export async function parseMarkdown(
         // only once even when referenced from multiple `:::story` directives.
         const seen = new Map<string, Promise<{ files: StoryCodeFile[] } | null>>();
         for (const story of stories) {
-          const absStoryFile = path.resolve(pageDir, story.src);
+          const absStoryFile = resolveSpec(story.src, pageDir);
+          if (!absStoryFile) continue;
           const cacheKey = `${absStoryFile}::${story.exportName}`;
           if (!seen.has(cacheKey)) {
             seen.set(cacheKey, resolveStoryCode({ absStoryFile, exportName: story.exportName }));

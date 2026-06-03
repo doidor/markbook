@@ -146,6 +146,85 @@ component: ./Foo.tsx
     expect(result.title).toBe('Inferred title');
   });
 
+  describe('bare-specifier resolution (frontmatter.component)', () => {
+    it('resolves `component:` from a bare specifier via Node module resolution', async () => {
+      const path = await import('node:path');
+      const os = await import('node:os');
+      const fs = await import('node:fs/promises');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-bare-'));
+      try {
+        // Stand up a tiny node_modules tree with @my-org/button
+        await fs.mkdir(path.join(root, 'node_modules/@my-org/button'), { recursive: true });
+        await fs.writeFile(
+          path.join(root, 'node_modules/@my-org/button/package.json'),
+          JSON.stringify({ name: '@my-org/button', main: './index.tsx' }),
+        );
+        await fs.writeFile(
+          path.join(root, 'node_modules/@my-org/button/index.tsx'),
+          `import * as React from 'react';
+export interface ButtonProps {
+  /** Visual variant. */
+  variant?: 'primary' | 'secondary';
+}
+export const Button = (_props: ButtonProps) => null;`,
+        );
+        await fs.writeFile(path.join(root, 'package.json'), '{}');
+
+        const pageFile = path.join(root, 'docs', 'index.md');
+        await fs.mkdir(path.dirname(pageFile), { recursive: true });
+
+        // We verify the COMPONENT path resolution surfaces the right absolute
+        // file to the resolveProps callback — not that react-docgen-typescript
+        // actually generates a table (that's covered by props.test.ts).
+        const observed: { absComponentFile: string }[] = [];
+        const source = `---
+title: Bare
+component: '@my-org/button'
+---
+
+:::props
+:::`;
+        await parseMarkdown(source, 'bare', {
+          pageFile,
+          resolveProps: async (info) => {
+            observed.push(info);
+            return { tableHtml: '<table>ok</table>', tableMarkdown: '| ok |' };
+          },
+        });
+
+        expect(observed).toHaveLength(1);
+        const realRoot = await fs.realpath(root);
+        expect(observed[0]!.absComponentFile).toBe(
+          path.join(realRoot, 'node_modules/@my-org/button/index.tsx'),
+        );
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it('relative `component:` paths still resolve as before', async () => {
+      const path = await import('node:path');
+      const observed: { absComponentFile: string }[] = [];
+      await parseMarkdown(
+        `---
+component: ../src/Button.tsx
+---
+
+:::props
+:::`,
+        'rel',
+        {
+          pageFile: '/tmp/docs/page.md',
+          resolveProps: async (info) => {
+            observed.push(info);
+            return { tableHtml: '<table>ok</table>', tableMarkdown: '| ok |' };
+          },
+        },
+      );
+      expect(observed[0]!.absComponentFile).toBe(path.resolve('/tmp/src/Button.tsx'));
+    });
+  });
+
   describe(':::stories directive', () => {
     const exportsByFile = new Map<string, string[]>([
       ['/tmp/Foo.stories.tsx', ['Primary', 'Secondary', 'Tertiary']],

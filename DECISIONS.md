@@ -259,3 +259,29 @@ Test files keep importing from sibling source modules (no path change). Cross-pa
 - **Sandbox payload is the story's source verbatim.** In-repo relative imports stay broken in the sandbox — documented as a known limitation in `.copilot/wiki/playground-imports-stay-broken.md`. Markbook does NOT rewrite imports or copy in-repo source files; doing so would require module-graph traversal and per-project resolution assumptions that would frequently be wrong.
 
 **Consequences:** The feature ships with one new file (`playground.ts`), one config addition, ~280 bytes of inline JS, and a small CSS block. Bundle size impact on the docs site is per-story: a base64-encoded JSON descriptor (~1–3 KB per button per story per provider). For Pixie's 20 stories × 2 providers that adds ~60–80 KB of HTML across all pages — acceptable for the feature value. The "broken imports for in-repo demos" tradeoff is real and surfaces immediately when a Pixie user clicks Open in CodeSandbox; the wiki entry tells them why and how to recover. A future `playground.inlineSourceImports` hook can address that case without rework.
+
+---
+
+## ADR-0021 — Bare-specifier resolution for path-like fields
+
+**Context:** Five places in `MarkbookConfig` / frontmatter / directive attributes take a path-like value: `frontmatter.component` (props table source), `:::story{src=}` and `:::stories{src=}` (story file), `MarkbookAdapter.decoratorModules` (decorator components), and `MarkbookConfig.css` (chrome customization). All of them shipped using `path.resolve(fromDir, spec)`, which silently treats bare specifiers like `@my-org/button` as relative path segments (`/page/dir/@my-org/button`). The downstream code then fails to find the file and produces invisible degradation — for `:::props` this means the table renders as an HTML comment with no error in the terminal.
+
+Real-world Markbook consumers documenting npm-published component libraries naturally want `component: '@my-org/button'` to work. Same for `decoratorModules: ['@my-org/theme-provider']` and `css: ['@my-org/theme/light.css']`.
+
+**Decision:** New shared helper `resolveSpec(spec, fromDir)` in `packages/core/src/resolve.ts`:
+
+- Specs starting with `./`, `../`, or `/` → `path.resolve(fromDir, spec)` (unchanged behaviour)
+- Otherwise → treat as a bare specifier, resolve via `createRequire(path.join(fromDir, 'package.json')).resolve(spec)` so Node's full module resolution algorithm runs (incl. `package.json#exports`, `#`-prefixed subpath imports, scoped packages, subpath imports like `lodash/get`)
+- Bare specifiers that fail to resolve return `null`; callers either fall through to "no props table" silently (`frontmatter.component`) or throw a Markbook-prefixed error pointing at the spec (`:::stories`, decorators, css)
+
+Applied at every parse/build boundary call site so downstream consumers (code extractor, props extractor, entry generator) continue working with absolute paths exclusively. The entry generators in `build.ts` and `embed.ts` get an extra branch: when the spec is bare, the generated `import` statement keeps the bare specifier as-is (Vite resolves it through node_modules at bundle time) instead of computing a relative path from the temp entry dir to a node_modules file (which works but is ugly).
+
+`extractStoryCode` / `discoverStoryExports` / `extractComponentProps` still take absolute paths — `resolveSpec` runs upstream of them. The `react-docgen-typescript` parser walks the TS source / `.d.ts` declaration files the resolved path points at; both shapes work because the TS compiler reads both.
+
+**Consequences:**
+
+- The original use case — `component: '@my-org/button'` in frontmatter — now produces a props table. Validated end-to-end by adding a `package.json#imports` field to `examples/react-demo` and converting the Switch page's `component:` from `'../../src/pixie/Switch.tsx'` to `'#pixie/Switch.tsx'`. The `checked` prop and its JSDoc description still appear in the rendered table.
+- Bare-specifier resolution depends on the file being installed in `node_modules` (or addressable via `package.json#imports`/`exports`). When it isn't, Markbook surfaces a clear "could not be resolved" error pointing at the spec — much better than the previous silent failure.
+- Relative-path consumers see zero behaviour change. The five existing demo pages with `component: '../../src/pixie/Button.tsx'` etc. continue rendering identically.
+- The `:::story` / `:::stories` `src=` change opens up two new patterns: stories live in published npm packages (`src=@my-org/btn/stories/Primary`), and stories live in a workspace package addressed via `#subpath` imports. Both render and bundle correctly; the embed bundle's entry imports the bare specifier directly, leaving Vite to do final module resolution at bundle time.
+- `inlineSourceImports` (playground) still operates against `MarkbookConfig.root`-relative globs; it does NOT follow bare-specifier imports into `node_modules`. That's intentional — published packages bring their own resolution to the sandbox via `dependencies` in `playground.dependencies`.

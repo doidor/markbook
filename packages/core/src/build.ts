@@ -10,6 +10,7 @@ import { discoverStoryExports, invalidateExportsCache } from './exports.js';
 import { extractComponentProps } from './props.js';
 import { buildPlaygroundDescriptors } from './playground.js';
 import { resolveInlinedSources } from './inline-sources.js';
+import { isPathLikeSpec, resolveSpec } from './resolve.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig, PlaygroundConfig } from './config.js';
 
@@ -85,13 +86,31 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     const list = Array.isArray(raw) ? raw : [raw];
     return list.map((d) => path.resolve(root, d));
   })();
-  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) => path.resolve(root, m));
+  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) => {
+    const resolved = resolveSpec(m, root);
+    if (!resolved) {
+      throw new Error(
+        `Markbook: decorator module '${m}' could not be resolved from ${root}. ` +
+          `Use a relative path or install the bare-specifier package.`,
+      );
+    }
+    return resolved;
+  });
   const adapterPlugins = config.adapter.vitePlugins ? await config.adapter.vitePlugins() : [];
   const cssPaths = (() => {
     const raw = config.css;
     if (!raw) return [];
     const list = Array.isArray(raw) ? raw : [raw];
-    return list.map((p) => path.resolve(root, p));
+    return list.map((p) => {
+      const resolved = resolveSpec(p, root);
+      if (!resolved) {
+        throw new Error(
+          `Markbook: css file '${p}' could not be resolved from ${root}. ` +
+            `Use a relative path or install the bare-specifier package.`,
+        );
+      }
+      return resolved;
+    });
   })();
   const userCss = await loadUserCss(cssPaths);
 
@@ -518,7 +537,8 @@ async function renderPlaygroundButtons(
 
   // The story file's path relative to the config root — used as the
   // sandbox-side path so the entry can import it correctly.
-  const storyAbsPath = path.resolve(path.dirname(pageFile), story.src);
+  const storyAbsPath = resolveSpec(story.src, path.dirname(pageFile));
+  if (!storyAbsPath) return '';
   const storyRelPath = path.relative(ctxRoot, storyAbsPath).replace(/\\/g, '/');
   const storyDir = path.dirname(storyRelPath);
   const storyFileName = path.basename(storyAbsPath);
@@ -600,10 +620,17 @@ function generateEntry(
   });
 
   stories.forEach((s, i) => {
-    const abs = path.resolve(pageDir, s.src);
-    let rel = path.relative(entryDir, abs).replace(/\\/g, '/');
-    if (!rel.startsWith('.')) rel = `./${rel}`;
-    importLines.push(`import * as story_${i}_mod from ${JSON.stringify(rel)};`);
+    let importSpec: string;
+    if (isPathLikeSpec(s.src)) {
+      const abs = path.resolve(pageDir, s.src);
+      let rel = path.relative(entryDir, abs).replace(/\\/g, '/');
+      if (!rel.startsWith('.')) rel = `./${rel}`;
+      importSpec = rel;
+    } else {
+      // Bare specifier — import as-is, Vite resolves through node_modules.
+      importSpec = s.src;
+    }
+    importLines.push(`import * as story_${i}_mod from ${JSON.stringify(importSpec)};`);
   });
 
   const setups = stories.map((s, i) => {

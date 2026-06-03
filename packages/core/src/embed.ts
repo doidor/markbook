@@ -5,6 +5,7 @@ import { build as viteBuild, type Plugin } from 'vite';
 import { parseMarkdown, kebabExportName } from './parse.js';
 import { discoverStoryExports } from './exports.js';
 import { createContext, makeLoadTemplate, type BuildContext } from './build.js';
+import { isPathLikeSpec, resolveSpec } from './resolve.js';
 import type { MarkbookConfig } from './config.js';
 
 /**
@@ -296,8 +297,17 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
       loadTemplate,
     });
     for (const story of parsed.stories) {
-      const absStoryFile = path.resolve(path.dirname(mdFile), story.src);
-      const docsRel = path.relative(ctx.docsDir, absStoryFile);
+      const pageDir = path.dirname(mdFile);
+      const absStoryFile = resolveSpec(story.src, pageDir);
+      if (absStoryFile === null) {
+        throw new Error(
+          `Markbook bundle: story '${story.src}' (in ${path.relative(ctx.root, mdFile)}) ` +
+            `could not be resolved. Use a relative path or install the bare-specifier package.`,
+        );
+      }
+      const docsRel = isPathLikeSpec(story.src)
+        ? path.relative(ctx.docsDir, absStoryFile)
+        : story.src.replace(/[@/]/g, '-');
       const baseSlug = story.slug ?? slugify(docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''));
       // `:::stories` fan-outs ALWAYS promote the slug with the export name so
       // adding/removing exports later doesn't silently rename an existing
@@ -350,9 +360,16 @@ function buildEntryImports(
     lines.push(`import Decorator${i} from ${JSON.stringify(rel)};`);
     decoratorRefs.push(`Decorator${i}`);
   });
-  let storyRel = path.relative(entryDir, story.absStoryFile).replace(/\\/g, '/');
-  if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
-  lines.push(`import * as storyModule from ${JSON.stringify(storyRel)};`);
+  let storySpec: string;
+  if (isPathLikeSpec(story.src)) {
+    let storyRel = path.relative(entryDir, story.absStoryFile).replace(/\\/g, '/');
+    if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
+    storySpec = storyRel;
+  } else {
+    // Bare specifier — keep as-is so Vite resolves through node_modules.
+    storySpec = story.src;
+  }
+  lines.push(`import * as storyModule from ${JSON.stringify(storySpec)};`);
   const storyExportRef =
     story.exportName === 'default'
       ? 'storyModule.default'

@@ -416,3 +416,24 @@ Tests: 10 new in `inline-sources.test.ts` covering empty patterns, direct relati
 **Why:** The playground feature shipped this morning was technically correct but practically broken for the demo it shipped on — first-click on a Pixie Button button produced a sandbox with `Cannot find module '../../../src/pixie/Button.js'` and the user bounced. Closing that loop pays back the most per hour of any pending work — turns "neat feature with a known limitation" into "neat feature that just works." The conservative scope (relative imports only, glob-gated, no rewriting) keeps the algorithm small and predictable; the `playground-inline-source-imports.md` wiki entry documents the sandbox layout convention and the limits (no dynamic imports, no bare specifiers walked).
 
 **Next:** Nothing specific. The deferred carve-outs from earlier (Vue/WC props tables, Vue/WC controls, WC decorators, v1.0 freeze) are still waiting. Playground feature is now fully closed.
+
+---
+
+## 2026-06-03 — Bare-specifier resolution for path-like fields
+
+**What changed:** Five `path.resolve(fromDir, spec)` call sites used to silently glue bare specifiers like `'@my-org/button'` onto the surrounding directory, then fail invisibly downstream. Now they go through Node's full module resolution algorithm. New shared helper `resolveSpec(spec, fromDir)` in `packages/core/src/resolve.ts` branches on relative/absolute vs bare; bare specifiers run through `createRequire(...).resolve(spec)` so `package.json#exports`, scoped packages, subpath imports, and Node's `#`-prefixed `package.json#imports` field all work. Applied to:
+
+1. **`frontmatter.component`** (`parse.ts`) — the original report. `component: '@my-org/button'` now resolves to the package's declared entry and feeds `react-docgen-typescript` like any other source path. Silent-failure mode (HTML-comment placeholder) is gone for resolvable bare specs.
+2. **`:::story{src=…}` / `:::stories{src=…}`** (`parse.ts`, `embed.ts`) — stories can now live in published packages (`src=@my-org/btn/stories/Primary`) or via `#`-subpath imports inside the demo's own package. The entry generator (in both `build.ts` and `embed.ts`) keeps the bare specifier as-is in the generated `import` statement so Vite handles resolution at bundle time.
+3. **`MarkbookAdapter.decoratorModules`** (`build.ts createContext`) — `decorators: ['@my-org/theme-provider']` works.
+4. **`MarkbookConfig.css`** (`build.ts createContext`) — `css: ['@my-org/theme/light.css']` works.
+
+The downstream extractors (`extractStoryCode`, `discoverStoryExports`, `extractComponentProps`, `resolveInlinedSources`) keep operating on absolute paths exclusively — `resolveSpec` runs upstream of them. When a bare specifier doesn't resolve, story / decorator / css surfaces throw a Markbook-prefixed error pointing at the spec; the `frontmatter.component` path stays soft (falls through to "no table") to match its pre-existing silent-failure shape for the missing-component case.
+
+Dogfood: `examples/react-demo/package.json` now declares a Node `imports` field (`"#pixie/*": "./src/pixie/*"`) and the Switch page's frontmatter was converted from `component: '../../src/pixie/Switch.tsx'` to `component: '#pixie/Switch.tsx'`. The build produces an identical props table including the `checked` prop and its JSDoc description, proving the resolver actually runs Node module resolution rather than path-string-glue.
+
+Tests: 8 new in `resolve.test.ts` (isPathLikeSpec coverage, absolute/relative/bare/subpath/unresolvable cases). 2 new in `parse.test.ts` (bare-spec component resolution surfaces the right absolute file to `resolveProps`; relative-path component still resolves as before). Total suite: 96 passing.
+
+**Why:** "Document a real npm-published component library" is the canonical Markbook use case, and `component: '@my-org/button'` is the natural way to write that. The previous silent failure made the feature look broken with no indication of cause. Closing the gap also unlocks the `decoratorModules` and `css` extension points for npm-distributed shared infrastructure — a theme provider, a corporate brand CSS sheet — without each consumer needing to hand-write relative paths into `node_modules`. ADR-0021 captures the design.
+
+**Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators, v1.0 freeze) still wait.
