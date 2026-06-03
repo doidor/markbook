@@ -33,6 +33,7 @@ the new skill would have caught — admission test for the skill itself.
 | [`add-stories`](add-stories/SKILL.md) | Scaffold a multi-export `.stories.tsx` and wire it via `:::stories` |
 | [`bundle-story`](bundle-story/SKILL.md) | Produce + smoke-test an embed bundle |
 | [`progress-log`](progress-log/SKILL.md) | Append a PROGRESS.md entry (replaces the legacy `/markbook-log` slash command) |
+| [`style-markbook`](style-markbook/SKILL.md) | Apply a named visual preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) to a Markbook site |
 | [`verify-build`](verify-build/SKILL.md) | Pre-handoff verify loop (lint → typecheck → test → build → demos), iteration cap N=3 |
 
 ## Adding a skill

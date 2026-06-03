@@ -1,0 +1,38 @@
+/* markbook style preset: corporate
+ *
+ * Traditional muted blue / gray. Conservative type, denser layout.
+ * Plays nice with enterprise design systems (Fluent, Material) that
+ * carry their own visual weight inside the story preview.
+ */
+
+:root {
+  --mb-bg: #ffffff;
+  --mb-fg: #1a202c;
+  --mb-fg-muted: #4a5568;
+  --mb-border: #e2e8f0;
+  --mb-bg-elev: #f7fafc;
+  --mb-bg-soft: #f8fafc;
+  --mb-accent: #1e40af;
+  --mb-accent-fg: #ffffff;
+  --mb-link: #2563eb;
+  --mb-code-bg: #f1f5f9;
+  --mb-radius: 4px;
+  --mb-font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mb-font-mono: Consolas, "SF Mono", Menlo, monospace;
+  --mb-content-width: 720px;
+  --mb-sidebar-width: 240px;
+  --mb-toc-width: 200px;
+  --mb-header-height: 56px;
+}
+
+:root[data-theme="dark"] {
+  --mb-bg: #0f172a;
+  --mb-fg: #e2e8f0;
+  --mb-fg-muted: #94a3b8;
+  --mb-border: #1e293b;
+  --mb-bg-elev: #1e293b;
+  --mb-bg-soft: #172033;
+  --mb-accent: #60a5fa;
+  --mb-link: #93c5fd;
+  --mb-code-bg: #1a2438;
+}

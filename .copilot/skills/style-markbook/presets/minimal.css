@@ -1,0 +1,38 @@
+/* markbook style preset: minimal
+ *
+ * Quiet, low-contrast, narrow content column. Achromatic palette so the
+ * chrome stays out of the way of prose. Best for documentation-heavy
+ * sites where readability beats branding.
+ */
+
+:root {
+  --mb-bg: #ffffff;
+  --mb-fg: #1f1f1f;
+  --mb-fg-muted: #6b7280;
+  --mb-border: #ececec;
+  --mb-bg-elev: #fafafa;
+  --mb-bg-soft: #fafafa;
+  --mb-accent: #444444;
+  --mb-accent-fg: #ffffff;
+  --mb-link: #444444;
+  --mb-code-bg: #f3f3f3;
+  --mb-radius: 3px;
+  --mb-font-sans: Georgia, "Times New Roman", serif;
+  --mb-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --mb-content-width: 640px;
+  --mb-sidebar-width: 200px;
+  --mb-toc-width: 180px;
+  --mb-header-height: 52px;
+}
+
+:root[data-theme="dark"] {
+  --mb-bg: #0d0d0d;
+  --mb-fg: #ededed;
+  --mb-fg-muted: #a1a1a1;
+  --mb-border: #232323;
+  --mb-bg-elev: #161616;
+  --mb-bg-soft: #131313;
+  --mb-accent: #d4d4d4;
+  --mb-link: #d4d4d4;
+  --mb-code-bg: #1a1a1a;
+}
