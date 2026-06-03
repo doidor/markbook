@@ -1,8 +1,15 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import ts from 'typescript';
 import { codeToHtml } from 'shiki';
 
 const fileCache = new Map<string, string | null>();
+
+/** Invalidate the in-memory cache for one file (or all when omitted). */
+export function invalidateCodeCache(absPath?: string): void {
+  if (absPath === undefined) fileCache.clear();
+  else fileCache.delete(absPath);
+}
 
 export interface CodeFile {
   /** File name shown above the block (e.g. `Variants.stories.tsx`). */
@@ -16,23 +23,33 @@ export interface CodeFile {
 }
 
 /**
- * Read the full source of the story file (and any CSS files it directly
- * imports) and Shiki-highlight each. The convention is one story per file (with
- * a `default` export) so the entire file IS the story — users see the imports
- * and any helpers alongside the story body. Sibling CSS imports are surfaced so
- * style rules live next to the JSX that uses them in the docs.
+ * Read the source of a story file (and any CSS files it directly imports)
+ * and Shiki-highlight each.
  *
- * `exportName` is accepted for API compatibility with the generated entry's
- * import statement but is not used to slice the source.
+ * The source view depends on `exportName`:
+ *   - `'default'` (singleton `:::story` files) — return the WHOLE file so
+ *     users see imports + helpers + the renderer alongside each other.
+ *   - any other name (a `:::stories` fan-out, or a named singleton export) —
+ *     return a slice consisting of (a) all `import` statements, (b) all
+ *     non-export top-level statements (helpers, constants), and (c) the
+ *     named export's declaration only. Other named exports in the same file
+ *     are excluded. Type-only declarations (`type`, `interface`) are
+ *     skipped. JSDoc above the export is preserved.
+ *
+ * Sibling CSS imports (`./Foo.module.css`) are surfaced as additional
+ * `CodeFile`s in either mode.
  */
 export async function extractStoryCode(
   absStoryFile: string,
-  _exportName: string,
+  exportName: string,
 ): Promise<{ files: CodeFile[] } | null> {
   const source = await readCached(absStoryFile);
   if (source === null) return null;
 
-  const files: CodeFile[] = [await toCodeFile(absStoryFile, source)];
+  const storySource =
+    exportName === 'default' ? source : (sliceExport(source, absStoryFile, exportName) ?? source);
+
+  const files: CodeFile[] = [await toCodeFile(absStoryFile, storySource)];
 
   const seen = new Set<string>([absStoryFile]);
   for (const spec of importSpecifiers(source)) {
@@ -47,6 +64,101 @@ export async function extractStoryCode(
   }
 
   return { files };
+}
+
+/**
+ * Build a per-export source slice for multi-export story files. Returns
+ * `null` if the named export can't be found — the caller falls back to the
+ * whole file.
+ *
+ * The slice preserves source order: imports first (as written), then the
+ * interleaved non-export helpers and the target export. We capture each
+ * statement via `getFullStart()` so leading comments / JSDoc attach to the
+ * statement they belong to.
+ */
+function sliceExport(source: string, fileName: string, exportName: string): string | null {
+  const scriptKind = pickScriptKind(fileName);
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, false, scriptKind);
+
+  interface Range {
+    start: number;
+    end: number;
+  }
+  const kept: Range[] = [];
+  let foundExport = false;
+
+  for (const stmt of sf.statements) {
+    if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) continue;
+
+    if (ts.isImportDeclaration(stmt)) {
+      kept.push({ start: stmt.getFullStart(), end: stmt.end });
+      continue;
+    }
+
+    if (hasExportModifier(stmt)) {
+      if (declaresExportName(stmt, exportName)) {
+        kept.push({ start: stmt.getFullStart(), end: stmt.end });
+        foundExport = true;
+      }
+      continue;
+    }
+
+    if (ts.isExportDeclaration(stmt)) {
+      if (matchesNamedExport(stmt, exportName)) {
+        kept.push({ start: stmt.getFullStart(), end: stmt.end });
+        foundExport = true;
+      }
+      continue;
+    }
+
+    // Non-export top-level statement (variable, function, class, expression
+    // statement) — keep as a potential helper used by the target export.
+    kept.push({ start: stmt.getFullStart(), end: stmt.end });
+  }
+
+  if (!foundExport) return null;
+
+  kept.sort((a, b) => a.start - b.start);
+  const out = kept
+    .map((r) => source.slice(r.start, r.end))
+    .join('')
+    .replace(/^\s+/, '');
+  return out;
+}
+
+function hasExportModifier(node: ts.Node): boolean {
+  const mods = (node as ts.HasModifiers).modifiers;
+  if (!mods) return false;
+  return mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function declaresExportName(stmt: ts.Statement, name: string): boolean {
+  if (ts.isVariableStatement(stmt)) {
+    return stmt.declarationList.declarations.some(
+      (decl) => ts.isIdentifier(decl.name) && decl.name.text === name,
+    );
+  }
+  if (ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) {
+    return !!stmt.name && stmt.name.text === name;
+  }
+  if (ts.isEnumDeclaration(stmt)) {
+    return stmt.name.text === name;
+  }
+  return false;
+}
+
+function matchesNamedExport(stmt: ts.ExportDeclaration, name: string): boolean {
+  if (stmt.isTypeOnly) return false;
+  if (!stmt.exportClause || !ts.isNamedExports(stmt.exportClause)) return false;
+  return stmt.exportClause.elements.some((spec) => !spec.isTypeOnly && spec.name.text === name);
+}
+
+function pickScriptKind(fileName: string): ts.ScriptKind {
+  if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX;
+  if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX;
+  if (fileName.endsWith('.js')) return ts.ScriptKind.JS;
+  if (fileName.endsWith('.ts')) return ts.ScriptKind.TS;
+  return ts.ScriptKind.Unknown;
 }
 
 async function readCached(absPath: string): Promise<string | null> {

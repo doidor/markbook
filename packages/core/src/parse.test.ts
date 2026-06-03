@@ -145,4 +145,115 @@ component: ./Foo.tsx
     });
     expect(result.title).toBe('Inferred title');
   });
+
+  describe(':::stories directive', () => {
+    const exportsByFile = new Map<string, string[]>([
+      ['/tmp/Foo.stories.tsx', ['Primary', 'Secondary', 'Tertiary']],
+      ['/tmp/Empty.stories.tsx', []],
+    ]);
+    const resolveStoryExports = async (absStoryFile: string) =>
+      exportsByFile.get(absStoryFile) ?? null;
+
+    it('fans out one StoryRef per discovered export', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx}
+:::`;
+      const result = await parseMarkdown(source, 'page', {
+        pageFile: '/tmp/p.md',
+        resolveStoryExports,
+      });
+      expect(result.stories.map((s) => s.exportName)).toEqual(['Primary', 'Secondary', 'Tertiary']);
+      // Every fan-out story carries a groupId pointing at the shared group.
+      const groupIds = new Set(result.stories.map((s) => s.groupId));
+      expect(groupIds.size).toBe(1);
+      expect([...groupIds][0]).toMatch(/--g0$/);
+    });
+
+    it('applies only= whitelist', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx only=Primary,Tertiary}
+:::`;
+      const result = await parseMarkdown(source, 'page', {
+        pageFile: '/tmp/p.md',
+        resolveStoryExports,
+      });
+      expect(result.stories.map((s) => s.exportName)).toEqual(['Primary', 'Tertiary']);
+    });
+
+    it('applies exclude= blacklist', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx exclude=Secondary}
+:::`;
+      const result = await parseMarkdown(source, 'page', {
+        pageFile: '/tmp/p.md',
+        resolveStoryExports,
+      });
+      expect(result.stories.map((s) => s.exportName)).toEqual(['Primary', 'Tertiary']);
+    });
+
+    it('throws when only= references an unknown export', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx only=Primary,Missing}
+:::`;
+      await expect(
+        parseMarkdown(source, 'page', {
+          pageFile: '/tmp/p.md',
+          resolveStoryExports,
+        }),
+      ).rejects.toThrow(/'Missing' is not an export of/);
+    });
+
+    it('throws when filtering leaves zero exports', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx exclude=Primary,Secondary,Tertiary}
+:::`;
+      await expect(
+        parseMarkdown(source, 'page', {
+          pageFile: '/tmp/p.md',
+          resolveStoryExports,
+        }),
+      ).rejects.toThrow(/zero exports/);
+    });
+
+    it('throws when the resolver returns null (missing file)', async () => {
+      const source = `:::stories{src=./Missing.stories.tsx}
+:::`;
+      await expect(
+        parseMarkdown(source, 'page', {
+          pageFile: '/tmp/p.md',
+          resolveStoryExports,
+        }),
+      ).rejects.toThrow(/could not be read/);
+    });
+
+    it('throws when no resolver is provided', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx}
+:::`;
+      await expect(
+        parseMarkdown(source, 'page', {
+          pageFile: '/tmp/p.md',
+        }),
+      ).rejects.toThrow(/no `resolveStoryExports` callback/);
+    });
+
+    it('inserts an H3 heading per story so they appear in TOC', async () => {
+      const source = `:::stories{src=./Foo.stories.tsx}
+:::`;
+      const result = await parseMarkdown(source, 'page', {
+        pageFile: '/tmp/p.md',
+        resolveStoryExports,
+      });
+      const h3s = result.headings.filter((h) => h.level === 3).map((h) => h.text);
+      expect(h3s).toEqual(['Primary', 'Secondary', 'Tertiary']);
+    });
+
+    it('humanizes export names in the inserted headings', async () => {
+      const exports = new Map([['/tmp/F.stories.tsx', ['PrimaryButton', 'FullWidthVariant']]]);
+      const source = `:::stories{src=./F.stories.tsx}
+:::`;
+      const result = await parseMarkdown(source, 'page', {
+        pageFile: '/tmp/p.md',
+        resolveStoryExports: async (f) => exports.get(f) ?? null,
+      });
+      expect(result.headings.filter((h) => h.level === 3).map((h) => h.text)).toEqual([
+        'Primary Button',
+        'Full Width Variant',
+      ]);
+    });
+  });
 });

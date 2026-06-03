@@ -9,6 +9,7 @@ import rehypeStringify from 'rehype-stringify';
 import rehypeSlug from 'rehype-slug';
 import { visit } from 'unist-util-visit';
 import { applyTemplate } from './template.js';
+import { humanizeExportName } from './exports.js';
 
 export interface StoryCodeFile {
   label: string;
@@ -21,8 +22,19 @@ export interface StoryRef {
   id: string;
   src: string;
   exportName: string;
-  /** User-provided embed slug from the directive's `id=` attribute. Stable across file moves. */
+  /**
+   * User-provided embed slug from the directive's `id=` attribute. Stable
+   * across file moves. For `:::stories` fan-outs this is the GROUP base; the
+   * per-story slug is `${slug}-${kebab(exportName)}`.
+   */
   slug?: string;
+  /**
+   * Set when the story came from a `:::stories` fan-out — used downstream to
+   * promote the embed slug with the export name (so multiple exports from the
+   * same file don't collide and so adding a second export later doesn't
+   * silently rename the original embed).
+   */
+  groupId?: string;
   /**
    * Story source plus any CSS files it imports directly. The first entry is
    * always the story file itself.
@@ -52,6 +64,7 @@ export interface ParseOptions {
     absStoryFile: string;
     exportName: string;
   }) => Promise<{ files: StoryCodeFile[] } | null>;
+  resolveStoryExports?: (absStoryFile: string) => Promise<string[] | null>;
   resolveProps?: (info: {
     absComponentFile: string;
     exportName?: string;
@@ -60,21 +73,37 @@ export interface ParseOptions {
   loadTemplate?: (name: string) => Promise<string>;
 }
 
-interface DirectiveSlot {
-  kind: 'story' | 'props';
+interface BaseSlot {
   parent: { children: unknown[] };
+  /** Current index in parent.children at the moment the directive was visited. */
   index: number;
   start: number;
   end: number;
-  story?: StoryRef;
 }
+
+interface StorySlot extends BaseSlot {
+  kind: 'story';
+  story: StoryRef;
+}
+
+interface StoriesSlot extends BaseSlot {
+  kind: 'stories';
+  groupId: string;
+  stories: StoryRef[];
+}
+
+interface PropsSlot extends BaseSlot {
+  kind: 'props';
+}
+
+type DirectiveSlot = StorySlot | StoriesSlot | PropsSlot;
 
 export async function parseMarkdown(
   source: string,
   fileId: string,
   options: ParseOptions,
 ): Promise<ParsedPage> {
-  const { pageFile, resolveStoryCode, resolveProps } = options;
+  const { pageFile, resolveStoryCode, resolveStoryExports, resolveProps } = options;
   const pageDir = path.dirname(pageFile);
 
   const { data, content: rawContent } = matter(source);
@@ -98,7 +127,21 @@ export async function parseMarkdown(
   const headings: HeadingRef[] = [];
   const slots: DirectiveSlot[] = [];
   let storyCounter = 0;
+  let groupCounter = 0;
   let propsTableMarkdown: string | undefined;
+
+  // Pending tasks for `:::stories` fan-out — collected during the visit
+  // because the visit callback is sync but export discovery is async. We
+  // resolve them all together before slot replacement.
+  interface PendingStoriesTask {
+    slot: StoriesSlot;
+    src: string;
+    absStoryFile: string;
+    userSlug?: string;
+    only?: string[];
+    exclude?: string[];
+  }
+  const pendingStoriesTasks: PendingStoriesTask[] = [];
 
   const file = await unified()
     .use(remarkParse)
@@ -122,25 +165,104 @@ export async function parseMarkdown(
           const story: StoryRef = { id, src, exportName, slug: userSlug };
           stories.push(story);
           slots.push({ kind: 'story', parent, index, start, end, story });
+        } else if (node.name === 'stories') {
+          const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
+          const src = attrs.src;
+          if (!src) return;
+          const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
+          const only = parseNameList(attrs.only);
+          const exclude = parseNameList(attrs.exclude);
+          const groupId = `${fileId}--g${groupCounter++}`;
+          const slot: StoriesSlot = {
+            kind: 'stories',
+            parent,
+            index,
+            start,
+            end,
+            groupId,
+            stories: [],
+          };
+          slots.push(slot);
+          pendingStoriesTasks.push({
+            slot,
+            src,
+            absStoryFile: path.resolve(pageDir, src),
+            userSlug,
+            only,
+            exclude,
+          });
         } else if (node.name === 'props') {
           slots.push({ kind: 'props', parent, index, start, end });
         }
       });
 
+      // Fan out `:::stories` slots first — they create StoryRefs that the
+      // subsequent code-resolution loop iterates over.
+      if (pendingStoriesTasks.length > 0) {
+        if (!resolveStoryExports) {
+          throw new Error(
+            'Markbook: `:::stories` directive used but no `resolveStoryExports` callback was provided to parseMarkdown.',
+          );
+        }
+        for (const task of pendingStoriesTasks) {
+          const discovered = await resolveStoryExports(task.absStoryFile);
+          if (!discovered) {
+            throw new Error(
+              `Markbook: \`:::stories\` directive points at '${task.src}' which could not be read.`,
+            );
+          }
+          let names = discovered;
+          if (task.only && task.only.length > 0) {
+            const allow = new Set(task.only);
+            for (const n of task.only) {
+              if (!discovered.includes(n)) {
+                throw new Error(
+                  `Markbook: \`:::stories\` only=${task.only.join(',')} but '${n}' is not an export of '${task.src}'. Found: [${discovered.join(', ')}]`,
+                );
+              }
+            }
+            names = names.filter((n) => allow.has(n));
+          }
+          if (task.exclude && task.exclude.length > 0) {
+            const deny = new Set(task.exclude);
+            names = names.filter((n) => !deny.has(n));
+          }
+          if (names.length === 0) {
+            throw new Error(
+              `Markbook: \`:::stories\` directive for '${task.src}' resolved to zero exports after filtering.`,
+            );
+          }
+          for (const exportName of names) {
+            const id = `${fileId}--${storyCounter++}`;
+            const story: StoryRef = {
+              id,
+              src: task.src,
+              exportName,
+              slug: task.userSlug,
+              groupId: task.slot.groupId,
+            };
+            stories.push(story);
+            task.slot.stories.push(story);
+          }
+        }
+      }
+
       const tasks: Array<Promise<void>> = [];
 
       if (resolveStoryCode) {
+        // Dedup by (file, export) so multi-export files slice each export
+        // only once even when referenced from multiple `:::story` directives.
+        const seen = new Map<string, Promise<{ files: StoryCodeFile[] } | null>>();
         for (const story of stories) {
+          const absStoryFile = path.resolve(pageDir, story.src);
+          const cacheKey = `${absStoryFile}::${story.exportName}`;
+          if (!seen.has(cacheKey)) {
+            seen.set(cacheKey, resolveStoryCode({ absStoryFile, exportName: story.exportName }));
+          }
           tasks.push(
             (async () => {
-              const absStoryFile = path.resolve(pageDir, story.src);
-              const result = await resolveStoryCode({
-                absStoryFile,
-                exportName: story.exportName,
-              });
-              if (result) {
-                story.codeFiles = result.files;
-              }
+              const result = await seen.get(cacheKey)!;
+              if (result) story.codeFiles = result.files;
             })(),
           );
         }
@@ -165,21 +287,12 @@ export async function parseMarkdown(
 
       await Promise.all(tasks);
 
-      for (const slot of slots) {
-        if (slot.kind === 'story' && slot.story) {
-          const files = slot.story.codeFiles ?? [];
-          const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(slot.story.id, files);
-          slot.parent.children[slot.index] = {
-            type: 'html',
-            value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
-          } as never;
-        } else if (slot.kind === 'props') {
-          slot.parent.children[slot.index] = {
-            type: 'html',
-            value:
-              propsTableHtml ?? '<!-- markbook props table: no `component:` set in frontmatter -->',
-          } as never;
-        }
+      // Splice in descending source order so earlier slots' indexes are not
+      // shifted by later replacements in the same parent.
+      const orderedSlots = [...slots].sort((a, b) => b.start - a.start);
+      for (const slot of orderedSlots) {
+        const replacement = buildSlotReplacement(slot, propsTableHtml);
+        slot.parent.children.splice(slot.index, 1, ...(replacement as never[]));
       }
     })
     .use(remarkRehype, { allowDangerousHtml: true })
@@ -232,6 +345,19 @@ function buildPlainMarkdown(
       out += slot.story.codeFiles
         .map((f) => `**\`${f.label}\`**\n\n\`\`\`${f.lang}\n${f.code}\n\`\`\``)
         .join('\n\n');
+    } else if (slot.kind === 'stories') {
+      const sections: string[] = [];
+      for (const story of slot.stories) {
+        sections.push(`### ${humanizeExportName(story.exportName)}`);
+        if (story.codeFiles?.length) {
+          sections.push(
+            story.codeFiles
+              .map((f) => `**\`${f.label}\`**\n\n\`\`\`${f.lang}\n${f.code}\n\`\`\``)
+              .join('\n\n'),
+          );
+        }
+      }
+      out += sections.join('\n\n');
     } else if (slot.kind === 'props' && propsTableMarkdown) {
       out += propsTableMarkdown;
     }
@@ -240,6 +366,64 @@ function buildPlainMarkdown(
   out += content.slice(cursor);
   return out.replace(/\n{3,}/g, '\n\n');
 }
+
+function parseNameList(raw: string | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Produce the mdast nodes that replace one directive slot. For `:::story` and
+ * `:::props` this is a single raw-html node; for `:::stories` it is a sequence
+ * of (heading + story-block) pairs followed by a single shared code-disclosure
+ * block. Headings are real `heading` nodes so `rehype-slug` slugs them and the
+ * page TOC picks them up.
+ */
+function buildSlotReplacement(slot: DirectiveSlot, propsTableHtml: string | undefined): unknown[] {
+  if (slot.kind === 'story') {
+    const files = slot.story.codeFiles ?? [];
+    const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(slot.story.id, files);
+    return [
+      {
+        type: 'html',
+        value: `<div class="markbook-story-block"><div class="markbook-story" data-markbook-story="${slot.story.id}"></div><div class="markbook-controls" data-markbook-controls="${slot.story.id}"></div>${codeBlock}</div>`,
+      },
+    ];
+  }
+  if (slot.kind === 'props') {
+    return [
+      {
+        type: 'html',
+        value:
+          propsTableHtml ?? '<!-- markbook props table: no `component:` set in frontmatter -->',
+      },
+    ];
+  }
+  // `:::stories` — fan out
+  const nodes: unknown[] = [];
+  for (const story of slot.stories) {
+    const text = humanizeExportName(story.exportName);
+    const files = story.codeFiles ?? [];
+    const codeBlock = files.length === 0 ? '' : renderCodeDisclosure(story.id, files);
+    nodes.push({
+      type: 'heading',
+      depth: 3,
+      children: [{ type: 'text', value: text }],
+    });
+    nodes.push({
+      type: 'html',
+      value: `<div class="markbook-story-block" data-markbook-group="${slot.groupId}"><div class="markbook-story" data-markbook-story="${story.id}"></div><div class="markbook-controls" data-markbook-controls="${story.id}"></div>${codeBlock}</div>`,
+    });
+  }
+  return nodes;
+}
+
+// Use the export-name kebab helper for consistent slug derivation in
+// downstream consumers (embed.ts).
+export { kebabExportName, humanizeExportName } from './exports.js';
 
 function escapeHtml(s: string): string {
   return s

@@ -106,4 +106,151 @@ export default () => null;`,
       await fs.rm(tmp, { recursive: true, force: true });
     }
   });
+
+  describe('per-export slicing (exportName !== "default")', () => {
+    it('returns just the named export plus the file imports', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'Multi.stories.tsx');
+        await fs.writeFile(
+          story,
+          `import { Button } from './Button.js';
+import { Spinner } from './Spinner.js';
+
+export const Primary = () => <Button variant="primary" />;
+
+export const Secondary = () => <Button variant="secondary" />;
+
+export const Loading = () => <Spinner />;
+`,
+        );
+        const result = await extractStoryCode(story, 'Secondary');
+        const code = result?.files[0]?.code ?? '';
+        expect(code).toContain('import { Button }');
+        expect(code).toContain('import { Spinner }');
+        expect(code).toContain('export const Secondary');
+        expect(code).not.toContain('export const Primary');
+        expect(code).not.toContain('export const Loading');
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps top-level helpers (non-export consts and functions)', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'Helpers.stories.tsx');
+        await fs.writeFile(
+          story,
+          `import { Button } from './Button.js';
+
+const shared = { gap: '1rem' };
+
+function fmt(name: string) { return name.toUpperCase(); }
+
+export const Primary = () => <Button label={fmt('hi')} style={shared} />;
+
+export const Secondary = () => <Button label="b" />;
+`,
+        );
+        const result = await extractStoryCode(story, 'Primary');
+        const code = result?.files[0]?.code ?? '';
+        expect(code).toContain('const shared = ');
+        expect(code).toContain('function fmt');
+        expect(code).toContain('export const Primary');
+        expect(code).not.toContain('export const Secondary');
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+
+    it('preserves JSDoc comments above the export', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'WithDoc.stories.tsx');
+        await fs.writeFile(
+          story,
+          `import { Button } from './Button.js';
+
+/** Primary CTA. */
+export const Primary = () => <Button />;
+
+/** Secondary CTA. */
+export const Secondary = () => <Button />;
+`,
+        );
+        const result = await extractStoryCode(story, 'Primary');
+        const code = result?.files[0]?.code ?? '';
+        expect(code).toContain('Primary CTA.');
+        expect(code).not.toContain('Secondary CTA.');
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+
+    it('skips type-only declarations', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'Typed.stories.tsx');
+        await fs.writeFile(
+          story,
+          `import { Button } from './Button.js';
+
+type Variant = 'a' | 'b';
+interface Props { v: Variant }
+
+export const Primary = () => <Button />;
+`,
+        );
+        const result = await extractStoryCode(story, 'Primary');
+        const code = result?.files[0]?.code ?? '';
+        expect(code).not.toContain('type Variant');
+        expect(code).not.toContain('interface Props');
+        expect(code).toContain('export const Primary');
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+
+    it('falls back to the whole file when the export name is not found', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'Single.stories.tsx');
+        const src = `import { Button } from './Button.js';
+export const OnlyOne = () => <Button />;`;
+        await fs.writeFile(story, src);
+        const result = await extractStoryCode(story, 'Missing');
+        expect(result?.files[0]?.code).toBe(src.trim());
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+
+    it('still surfaces sibling CSS imports in sliced mode', async () => {
+      const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-code-'));
+      try {
+        const story = path.join(tmp, 'Styled.stories.tsx');
+        const cssMod = path.join(tmp, 'Styled.module.css');
+        await fs.writeFile(
+          story,
+          `import { Button } from './Button.js';
+import styles from './Styled.module.css';
+export const Primary = () => <Button className={styles.btn} />;
+export const Secondary = () => <Button />;
+`,
+        );
+        await fs.writeFile(cssMod, '.btn { padding: 0.5rem; }');
+
+        const result = await extractStoryCode(story, 'Primary');
+        expect(result?.files.map((f) => f.label)).toEqual([
+          'Styled.stories.tsx',
+          'Styled.module.css',
+        ]);
+        expect(result?.files[0]?.code).toContain('export const Primary');
+        expect(result?.files[0]?.code).not.toContain('export const Secondary');
+      } finally {
+        await fs.rm(tmp, { recursive: true, force: true });
+      }
+    });
+  });
 });

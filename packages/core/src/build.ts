@@ -5,7 +5,8 @@ import { build as viteBuild, createServer } from 'vite';
 import * as pagefind from 'pagefind';
 import chokidar from 'chokidar';
 import { parseMarkdown } from './parse.js';
-import { extractStoryCode } from './code.js';
+import { extractStoryCode, invalidateCodeCache } from './code.js';
+import { discoverStoryExports, invalidateExportsCache } from './exports.js';
 import { extractComponentProps } from './props.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig } from './config.js';
@@ -125,6 +126,8 @@ async function loadUserCss(cssPaths: string[]): Promise<string> {
 interface WritePagesResult {
   pages: PageRecord[];
   htmlInputs: Record<string, string>;
+  /** Absolute paths of every story file referenced by any directive. Used by `dev` for HMR watching. */
+  storyFiles: string[];
 }
 
 async function writePages(
@@ -155,6 +158,7 @@ async function writePages(
     const parsed = await parseMarkdown(source, fileId, {
       pageFile: file,
       resolveStoryCode: (info) => extractStoryCode(info.absStoryFile, info.exportName),
+      resolveStoryExports: (absStoryFile) => discoverStoryExports(absStoryFile),
       resolveProps: (info) =>
         extractComponentProps(info.absComponentFile, info.exportName, ctx.root),
       loadTemplate: makeLoadTemplate(ctx.templateDirs, ctx.root),
@@ -211,7 +215,19 @@ async function writePages(
     htmlInputs[page.fileId] = htmlAbs;
   }
 
-  return { pages, htmlInputs };
+  const storyFiles = collectStoryFiles(pages);
+  return { pages, htmlInputs, storyFiles };
+}
+
+function collectStoryFiles(pages: PageRecord[]): string[] {
+  const set = new Set<string>();
+  for (const page of pages) {
+    const pageDir = path.dirname(page.file);
+    for (const story of page.parsed.stories) {
+      set.add(path.resolve(pageDir, story.src));
+    }
+  }
+  return [...set];
 }
 
 export async function build(config: MarkbookConfig): Promise<void> {
@@ -249,7 +265,7 @@ export async function build(config: MarkbookConfig): Promise<void> {
 
 export async function dev(config: MarkbookConfig): Promise<void> {
   const ctx = await createContext(config);
-  await writePages(ctx, { clean: true, searchEnabled: false });
+  const initial = await writePages(ctx, { clean: true, searchEnabled: false });
 
   const server = await createServer({
     root: ctx.tmpDir,
@@ -277,26 +293,51 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   for (const url of localUrls) console.log(`    ➜  Local:   ${url}`);
   for (const url of networkUrls) console.log(`    ➜  Network: ${url}`);
   console.log('');
-  console.log('  Watching markdown + templates for changes (Ctrl-C to stop)');
+  console.log('  Watching markdown, templates, CSS, and story files for changes (Ctrl-C to stop)');
   console.log('');
 
-  const watchPaths = [ctx.docsDir, ...ctx.templateDirs, ...ctx.cssPaths];
-  const watcher = chokidar.watch(watchPaths, {
-    ignoreInitial: true,
-    awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
-  });
+  const watcher = chokidar.watch(
+    [ctx.docsDir, ...ctx.templateDirs, ...ctx.cssPaths, ...initial.storyFiles],
+    {
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
+    },
+  );
+  let watchedStoryFiles = new Set(initial.storyFiles);
 
   let regenerating = false;
   const onChange = async (event: 'change' | 'add' | 'unlink', file: string) => {
+    const abs = path.resolve(file);
     const isMd = file.endsWith('.md');
-    const isCss = ctx.cssPaths.includes(path.resolve(file));
-    if (!isMd && !isCss) return;
+    const isCss = ctx.cssPaths.includes(abs);
+    const isStory = watchedStoryFiles.has(abs);
+    // Story files inside docsDir are picked up by the docsDir watcher; only
+    // bypass this guard for files we care about.
+    if (!isMd && !isCss && !isStory) return;
     if (regenerating) return;
     regenerating = true;
     try {
       const t0 = Date.now();
       if (isCss) ctx.userCss = await loadUserCss(ctx.cssPaths);
-      await writePages(ctx, { clean: false, searchEnabled: false });
+      if (isStory) {
+        // The story file's export list and/or source may have changed —
+        // invalidate both caches so the next parse re-reads them.
+        invalidateExportsCache(abs);
+        invalidateCodeCache(abs);
+      }
+      const result = await writePages(ctx, { clean: false, searchEnabled: false });
+
+      // Add newly-referenced story files to the watcher (e.g. a markdown
+      // page now points at a new `:::stories` source). Removing stale
+      // watches is rare and not worth the bookkeeping; chokidar tolerates
+      // missing files silently.
+      const fresh = result.storyFiles.filter((p) => !watchedStoryFiles.has(p));
+      if (fresh.length > 0) {
+        watcher.add(fresh);
+        for (const p of fresh) watchedStoryFiles.add(p);
+      }
+      watchedStoryFiles = new Set(result.storyFiles);
+
       const dt = Date.now() - t0;
       console.log(`[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`);
       server.ws.send({ type: 'full-reload', path: '*' });
@@ -487,10 +528,15 @@ function generateEntry(
     const decoratorsField =
       decoratorRefs.length > 0 ? `decorators: [${decoratorRefs.join(', ')}], ` : '';
     return `
-const story_${i} = ${exportRef};
-const args_${i} = story_${i}_mod.args ? { ...story_${i}_mod.args } : undefined;
-const argTypes_${i} = story_${i}_mod.argTypes;
-const params_${i} = story_${i}_mod.parameters;
+const _exp_${i} = ${exportRef};
+const _csf_${i} = __mb_isCsf(_exp_${i});
+const story_${i} = _csf_${i} ? _exp_${i}.render : _exp_${i};
+const args_${i} = (() => {
+  const a = _csf_${i} ? _exp_${i}.args : story_${i}_mod.args;
+  return a ? { ...a } : undefined;
+})();
+const argTypes_${i} = _csf_${i} ? _exp_${i}.argTypes : story_${i}_mod.argTypes;
+const params_${i} = _csf_${i} ? _exp_${i}.parameters : story_${i}_mod.parameters;
 const el_${i} = document.querySelector('[data-markbook-story="${s.id}"]');
 ${hasControls ? `const ctrl_${i} = document.querySelector('[data-markbook-controls="${s.id}"]');` : ''}
 function render_${i}() {
@@ -506,8 +552,24 @@ ${
 }`;
   });
 
-  return `${importLines.join('\n')}\n${setups.join('\n')}\n`;
+  return `${importLines.join('\n')}\n${MB_CSF_HELPER}\n${setups.join('\n')}\n`;
 }
+
+/**
+ * Runtime helper that distinguishes a Storybook CSF v3 story object from
+ * a plain component object (e.g. Vue's `defineComponent({ render })` or
+ * React's `forwardRef`). To be considered a CSF story, the value must:
+ *   - be a non-null object
+ *   - have a `render` function
+ *   - carry at least one of the CSF metadata fields (args, argTypes,
+ *     parameters, or name) so we don't unwrap arbitrary component objects
+ *     that happen to expose a `render` method.
+ */
+const MB_CSF_HELPER = `function __mb_isCsf(v) {
+  if (!v || typeof v !== 'object') return false;
+  if (typeof v.render !== 'function') return false;
+  return !!(v.args || v.argTypes || v.parameters || typeof v.name === 'string');
+}`;
 
 function generateHtml(
   page: PageRecord,

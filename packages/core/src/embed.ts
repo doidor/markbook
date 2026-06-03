@@ -2,7 +2,8 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
 import { build as viteBuild, type Plugin } from 'vite';
-import { parseMarkdown } from './parse.js';
+import { parseMarkdown, kebabExportName } from './parse.js';
+import { discoverStoryExports } from './exports.js';
 import { createContext, makeLoadTemplate, type BuildContext } from './build.js';
 import type { MarkbookConfig } from './config.js';
 
@@ -284,13 +285,17 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
     const fileId = path.relative(ctx.docsDir, mdFile).replace(/\.md$/, '').replace(/[\\/]/g, '__');
     const parsed = await parseMarkdown(source, fileId, {
       pageFile: mdFile,
+      resolveStoryExports: (absStoryFile) => discoverStoryExports(absStoryFile),
       loadTemplate,
     });
     for (const story of parsed.stories) {
       const absStoryFile = path.resolve(path.dirname(mdFile), story.src);
       const docsRel = path.relative(ctx.docsDir, absStoryFile);
-      const derivedSlug = slugify(docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''));
-      const slug = story.slug ?? derivedSlug;
+      const baseSlug = story.slug ?? slugify(docsRel.replace(/\.stories\.(tsx|ts|jsx|js)$/, ''));
+      // `:::stories` fan-outs ALWAYS promote the slug with the export name so
+      // adding/removing exports later doesn't silently rename an existing
+      // embed. Singleton `:::story` keeps the bare slug for back-compat.
+      const slug = story.groupId ? `${baseSlug}-${kebabExportName(story.exportName)}` : baseSlug;
       stories.push({
         slug,
         pageRelPath: path.relative(ctx.docsDir, mdFile),
@@ -299,6 +304,18 @@ async function discoverStories(ctx: BuildContext): Promise<DiscoveredStory[]> {
         absStoryFile,
       });
     }
+  }
+  // Detect duplicate slugs globally — silently overwriting bundle outputs
+  // would let two stories ship the same JS file.
+  const seen = new Map<string, DiscoveredStory>();
+  for (const s of stories) {
+    const prev = seen.get(s.slug);
+    if (prev) {
+      throw new Error(
+        `Markbook bundle: duplicate story slug '${s.slug}' — collides between '${prev.pageRelPath}' (${prev.src}#${prev.exportName}) and '${s.pageRelPath}' (${s.src}#${s.exportName}). Use \`:::story{... id=unique-slug}\` to disambiguate.`,
+      );
+    }
+    seen.set(s.slug, s);
   }
   return stories;
 }
@@ -317,7 +334,7 @@ function buildEntryImports(
   adapterPkg: string,
   decoratorPaths: string[],
   entryDir: string,
-): { imports: string; storyRef: string; decoratorRefs: string[] } {
+): { imports: string; storyExportRef: string; decoratorRefs: string[] } {
   const lines: string[] = [`import { mount as adapterMount } from ${JSON.stringify(adapterPkg)};`];
   const decoratorRefs: string[] = [];
   decoratorPaths.forEach((p, i) => {
@@ -329,12 +346,23 @@ function buildEntryImports(
   let storyRel = path.relative(entryDir, story.absStoryFile).replace(/\\/g, '/');
   if (!storyRel.startsWith('.')) storyRel = `./${storyRel}`;
   lines.push(`import * as storyModule from ${JSON.stringify(storyRel)};`);
-  const storyRef =
+  const storyExportRef =
     story.exportName === 'default'
       ? 'storyModule.default'
       : `storyModule[${JSON.stringify(story.exportName)}]`;
-  return { imports: lines.join('\n'), storyRef, decoratorRefs };
+  return { imports: lines.join('\n'), storyExportRef, decoratorRefs };
 }
+
+/**
+ * Shared with build.ts's page entry generator — the same predicate decides
+ * whether a story export is a Storybook CSF v3 object (`{ render, args... }`)
+ * or a plain function / component. See `MB_CSF_HELPER` in build.ts.
+ */
+const MB_CSF_HELPER = `function __mb_isCsf(v) {
+  if (!v || typeof v !== 'object') return false;
+  if (typeof v.render !== 'function') return false;
+  return !!(v.args || v.argTypes || v.parameters || typeof v.name === 'string');
+}`;
 
 function buildMountOptsExpr(
   decoratorRefs: string[],
@@ -345,8 +373,8 @@ function buildMountOptsExpr(
     fields.push(`decorators: [${decoratorRefs.join(', ')}]`);
   }
   if (isolation) fields.push(`isolation: ${JSON.stringify(isolation)}`);
-  fields.push(`args: storyModule.args`);
-  fields.push(`parameters: storyModule.parameters`);
+  fields.push(`args: _args`);
+  fields.push(`parameters: _params`);
   return `{ ${fields.join(', ')} }`;
 }
 
@@ -357,7 +385,7 @@ function generateEmbedEntry(
   entryDir: string,
   isolation: BundleIsolation | undefined,
 ): string {
-  const { imports, storyRef, decoratorRefs } = buildEntryImports(
+  const { imports, storyExportRef, decoratorRefs } = buildEntryImports(
     story,
     adapterPkg,
     decoratorPaths,
@@ -367,10 +395,18 @@ function generateEmbedEntry(
 
   return `${imports}
 
+${MB_CSF_HELPER}
+
+const _exp = ${storyExportRef};
+const _csf = __mb_isCsf(_exp);
+const _render = _csf ? _exp.render : _exp;
+const _args = _csf ? _exp.args : storyModule.args;
+const _params = _csf ? _exp.parameters : storyModule.parameters;
+
 const SLUG = ${JSON.stringify(story.slug)};
 const targets = document.querySelectorAll('[data-markbook-embed="' + SLUG + '"]');
 for (const el of targets) {
-  adapterMount(el, ${storyRef}, ${optsExpr});
+  adapterMount(el, _render, ${optsExpr});
 }
 `;
 }
@@ -382,7 +418,7 @@ function generatePackageEntry(
   entryDir: string,
   isolation: BundleIsolation | undefined,
 ): string {
-  const { imports, storyRef, decoratorRefs } = buildEntryImports(
+  const { imports, storyExportRef, decoratorRefs } = buildEntryImports(
     story,
     adapterPkg,
     decoratorPaths,
@@ -392,15 +428,24 @@ function generatePackageEntry(
 
   return `${imports}
 
-export const story = ${storyRef};
-export const args = storyModule.args;
-export const argTypes = storyModule.argTypes;
-export const parameters = storyModule.parameters;
+${MB_CSF_HELPER}
+
+const _exp = ${storyExportRef};
+const _csf = __mb_isCsf(_exp);
+const _render = _csf ? _exp.render : _exp;
+const _args = _csf ? _exp.args : storyModule.args;
+const _argTypes = _csf ? _exp.argTypes : storyModule.argTypes;
+const _params = _csf ? _exp.parameters : storyModule.parameters;
+
+export const story = _render;
+export const args = _args;
+export const argTypes = _argTypes;
+export const parameters = _params;
 
 const BASE_OPTS = ${baseOpts};
 
 export function mount(el, opts) {
-  return adapterMount(el, ${storyRef}, Object.assign({}, BASE_OPTS, opts || {}));
+  return adapterMount(el, _render, Object.assign({}, BASE_OPTS, opts || {}));
 }
 
 export default mount;

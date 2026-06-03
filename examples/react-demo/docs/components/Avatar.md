@@ -6,22 +6,8 @@ component: ../../src/pixie/Avatar.tsx
 componentExport: Avatar
 ---
 
-## Initials
+All Avatar variants live in a single multi-export stories file, surfaced via
+the `:::stories` directive.
 
-:::story{src=./Avatar/Initials.stories.tsx}
-:::
-
-## With image
-
-:::story{src=./Avatar/WithImage.stories.tsx}
-:::
-
-## Sizes
-
-:::story{src=./Avatar/Sizes.stories.tsx}
-:::
-
-## Square shape
-
-:::story{src=./Avatar/Square.stories.tsx}
+:::stories{src=./Avatar/Avatar.stories.tsx}
 :::
