@@ -25,16 +25,15 @@
 <ul>
   <li><a href="./embed.html">Embed mode</a> — drop in a <code>&lt;script type="module"&gt;</code> tag. Self-contained ESM, no host-side build.</li>
   <li><a href="./package.html">Package mode</a> — npm-style import via importmap, framework provided by the host (~3.5 KB story bundle).</li>
+  <li><a href="./shadow.html">Shadow-DOM isolation</a> — package mode + <code>mount(el, { isolation: 'shadow' })</code>. Host-page CSS does not leak into the story.</li>
 </ul>
 
 <h2>Setup</h2>
-<p>Generate the bundles from the React demo first:</p>
-<pre><code># Embed mode (all 19 Pixie stories)
-pnpm example:bundle
-
-# Package mode (one story for now)
-pnpm --filter @markbook/example-react-demo exec markbook bundle \
-    components-button-variants --mode package</code></pre>
+<p>Generate every bundle in one shot:</p>
+<pre><code>pnpm example:embed-host:build</code></pre>
+<p>Or, individually:</p>
+<pre><code>pnpm example:bundle           # embed mode (all stories)
+pnpm example:bundle:package   # package mode (all stories)</code></pre>
 
 <h2>Serve</h2>
 <pre><code>pnpm example:embed-host:serve   # http://localhost:4500/embed-host/</code></pre>

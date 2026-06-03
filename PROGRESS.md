@@ -308,3 +308,29 @@ Tests: 6 new code.test.ts cases (slice keeps imports + helpers + JSDoc; excludes
 **Why:** The full epichan-style harness (state machine, role-separated agents, 11-axis scoring, polling scripts, hermetic worktrees) is overkill for a solo TypeScript library — it's infrastructure for a multi-agent issue-processing pipeline that doesn't exist here. The lightweight version captures the ~30% of agent-harness principles that pay back immediately for solo development: procedural memory (skills), file-class reflexes (rules), and post-mortem accretion (wiki). All future tooling can grow from these primitives without rework — the `.copilot/` canonical directory is the contract.
 
 **Next:** No specific follow-up. Continue adding skills/rules/wiki entries opportunistically as the same problems re-appear. If multi-agent throughput ever becomes a need, the deferred carve-outs (engine config, role agents, rubrics, MCP layer) plug in alongside without redesign.
+
+---
+
+## 2026-06-03 — Shadow-DOM CSS injection (closes a documented embed-bundle gap)
+
+**What changed:** Embed and package bundles now ship their CSS as a baked string constant and inject it at mount time into whichever scope the story actually rendered into — `document.head` for light-DOM mounts (deduped via `data-markbook-css="<cssId>"`), or the shadow root itself for `isolation: 'shadow'` mounts. Six pieces:
+
+1. **`inlineExtractedCssPlugin` rewrite** (`packages/core/src/embed.ts`). The old plugin prepended an IIFE that mutated `document.head` at import time — broken for shadow mounts. The new plugin uses a placeholder pattern: every entry-generator-emitted file declares `var __MARKBOOK_CSS__ = "__MARKBOOK_CSS_PLACEHOLDER__"` and the plugin string-replaces the placeholder during `generateBundle` with the JSON-encoded concatenation of every CSS asset Vite extracted. Empty string when no CSS was extracted — the var always exists, no runtime ReferenceError risk. The plugin no longer needs the slug as a constructor argument.
+
+2. **Entry generators pass `css` + `cssId` to mount** (same file, `generateEmbedEntry` / `generatePackageEntry`). The `cssId` is baked at generation time (`story.slug` for embed mode, `pkgName` for package mode). `generatePackageEntry` now takes `pkgName` as an explicit parameter so the bundle's dedup key matches the npm package name a consumer would import by.
+
+3. **All three adapters added a private `injectCss(target, opts)` helper** (`packages/adapter-{react,vue,wc}/src/index.ts`) with a new `MountOptions.css?: string` and `MountOptions.cssId?: string`. The helper reads `target.getRootNode()` — if it's a `ShadowRoot`, it appends the `<style>` inside the shadow (deduped per `cssId` within that root); otherwise it appends to `document.head` (deduped page-wide). Symmetric across React/Vue/WC.
+
+4. **WC adapter fix** — previously `resolveMountTarget` returned the `ShadowRoot` itself, and the subsequent `while (target.firstChild) target.removeChild(target.firstChild)` cleanup would have wiped any injected `<style>` siblings. Now WC mirrors React/Vue by creating a `.markbook-shadow-host` child div inside the shadow and clearing only that container — the injected stylesheet sits next to it untouched.
+
+5. **Pixie tokens duplicated on `:host`** (`examples/react-demo/src/pixie/pixie.css`). CSS custom properties declared only on `:root` do not reach inside shadow roots. Adding paired `:root, :host` and `:root[data-theme="dark"], :host([data-theme="dark"]), [data-theme="dark"]` selectors makes the same token sheet work in both light DOM and shadow mounts. Captured the gotcha at `.copilot/wiki/shadow-tokens-on-host-and-root.md` with the do/don't pattern and a note that ambient `<html data-theme="dark">` does NOT cross the shadow boundary (the host element itself needs the attribute for dark mode to apply inside the shadow).
+
+6. **`examples/embed-host/shadow.html`** — package-mode bundle mounted with `mount(el, { isolation: 'shadow' })` and an aggressive host-page `.demo button { all: revert; opacity: 0.3 !important; background: pink !important; }` reset that proves nothing leaks in. Added a link from `index.html` to the new page.
+
+The IIFE side-effect path is gone. Package mode already advertised `sideEffects: false`, so "import a bundle just to register its CSS" was never a supported contract — no migration cost.
+
+Verified: `pnpm example:embed-host:build` rebuilds 20 embed + 20 package bundles cleanly; the package bundle has the Pixie CSS string baked in (`grep pixie-primary dist/.../index.js` → 1 hit); placeholder is gone (`grep __MARKBOOK_CSS_PLACEHOLDER__` → 0 hits). 69 unit tests still pass. Vue + WC example builds clean.
+
+**Why:** `--isolation=shadow` was advertised but never actually worked for stories with extracted CSS — anyone using it got an unstyled story. The placeholder-pattern + per-adapter `injectCss` design is the smallest change that keeps the existing dedup-on-cssId behaviour for light DOM AND extends correctly to shadow scope. Pushing the injection responsibility to the adapter (rather than core) means each adapter's runtime knows where it actually mounted and which scope owns the styles — no out-of-band coordination needed. The Pixie token fix proves the same source CSS can serve both worlds without runtime transformation (which the rubber-duck specifically pushed back on as too magical).
+
+**Next:** C — "open in playground" button per story. Then E — UX polish batch (copy-code, heading permalinks, search includes story names).

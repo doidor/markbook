@@ -8,17 +8,24 @@ import { createContext, makeLoadTemplate, type BuildContext } from './build.js';
 import type { MarkbookConfig } from './config.js';
 
 /**
- * Inline any CSS Vite extracted alongside a library build into the entry
- * chunk, so each bundle stays self-contained (the host page mounts via a
- * single `<script type="module">` and gets working styles, no separate
- * `<link rel="stylesheet">` to remember). The injected snippet is dedup-keyed
- * per build so multiple mounts of the same bundle insert the `<style>` once.
+ * Bake the CSS that Vite extracted from the bundle into the entry chunk as
+ * a string literal, so the adapter's `mount` function can inject it into the
+ * correct scope at mount time (light DOM document.head when not isolated, or
+ * the shadow root when `isolation: 'shadow'`).
  *
- * Note: this targets `document.head`, so shadow-isolated mounts still see the
- * styles from the host's light DOM. Shadow-scoped CSS injection is a future
- * enhancement.
+ * The entry generator writes `var __MARKBOOK_CSS__ = ${CSS_PLACEHOLDER};` at
+ * the top of every entry. This plugin's `generateBundle` hook scans every
+ * `.css` asset emitted alongside the entry, concatenates, and replaces the
+ * placeholder with the CSS as a JSON string literal. When no CSS was
+ * extracted the placeholder is replaced with an empty string — never left in
+ * the output.
+ *
+ * Adapters receive `{ css, cssId }` in `MountOptions` and dedup light-DOM
+ * `<style>` tags via `data-markbook-css="<cssId>"`.
  */
-function inlineExtractedCssPlugin(slug: string): Plugin {
+const CSS_PLACEHOLDER = '"__MARKBOOK_CSS_PLACEHOLDER__"';
+
+function inlineExtractedCssPlugin(): Plugin {
   return {
     name: 'markbook-inline-extracted-css',
     apply: 'build',
@@ -34,11 +41,10 @@ function inlineExtractedCssPlugin(slug: string): Plugin {
           delete bundle[name];
         }
       }
-      if (!css) return;
-      const inject = `(()=>{if(typeof document==='undefined')return;const k=${JSON.stringify(slug)};if(document.querySelector('style[data-markbook-css="'+k+'"]'))return;const s=document.createElement('style');s.setAttribute('data-markbook-css',k);s.textContent=${JSON.stringify(css)};document.head.appendChild(s);})();\n`;
+      const replacement = JSON.stringify(css);
       for (const chunk of Object.values(bundle)) {
         if (chunk.type === 'chunk' && chunk.isEntry) {
-          chunk.code = inject + chunk.code;
+          chunk.code = chunk.code.split(CSS_PLACEHOLDER).join(replacement);
         }
       }
     },
@@ -138,7 +144,7 @@ async function bundleEmbedOne(
 
   await viteBuild({
     root: ctx.root,
-    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin(story.slug)],
+    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin()],
     define: {
       'process.env.NODE_ENV': '"production"',
     },
@@ -187,6 +193,7 @@ async function bundlePackageOne(
   const entryAbs = path.join(tmpDir, `${story.slug}.entry.ts`);
   const entryCode = generatePackageEntry(
     story,
+    pkgName,
     ctx.adapterPackageName,
     ctx.decoratorPaths,
     tmpDir,
@@ -196,7 +203,7 @@ async function bundlePackageOne(
 
   await viteBuild({
     root: ctx.root,
-    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin(pkgName)],
+    plugins: [...(ctx.adapterPlugins as Plugin[]), inlineExtractedCssPlugin()],
     define: {
       'process.env.NODE_ENV': '"production"',
     },
@@ -375,6 +382,8 @@ function buildMountOptsExpr(
   if (isolation) fields.push(`isolation: ${JSON.stringify(isolation)}`);
   fields.push(`args: _args`);
   fields.push(`parameters: _params`);
+  fields.push(`css: __MARKBOOK_CSS__`);
+  fields.push(`cssId: __MARKBOOK_CSS_ID__`);
   return `{ ${fields.join(', ')} }`;
 }
 
@@ -395,6 +404,13 @@ function generateEmbedEntry(
 
   return `${imports}
 
+// __MARKBOOK_CSS__ is replaced by inlineExtractedCssPlugin at bundle time
+// with the JSON-encoded concatenation of every CSS asset Vite extracted from
+// this bundle. Empty string when no CSS exists. The adapter's mount() injects
+// it into the correct scope (light DOM document.head or shadow root).
+var __MARKBOOK_CSS__ = "__MARKBOOK_CSS_PLACEHOLDER__";
+var __MARKBOOK_CSS_ID__ = ${JSON.stringify(story.slug)};
+
 ${MB_CSF_HELPER}
 
 const _exp = ${storyExportRef};
@@ -413,6 +429,7 @@ for (const el of targets) {
 
 function generatePackageEntry(
   story: DiscoveredStory,
+  pkgName: string,
   adapterPkg: string,
   decoratorPaths: string[],
   entryDir: string,
@@ -427,6 +444,10 @@ function generatePackageEntry(
   const baseOpts = buildMountOptsExpr(decoratorRefs, isolation);
 
   return `${imports}
+
+// See generateEmbedEntry for placeholder semantics.
+var __MARKBOOK_CSS__ = "__MARKBOOK_CSS_PLACEHOLDER__";
+var __MARKBOOK_CSS_ID__ = ${JSON.stringify(pkgName)};
 
 ${MB_CSF_HELPER}
 

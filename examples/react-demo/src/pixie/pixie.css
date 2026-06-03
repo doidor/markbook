@@ -1,4 +1,5 @@
-:root {
+:root,
+:host {
   --pixie-primary: #6c5ce7;
   --pixie-primary-hover: #5849d6;
   --pixie-danger: #e63946;
@@ -26,6 +27,8 @@
   --pixie-transition: 0.15s ease;
 }
 
+:root[data-theme="dark"],
+:host([data-theme="dark"]),
 [data-theme="dark"] {
   --pixie-primary: #8a7cf0;
   --pixie-primary-hover: #a294f5;

@@ -36,6 +36,7 @@ A new wiki entry must:
 
 | Topic | What |
 | --- | --- |
+| [`shadow-tokens-on-host-and-root`](shadow-tokens-on-host-and-root.md) | CSS tokens declared on `:root` only don't reach shadow-rooted mounts — pair with `:host` |
 | [`css-in-ts-template-literal`](css-in-ts-template-literal.md) | Backticks in CSS comments inside a TS template literal break parsing |
 | [`vite-tmpdir-watching`](vite-tmpdir-watching.md) | Vite's watcher won't pick up files outside its `root`; chokidar handles user content |
 | [`parallel-mkdir-then-create`](parallel-mkdir-then-create.md) | `mkdir` and `create` in the same tool batch can race; serialize directory creation |

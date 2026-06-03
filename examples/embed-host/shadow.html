@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Markbook shadow-DOM isolation demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --fg: #1a1a1a; --muted: #5b5b66; --border: #e6e6eb; --soft: #fafafa; --accent: #4a3aff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1rem 1.5rem; color: var(--fg); line-height: 1.55; }
+  nav { font-size: 0.85rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
+  p { margin: 0.5rem 0 1rem; }
+  p.lede { color: var(--muted); }
+  code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: var(--soft); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+  pre { background: var(--soft); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; border: 1px solid var(--border); }
+  pre code { background: transparent; padding: 0; }
+  .demo { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  /* Host-page CSS reset that WOULD break the story if it leaked into the shadow.
+     Inside the shadow it has no effect — proving the isolation works. */
+  .demo button { all: revert; opacity: 0.3 !important; background: pink !important; }
+  .demo .mount { padding: 1.25rem; background: var(--soft); border-radius: 6px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav><a href="./">← All examples</a></nav>
+
+<h1>Shadow-DOM isolation</h1>
+<p class="lede">The same package-mode bundle, but mounted into an open shadow root via <code>mount(el, { isolation: 'shadow' })</code>. Host-page CSS (an aggressive button reset, see the source of this page) does <strong>not</strong> reach into the shadow tree — the buttons render with Pixie's intended styles.</p>
+
+<h2>Markup</h2>
+<pre><code>&lt;div id="here"&gt;&lt;/div&gt;
+&lt;script type="module"&gt;
+  import { mount } from 'components-button-variants';
+  mount(document.getElementById('here'), { isolation: 'shadow' });
+&lt;/script&gt;</code></pre>
+
+<h2>How styles get in</h2>
+<p>The embed bundler bakes the bundle's CSS into a string constant in the entry. At mount time the adapter detects whether the mount target lives inside a shadow root and injects a <code>&lt;style&gt;</code> there instead of in <code>document.head</code>. Token sheets that previously used <code>:root</code> selectors only (like Pixie's <code>pixie.css</code>) gained a paired <code>:host</code> selector so CSS custom properties are visible inside the shadow tree too.</p>
+
+<h2>Live</h2>
+<div class="demo">
+  <div class="mount" id="shadow-mount"></div>
+</div>
+<p>If host-page CSS leaked in, every button would be pink at 30% opacity. They aren't.</p>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "components-button-variants": "../react-demo/dist/packages/components-button-variants/dist/index.js"
+  }
+}
+</script>
+<script type="module">
+  import { mount } from 'components-button-variants';
+  mount(document.getElementById('shadow-mount'), { isolation: 'shadow' });
+</script>
+</body>
+</html>

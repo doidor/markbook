@@ -19,6 +19,10 @@ interface MountOptions {
   args?: Record<string, unknown>;
   /** Per-story display parameters applied to the placeholder element. */
   parameters?: StoryParameters;
+  /** CSS string injected before mounting (Markbook embed bundle). */
+  css?: string;
+  /** Stable id used to dedup the light-DOM `<style>` tag. */
+  cssId?: string;
 }
 
 const LAYOUT_CLASSES = [
@@ -32,6 +36,7 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
 
   applyParameters(el, opts?.parameters);
   const target = resolveMountTarget(el, opts);
+  injectCss(target, opts);
 
   const existing = apps.get(target);
   if (existing) existing.unmount();
@@ -83,4 +88,27 @@ function resolveMountTarget(el: Element, opts?: MountOptions): Element {
     shadow.appendChild(container);
   }
   return container;
+}
+
+/** See `@markbook/adapter-react`'s `injectCss` for the contract. */
+function injectCss(target: Element, opts?: MountOptions): void {
+  const css = opts?.css;
+  if (!css) return;
+  const cssId = opts?.cssId ?? '';
+
+  const root = target.getRootNode();
+  if (root instanceof ShadowRoot) {
+    if (cssId && root.querySelector(`style[data-markbook-css="${cssId}"]`)) return;
+    const style = document.createElement('style');
+    if (cssId) style.setAttribute('data-markbook-css', cssId);
+    style.textContent = css;
+    root.appendChild(style);
+    return;
+  }
+
+  if (cssId && document.head.querySelector(`style[data-markbook-css="${cssId}"]`)) return;
+  const style = document.createElement('style');
+  if (cssId) style.setAttribute('data-markbook-css', cssId);
+  style.textContent = css;
+  document.head.appendChild(style);
 }
