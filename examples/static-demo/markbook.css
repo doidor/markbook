@@ -1,0 +1,38 @@
+/* markbook style preset: nord
+ *
+ * The Nord palette (https://www.nordtheme.com/) — cool, calm Scandinavian
+ * blues and frost. Popular among designers and Vim users; gives docs a
+ * distinctly composed, low-saturation feel.
+ */
+
+:root {
+  --mb-bg: #eceff4;
+  --mb-fg: #2e3440;
+  --mb-fg-muted: #4c566a;
+  --mb-border: #d8dee9;
+  --mb-bg-elev: #e5e9f0;
+  --mb-bg-soft: #e5e9f0;
+  --mb-accent: #5e81ac;
+  --mb-accent-fg: #eceff4;
+  --mb-link: #5e81ac;
+  --mb-code-bg: #d8dee9;
+  --mb-radius: 4px;
+  --mb-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mb-font-mono: "Fira Code", ui-monospace, "SF Mono", Menlo, monospace;
+  --mb-content-width: 720px;
+  --mb-sidebar-width: 240px;
+  --mb-toc-width: 200px;
+  --mb-header-height: 56px;
+}
+
+:root[data-theme="dark"] {
+  --mb-bg: #2e3440;
+  --mb-fg: #eceff4;
+  --mb-fg-muted: #d8dee9;
+  --mb-border: #434c5e;
+  --mb-bg-elev: #3b4252;
+  --mb-bg-soft: #3b4252;
+  --mb-accent: #88c0d0;
+  --mb-link: #8fbcbb;
+  --mb-code-bg: #434c5e;
+}

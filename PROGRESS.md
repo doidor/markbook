@@ -515,3 +515,32 @@ End-to-end verification:
 **Why:** The user asked "can someone use Markbook to publish a static website that's markdown-driven?" The honest answer was "yes-ish — every demo declares an adapter even when it doesn't need one." Making `adapter` optional removes the only friction. The buttons are the killer adjacent feature for that use case: a markdown-driven site that exposes its own llms.txt content one click away is the kind of thing both human readers and LLM consumers benefit from (paste the .txt into ChatGPT/Claude and the page is portable). Both pieces are deliberate additions that change nothing for existing adapter-bound consumers beyond the new buttons (which they can disable via `llmsButtons: false`).
 
 **Next:** No specific follow-up. The deferred carve-outs from earlier (Vue/WC props tables, Vue/WC controls, WC decorators) still wait.
+
+---
+
+## 2026-06-03 — Dynamic per-page titles + new `examples/static-demo/` workspace
+
+**What changed:** Two complementary additions for the markdown-only path landed earlier today.
+
+1. **`MarkbookConfig.title` is now truly optional.** Previously it defaulted to the literal string `'Markbook'`, which leaked into every page's `<title>` tag (`"My Page — Markbook"`) and into the header brand. Now the default is `null`; when unset, each page's own `parsed.title` (from frontmatter or first H1) is used for BOTH the browser tab AND the header brand. Concrete behaviour:
+   - `config.title: 'Pixie'` (existing demo) — header shows "Pixie", `<title>` shows "Button — Pixie". **Unchanged.**
+   - `config.title` omitted (new behaviour) — header on the index page shows "Skyline", on the concepts page shows "Concepts", browser tab matches. The header brand becomes per-page, which is the right thing for a markdown-only / single-purpose site where the page IS the site.
+   - `llms.txt` H1 falls back to the index page's title (or the first page) when no `config.title` is set.
+   - `BuildContext.siteTitle` is now `string | null` to make the unset case explicit through the type system; `generateHtml` accepts the null and derives `brandText` / `browserTitle` per-page.
+   - `embed.ts`'s embed sandbox uses `siteTitle ?? 'Markbook'` because the sandbox is a meta-page about the bundles, not a content page — falling back to the literal is the right call there.
+
+2. **New `examples/static-demo/` workspace** — a fictional "Skyline" company-docs site that exercises the markdown-only path end-to-end. Six markdown files across two nav groups (`guide/`, `reference/`), no adapter, no React/Vue/WC deps. Uses the `nord` preset from the `markbook-style` skill for visual styling. Demonstrates frontmatter titles flowing into the header brand, per-page browser titles without site suffix, the new page action buttons, search, dark mode, nav grouping, code blocks, tables, and the `description:` frontmatter rendering as muted lede paragraphs.
+
+   New scripts in the root `package.json`: `example:static:build` and `example:static:dev`. CI workflow gained a "Build static demo" step (`example:static:build`) so the markdown-only path stays green forever.
+
+Verified end-to-end:
+- `pnpm example:static:build` produces 5 HTML pages, 5 per-page `.txt` mirrors, a `llms.txt` index with `# Skyline` (from the index page's frontmatter), and the `nord` accent visible in the rendered HTML.
+- `<title>` tags on the static demo are bare (`<title>Skyline</title>`, `<title>Concepts</title>`), not `— Markbook` suffixed.
+- React/Vue/WC demos rebuild unchanged: `<title>Button — Pixie</title>` and brand shows "Pixie" — backward compatible.
+- 119 unit tests still pass; lint clean.
+
+**Why:** The question came up while iterating on the markdown-only path: "what if people want to have dynamic titles on each page?" Defaulting `config.title` to `'Markbook'` was a pre-`staticAdapter()` artifact — it made sense when every site was a Markbook component-library docs site, less so for a small personal site where the user shouldn't have to think about a "site title" at all. The change unlocks the obvious natural reading (frontmatter title flows everywhere) without breaking any consumer who DOES want a site brand.
+
+The `static-demo` workspace was the user's other ask. It serves as both a smoke test for the markdown-only path AND a copy-pasteable starting point for someone setting up their own static site. The Skyline content is fictional but realistic — it shows what real Markbook documentation feels like for a non-component-library use case.
+
+**Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) still wait.

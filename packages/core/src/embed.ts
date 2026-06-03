@@ -113,7 +113,7 @@ export async function bundleEmbed(
   if (mode === 'embed') {
     await fs.writeFile(
       path.join(outRoot, 'index.html'),
-      generateSandboxHtml(targets, ctx.siteTitle),
+      generateSandboxHtml(targets, ctx.siteTitle ?? 'Markbook'),
     );
   }
 

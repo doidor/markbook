@@ -51,3 +51,6 @@ jobs:
 
       - name: Build web-components demo
         run: pnpm example:wc:build
+
+      - name: Build static demo (markdown-only, no adapter)
+        run: pnpm example:static:build

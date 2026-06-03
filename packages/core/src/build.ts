@@ -45,7 +45,13 @@ export interface BuildContext {
   tmpDir: string;
   templateDirs: string[];
   decoratorPaths: string[];
-  siteTitle: string;
+  /**
+   * Site-wide title from `MarkbookConfig.title`. When `null`, each page's
+   * own `parsed.title` (from frontmatter or first H1) is used in the
+   * header brand and `<title>` tag — useful for markdown-only sites where
+   * the page IS the site.
+   */
+  siteTitle: string | null;
   siteDescription: string | undefined;
   adapter: MarkbookAdapter;
   adapterPackageName: string;
@@ -83,7 +89,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   const docsDir = path.resolve(root, config.docsDir ?? 'docs');
   const outDir = path.resolve(root, config.outDir ?? 'dist');
   const tmpDir = path.resolve(root, '.markbook');
-  const siteTitle = config.title ?? 'Markbook';
+  const siteTitle = config.title ?? null;
   const siteDescription = config.description;
   const templateDirs = (() => {
     const raw = config.templatesDir ?? 'templates';
@@ -501,13 +507,19 @@ export function isIndexHref(href: string): boolean {
 async function emitLlms(
   pages: PageRecord[],
   outDir: string,
-  siteTitle: string,
+  siteTitle: string | null,
   siteDescription: string | undefined,
 ): Promise<void> {
   await emitPerPageLlmsTxt(pages, outDir);
 
+  // Fall back to the index page's title (or the first page's) so the
+  // llms.txt index still has a meaningful H1 when no `config.title` was
+  // supplied.
+  const indexPage = pages.find((p) => isIndexHref(p.htmlRelPath));
+  const titleH1 = siteTitle ?? indexPage?.parsed.title ?? pages[0]?.parsed.title ?? 'Documentation';
+
   const lines: string[] = [];
-  lines.push(`# ${siteTitle}`);
+  lines.push(`# ${titleH1}`);
   lines.push('');
   lines.push(
     '> **Note:** This is a summary overview using the LLMs.txt format (https://llmstxt.org/). Each section links to its full documentation file in plain text format.',
@@ -737,7 +749,7 @@ const MB_CSF_HELPER = `function __mb_isCsf(v) {
 function generateHtml(
   page: PageRecord,
   nav: NavGroup[],
-  siteTitle: string,
+  siteTitle: string | null,
   entryBasename: string | null,
   searchEnabled: boolean,
   userCss: string,
@@ -804,11 +816,18 @@ function generateHtml(
 </script>`
     : '';
 
+  // When the user supplies no `config.title`, fall back to per-page titles
+  // for both the browser tab and the header brand. The site reads as the
+  // current page — appropriate for markdown-only / single-purpose sites.
+  const pageTitle = page.parsed.title;
+  const browserTitle = siteTitle ? `${pageTitle} — ${siteTitle}` : pageTitle;
+  const brandText = siteTitle ?? pageTitle;
+
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${escapeHtml(page.parsed.title)} — ${escapeHtml(siteTitle)}</title>
+<title>${escapeHtml(browserTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>${THEME_BOOT_SCRIPT}</script>
 <script>${TABS_BOOT_SCRIPT}</script>
@@ -823,7 +842,7 @@ ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
 </head>
 <body>
 <header class="markbook-header">
-  <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(siteTitle)}</a>
+  <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(brandText)}</a>
   ${searchSlot}
   <button class="markbook-theme-toggle" type="button" data-markbook-theme-toggle aria-label="Toggle theme"><span class="markbook-icon-sun" aria-hidden>☀</span><span class="markbook-icon-moon" aria-hidden>☾</span></button>
 </header>

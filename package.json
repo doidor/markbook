@@ -28,6 +28,8 @@
     "example:wc:dev": "pnpm --filter @markbook/example-wc-demo dev",
     "example:wc:bundle": "pnpm --filter @markbook/example-wc-demo exec markbook bundle",
     "example:wc:bundle:package": "pnpm --filter @markbook/example-wc-demo exec markbook bundle --mode package",
+    "example:static:build": "pnpm --filter @markbook/example-static-demo build",
+    "example:static:dev": "pnpm --filter @markbook/example-static-demo dev",
     "example:embed-host:build": "pnpm example:build && pnpm example:bundle && pnpm example:bundle:package",
     "example:embed-host:serve": "python3 -m http.server 4500 --directory examples"
   },
