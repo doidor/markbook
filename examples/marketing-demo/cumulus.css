@@ -226,6 +226,31 @@ blockquote {
   white-space: nowrap;
 }
 
+/* Pagefind search input slot in the top nav. The {{ search }} placeholder
+   expands to <div id="markbook-search-ui"> which Pagefind's UI mounts into.
+   We just constrain its width so it doesn't dominate the nav. */
+.cumulus-topnav-search {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+.cumulus-topnav-search:empty {
+  display: none;
+}
+.cumulus-topnav-search .pagefind-ui__form {
+  margin: 0;
+}
+.cumulus-topnav-search .pagefind-ui__search-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+.cumulus-topnav-search .pagefind-ui__search-input::placeholder {
+  color: var(--c-fg-muted);
+}
+
 /* === SHELL & CONTENT ====================================================== */
 
 .cumulus-shell {
@@ -534,14 +559,9 @@ blockquote {
 
 /* === MARKBOOK CHROME HOOKS ================================================= */
 /*
- * Markbook always emits an inner `<main class="markbook-main">` wrapper and
- * heading anchor links. We pass through the wrapper transparently and hide
- * the heading anchors — they're a docs-site affordance that looks out of
- * place on a marketing landing page.
+ * Hide the docs-style `#` permalink anchors emitted on every heading.
+ * They're useful on docs sites; out of place on a marketing landing page.
  */
-.markbook-main {
-  display: contents;
-}
 .markbook-heading-anchor {
   display: none;
 }

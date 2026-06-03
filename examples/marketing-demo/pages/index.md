@@ -1,11 +1,8 @@
 ---
 title: Ship faster on infrastructure that thinks for you
-description: Cumulus is the cloud platform engineers actually want to use.
+description: Cumulus runs your services, scales them under load, and stays out of your way the rest of the time. No YAML mazes. No 3 AM pages. Just deploy.
+layout: landing
 ---
-
-# Ship faster on infrastructure that thinks for you
-
-Cumulus runs your services, scales them under load, and stays out of your way the rest of the time. No YAML mazes. No 3 AM pages. Just deploy.
 
 ## Built for teams that move fast
 

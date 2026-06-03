@@ -12,6 +12,7 @@ import { buildPlaygroundDescriptors } from './playground.js';
 import { resolveInlinedSources } from './inline-sources.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
 import { staticAdapter } from './config.js';
+import { applyHtmlLayout, type HtmlLayoutSubstitutions } from './template.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig, MarkbookAdapter, PlaygroundConfig } from './config.js';
 
@@ -40,10 +41,23 @@ export interface NavGroup {
 export interface BuildContext {
   config: MarkbookConfig;
   root: string;
+  /**
+   * Absolute path to the directory Markbook reads markdown content from.
+   * Resolved from `config.contentDir` (preferred) or `config.docsDir`
+   * (legacy alias). Kept named `docsDir` on the context for internal
+   * backward compatibility — the public-facing config now uses `contentDir`.
+   */
   docsDir: string;
   outDir: string;
   tmpDir: string;
   templateDirs: string[];
+  /**
+   * Absolute paths of HTML layout directories, searched in order for
+   * `<dir>/<name>.html` when a page (or `config.layout`) names a layout.
+   */
+  layoutDirs: string[];
+  /** Default HTML layout name applied to every page unless overridden. */
+  defaultLayout: string | null;
   decoratorPaths: string[];
   /**
    * Site-wide title from `MarkbookConfig.title`. When `null`, each page's
@@ -84,9 +98,45 @@ export function makeLoadTemplate(
   };
 }
 
+/**
+ * Build an HTML-layout loader. Resolves `<name>.html` against each entry
+ * in `layoutDirs`, first match wins. Throws a clear error if no candidate
+ * exists — silent fallback to the built-in shell would make typos
+ * indistinguishable from "no layout configured".
+ */
+export function makeLoadHtmlLayout(
+  layoutDirs: string[],
+  root: string,
+): (name: string) => Promise<string> {
+  return async (name: string) => {
+    for (const dir of layoutDirs) {
+      const candidate = path.join(dir, `${name}.html`);
+      try {
+        return await fs.readFile(candidate, 'utf8');
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      }
+    }
+    const searched =
+      layoutDirs.length > 0
+        ? layoutDirs.map((d) => path.relative(root, d) || d).join(', ')
+        : '(no layoutsDir configured)';
+    throw new Error(
+      `Markbook: HTML layout '${name}' not found in: ${searched}. ` +
+        `Create '${name}.html' in a layouts directory or set layoutsDir in markbook.config.ts.`,
+    );
+  };
+}
+
 export async function createContext(config: MarkbookConfig): Promise<BuildContext> {
   const root = path.resolve(config.root ?? process.cwd());
-  const docsDir = path.resolve(root, config.docsDir ?? 'docs');
+  if (config.contentDir != null && config.docsDir != null) {
+    throw new Error(
+      'Markbook: both `contentDir` and `docsDir` are set in markbook.config.ts. ' +
+        '`docsDir` is the legacy alias for `contentDir` — pick one. (Prefer `contentDir`.)',
+    );
+  }
+  const docsDir = path.resolve(root, config.contentDir ?? config.docsDir ?? 'docs');
   const outDir = path.resolve(root, config.outDir ?? 'dist');
   const tmpDir = path.resolve(root, '.markbook');
   const siteTitle = config.title ?? null;
@@ -96,6 +146,12 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     const list = Array.isArray(raw) ? raw : [raw];
     return list.map((d) => path.resolve(root, d));
   })();
+  const layoutDirs = (() => {
+    const raw = config.layoutsDir ?? 'layouts';
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list.map((d) => path.resolve(root, d));
+  })();
+  const defaultLayout = config.layout ?? null;
   const adapter = config.adapter ?? staticAdapter();
   const decoratorPaths = (adapter.decoratorModules ?? []).map((m) => {
     const resolved = resolveSpec(m, root);
@@ -132,6 +188,8 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     outDir,
     tmpDir,
     templateDirs,
+    layoutDirs,
+    defaultLayout,
     decoratorPaths,
     siteTitle,
     siteDescription,
@@ -238,6 +296,7 @@ async function writePages(
   }
 
   const htmlInputs: Record<string, string> = {};
+  const loadHtmlLayout = makeLoadHtmlLayout(ctx.layoutDirs, ctx.root);
   for (const page of pages) {
     const htmlAbs = path.join(ctx.tmpDir, page.htmlRelPath);
     const entryAbs = path.join(ctx.tmpDir, page.entryRelPath);
@@ -258,7 +317,9 @@ async function writePages(
       await fs.writeFile(entryAbs, entryCode);
     }
 
-    let html = generateHtml(
+    let html: string;
+    const layoutName = resolvePageLayout(page, ctx.defaultLayout);
+    const prc = buildPageRenderContext(
       page,
       nav,
       ctx.siteTitle,
@@ -268,6 +329,12 @@ async function writePages(
       ctx.disableBaseCss,
       ctx.llmsButtons,
     );
+    if (layoutName) {
+      const layoutBody = await loadHtmlLayout(layoutName);
+      html = renderLayout(prc, layoutName, layoutBody);
+    } else {
+      html = renderBuiltinShell(prc);
+    }
 
     if (ctx.config.transformHtml) {
       html = await ctx.config.transformHtml(html, {
@@ -367,11 +434,13 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   for (const url of localUrls) console.log(`    ➜  Local:   ${url}`);
   for (const url of networkUrls) console.log(`    ➜  Network: ${url}`);
   console.log('');
-  console.log('  Watching markdown, templates, CSS, and story files for changes (Ctrl-C to stop)');
+  console.log(
+    '  Watching markdown, templates, layouts, CSS, and story files for changes (Ctrl-C to stop)',
+  );
   console.log('');
 
   const watcher = chokidar.watch(
-    [ctx.docsDir, ...ctx.templateDirs, ...ctx.cssPaths, ...initial.storyFiles],
+    [ctx.docsDir, ...ctx.templateDirs, ...ctx.layoutDirs, ...ctx.cssPaths, ...initial.storyFiles],
     {
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
@@ -385,9 +454,11 @@ export async function dev(config: MarkbookConfig): Promise<void> {
     const isMd = file.endsWith('.md');
     const isCss = ctx.cssPaths.includes(abs);
     const isStory = watchedStoryFiles.has(abs);
+    const isHtmlLayout =
+      file.endsWith('.html') && ctx.layoutDirs.some((d) => abs.startsWith(d + path.sep));
     // Story files inside docsDir are picked up by the docsDir watcher; only
     // bypass this guard for files we care about.
-    if (!isMd && !isCss && !isStory) return;
+    if (!isMd && !isCss && !isStory && !isHtmlLayout) return;
     if (regenerating) return;
     regenerating = true;
     try {
@@ -746,7 +817,31 @@ const MB_CSF_HELPER = `function __mb_isCsf(v) {
   return !!(v.args || v.argTypes || v.parameters || typeof v.name === 'string');
 }`;
 
-function generateHtml(
+/**
+ * Bundle the data that's reused across the built-in shell and HTML
+ * layouts when rendering a single page. Computed once per page in
+ * `writePages`, then passed into `renderBuiltinShell` / `renderLayout`.
+ */
+interface PageRenderContext {
+  page: PageRecord;
+  nav: NavGroup[];
+  siteTitle: string | null;
+  entryBasename: string | null;
+  searchEnabled: boolean;
+  userCss: string;
+  disableBaseCss: boolean;
+  llmsButtons: boolean;
+  /** Function that rewrites a `target` path (e.g. `index.html`) to a relative href from this page. */
+  resolveHref: (target: string) => string;
+  /** Relative path from this page to `pagefind/` (no trailing slash). */
+  pagefindBase: string;
+  /** Effective browser-tab title for this page. */
+  browserTitle: string;
+  /** What goes in the header brand on the built-in shell. */
+  brandText: string;
+}
+
+function buildPageRenderContext(
   page: PageRecord,
   nav: NavGroup[],
   siteTitle: string | null,
@@ -755,7 +850,7 @@ function generateHtml(
   userCss: string,
   disableBaseCss: boolean,
   llmsButtons: boolean,
-): string {
+): PageRenderContext {
   const fromDir = path.dirname(page.htmlRelPath);
 
   const resolveHref = (target: string): string => {
@@ -765,9 +860,6 @@ function generateHtml(
     return rel;
   };
 
-  const homeItem = nav.find((g) => g.label === null)?.items[0];
-  const homeHref = homeItem ? resolveHref(homeItem.htmlRelPath) : resolveHref('index.html');
-
   const pagefindBase = (() => {
     let rel = path.relative(fromDir, 'pagefind').replace(/\\/g, '/');
     if (rel === '') rel = 'pagefind';
@@ -775,12 +867,99 @@ function generateHtml(
     return rel;
   })();
 
-  const navHtml = nav
+  const pageTitle = page.parsed.title;
+  const browserTitle = siteTitle ? `${pageTitle} — ${siteTitle}` : pageTitle;
+  const brandText = siteTitle ?? pageTitle;
+
+  return {
+    page,
+    nav,
+    siteTitle,
+    entryBasename,
+    searchEnabled,
+    userCss,
+    disableBaseCss,
+    llmsButtons,
+    resolveHref,
+    pagefindBase,
+    browserTitle,
+    brandText,
+  };
+}
+
+/**
+ * Build the Markbook-required content that lives inside `<head>` and is
+ * inserted via the `{{ head }}` placeholder in HTML layouts.
+ *
+ * Deliberately does NOT include `<title>`, `<meta charset>`, or `<meta
+ * viewport>` — those are the layout author's call. Use
+ * `{{ browserTitle }}` for the title string.
+ */
+function buildHeadInjections(prc: PageRenderContext): string {
+  const pagefindLink = prc.searchEnabled
+    ? `<link href="${prc.pagefindBase}/pagefind-ui.css" rel="stylesheet">`
+    : '';
+  const parts = [
+    `<script>${THEME_BOOT_SCRIPT}</script>`,
+    `<script>${TABS_BOOT_SCRIPT}</script>`,
+    `<script>${PLAYGROUND_BOOT_SCRIPT}</script>`,
+    `<script>${COPY_BOOT_SCRIPT}</script>`,
+    `<script>${PERMALINK_BOOT_SCRIPT}</script>`,
+  ];
+  if (prc.llmsButtons) parts.push(`<script>${COPY_MD_BOOT_SCRIPT}</script>`);
+  if (prc.searchEnabled) parts.push(`<script>${SEARCH_KBD_BOOT_SCRIPT}</script>`);
+  if (pagefindLink) parts.push(pagefindLink);
+  if (!prc.disableBaseCss) parts.push(`<style>${BASE_CSS}</style>`);
+  if (prc.userCss) parts.push(`<style data-markbook-user-css>${prc.userCss}</style>`);
+  return parts.join('\n');
+}
+
+/**
+ * Build the Markbook-required content that goes at end-of-body — the
+ * Pagefind UI script + init, plus the story entry module script. Inserted
+ * via the `{{ bodyEnd }}` placeholder in HTML layouts.
+ */
+function buildBodyEndInjections(prc: PageRenderContext): string {
+  const pagefindScripts = prc.searchEnabled
+    ? `<script src="${prc.pagefindBase}/pagefind-ui.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (typeof PagefindUI !== 'undefined') {
+      new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
+    }
+  });
+</script>`
+    : '';
+  const entryScript = prc.entryBasename
+    ? `<script type="module" src="./${prc.entryBasename}"></script>`
+    : '';
+  return [pagefindScripts, entryScript].filter(Boolean).join('\n');
+}
+
+/** The Pagefind search input slot. Empty when search is disabled. */
+function buildSearchSlot(prc: PageRenderContext): string {
+  return prc.searchEnabled ? '<div id="markbook-search-ui" class="markbook-search-ui"></div>' : '';
+}
+
+/** The dark/light toggle button. */
+function buildThemeToggle(): string {
+  return `<button class="markbook-theme-toggle" type="button" data-markbook-theme-toggle aria-label="Toggle theme"><span class="markbook-icon-sun" aria-hidden>☀</span><span class="markbook-icon-moon" aria-hidden>☾</span></button>`;
+}
+
+/**
+ * Render a page using the built-in Markbook shell (header + sidebar + TOC).
+ * Used when no HTML layout is configured for the page.
+ */
+function renderBuiltinShell(prc: PageRenderContext): string {
+  const homeItem = prc.nav.find((g) => g.label === null)?.items[0];
+  const homeHref = homeItem ? prc.resolveHref(homeItem.htmlRelPath) : prc.resolveHref('index.html');
+
+  const navHtml = prc.nav
     .map((group) => {
       const itemsHtml = group.items
         .map((n) => {
-          const href = resolveHref(n.htmlRelPath);
-          const active = n.id === page.fileId;
+          const href = prc.resolveHref(n.htmlRelPath);
+          const active = n.id === prc.page.fileId;
           return `<li><a href="${href}"${active ? ' class="active" aria-current="page"' : ''}>${escapeHtml(n.title)}</a></li>`;
         })
         .join('');
@@ -789,7 +968,7 @@ function generateHtml(
     })
     .join('');
 
-  const tocItems = page.parsed.headings.filter((h) => h.level === 2 || h.level === 3);
+  const tocItems = prc.page.parsed.headings.filter((h) => h.level === 2 || h.level === 3);
   const tocHtml = tocItems
     .map((h) => `<li class="toc-h${h.level}"><a href="#${h.slug}">${escapeHtml(h.text)}</a></li>`)
     .join('');
@@ -799,52 +978,25 @@ function generateHtml(
       : '';
   const shellClass = tocItems.length > 0 ? 'markbook-shell' : 'markbook-shell no-toc';
 
-  const pagefindLink = searchEnabled
-    ? `<link href="${pagefindBase}/pagefind-ui.css" rel="stylesheet">`
-    : '';
-  const searchSlot = searchEnabled
-    ? '<div id="markbook-search-ui" class="markbook-search-ui"></div>'
-    : '';
-  const pagefindScripts = searchEnabled
-    ? `<script src="${pagefindBase}/pagefind-ui.js"></script>
-<script>
-  window.addEventListener('DOMContentLoaded', () => {
-    if (typeof PagefindUI !== 'undefined') {
-      new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
-    }
-  });
-</script>`
-    : '';
-
-  // When the user supplies no `config.title`, fall back to per-page titles
-  // for both the browser tab and the header brand. The site reads as the
-  // current page — appropriate for markdown-only / single-purpose sites.
-  const pageTitle = page.parsed.title;
-  const browserTitle = siteTitle ? `${pageTitle} — ${siteTitle}` : pageTitle;
-  const brandText = siteTitle ?? pageTitle;
+  const headInjections = buildHeadInjections(prc);
+  const bodyEndInjections = buildBodyEndInjections(prc);
+  const searchSlot = buildSearchSlot(prc);
+  const themeToggle = buildThemeToggle();
+  const pageActions = prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '';
 
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${escapeHtml(browserTitle)}</title>
+<title>${escapeHtml(prc.browserTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script>${THEME_BOOT_SCRIPT}</script>
-<script>${TABS_BOOT_SCRIPT}</script>
-<script>${PLAYGROUND_BOOT_SCRIPT}</script>
-<script>${COPY_BOOT_SCRIPT}</script>
-<script>${PERMALINK_BOOT_SCRIPT}</script>
-${llmsButtons ? `<script>${COPY_MD_BOOT_SCRIPT}</script>` : ''}
-${searchEnabled ? `<script>${SEARCH_KBD_BOOT_SCRIPT}</script>` : ''}
-${pagefindLink}
-${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
-${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
+${headInjections}
 </head>
 <body>
 <header class="markbook-header">
-  <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(brandText)}</a>
+  <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(prc.brandText)}</a>
   ${searchSlot}
-  <button class="markbook-theme-toggle" type="button" data-markbook-theme-toggle aria-label="Toggle theme"><span class="markbook-icon-sun" aria-hidden>☀</span><span class="markbook-icon-moon" aria-hidden>☾</span></button>
+  ${themeToggle}
 </header>
 <div class="${shellClass}">
   <aside class="markbook-sidebar">
@@ -852,16 +1004,75 @@ ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
   </aside>
   <main class="markbook-main">
     <article class="markbook-content" data-pagefind-body>
-${llmsButtons ? renderPageActions(page, resolveHref) : ''}${page.parsed.html}
+${pageActions}${prc.page.parsed.html}
     </article>
   </main>
   ${tocBlock}
 </div>
-${pagefindScripts}
-${entryBasename ? `<script type="module" src="./${entryBasename}"></script>` : ''}
+${bodyEndInjections}
 </body>
 </html>
 `;
+}
+
+/**
+ * Render a page using a user-supplied HTML layout. Builds the
+ * substitution map and delegates to `applyHtmlLayout`, which validates
+ * that the layout has exactly one `{{ content }}` and rejects unknown
+ * placeholders.
+ *
+ * The layout owns the entire `<html>`/`<head>`/`<body>` structure. The
+ * `{{ content }}` placeholder receives the page's INNER HTML — the
+ * layout supplies its own `<article ... data-pagefind-body>` wrapper if
+ * it wants Pagefind to index the page.
+ */
+function renderLayout(prc: PageRenderContext, layoutName: string, layoutBody: string): string {
+  const subs: HtmlLayoutSubstitutions = {
+    raw: {
+      content: prc.page.parsed.html,
+      head: buildHeadInjections(prc),
+      bodyEnd: buildBodyEndInjections(prc),
+      pageActions: prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '',
+      search: buildSearchSlot(prc),
+      themeToggle: buildThemeToggle(),
+    },
+    text: {
+      title: prc.page.parsed.title,
+      description: stringifyOrEmpty(prc.page.parsed.frontmatter.description),
+      siteTitle: prc.siteTitle ?? '',
+      browserTitle: prc.browserTitle,
+    },
+  };
+  return applyHtmlLayout(layoutBody, subs, prc.page.parsed.frontmatter, layoutName);
+}
+
+function stringifyOrEmpty(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return JSON.stringify(v);
+}
+
+/**
+ * Resolve the layout name to use for a given page. Returns `null` when
+ * the built-in shell should be used.
+ *
+ * Resolution order:
+ *   1. Per-page frontmatter `layout: <name>` wins (or `layout: false` to
+ *      force the built-in shell even when a default is configured).
+ *   2. `MarkbookConfig.layout` provides the site-wide default.
+ *   3. Otherwise, no layout — built-in shell.
+ */
+export function resolvePageLayout(page: PageRecord, defaultLayout: string | null): string | null {
+  const fm = page.parsed.frontmatter.layout;
+  if (fm === false) return null;
+  if (typeof fm === 'string') return fm;
+  if (fm != null) {
+    throw new Error(
+      `Markbook: ${page.relPath} has invalid \`layout:\` frontmatter — expected a string layout name or \`false\`, got ${JSON.stringify(fm)}.`,
+    );
+  }
+  return defaultLayout;
 }
 
 /**

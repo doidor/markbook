@@ -26,7 +26,12 @@ export type { CodeFile } from './code.js';
 export { extractComponentProps } from './props.js';
 
 // Template (Markdown shell) substitution
-export { applyTemplate } from './template.js';
+export { applyTemplate, applyHtmlLayout } from './template.js';
+export type {
+  HtmlLayoutSubstitutions,
+  HtmlLayoutRawToken,
+  HtmlLayoutTextToken,
+} from './template.js';
 
 // TS-AST export discovery for `:::stories` fan-out
 export {
@@ -40,6 +45,8 @@ export {
 export {
   createContext,
   makeLoadTemplate,
+  makeLoadHtmlLayout,
+  resolvePageLayout,
   sortIndexFirst,
   isIndexHref,
   capitalize,

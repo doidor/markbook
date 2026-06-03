@@ -22,9 +22,10 @@ your stories.
 - **Stories that escape the docs site.** `markbook bundle` produces either
   self-contained ESM embeds (drop-in `<script type="module">` on any page) or
   publishable npm packages with the framework as a peer dep.
-- **Search, dark mode, themes, custom CSS.** Pagefind, `[data-theme]` token
-  flipping, three layers of customization (`css` / `disableBaseCss` /
-  `transformHtml`).
+- **Search, dark mode, themes, custom CSS, HTML layouts.** Pagefind,
+  `[data-theme]` token flipping, and four layers of customization
+  (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) so the same
+  engine can render docs sites, marketing sites, or anything in between.
 
 ## Install
 
@@ -112,7 +113,7 @@ examples/
   wc-demo/          — <click-counter> custom element
   static-demo/      — Skyline: a markdown-only docs site, no adapter
   marketing-demo/   — Cumulus: a marketing site with a fully custom layout
-                      (disableBaseCss + transformHtml)
+                      (disableBaseCss + layouts/*.html + contentDir: 'pages')
   embed-host/       — external consumer of the React demo's embed bundles
 ```
 
@@ -131,7 +132,7 @@ pnpm example:embed-host:serve  # serve the embed-host pages
 pnpm example:vue:dev|build|bundle
 pnpm example:wc:dev|build|bundle
 pnpm example:static:dev|build      # markdown-only docs site (no adapter)
-pnpm example:marketing:dev|build   # fully custom layout via transformHtml
+pnpm example:marketing:dev|build   # fully custom layout via HTML layouts + disableBaseCss
 ```
 
 ## License

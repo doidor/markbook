@@ -574,3 +574,101 @@ Verified end-to-end:
 It also doubles as the canonical "starter for a non-docs Markbook site" — copy `examples/marketing-demo/`, swap the markdown, restyle the tokens, ship a landing page in an afternoon.
 
 **Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) still wait. With six worked examples (React docs, Vue docs, WC docs, embed-host, static docs, marketing) the demo surface is now broad enough that v1.0 prep can shift to API freeze / Pagefind v0.2 work without needing more demos.
+
+## 2026-06-03 — HTML layouts (`layoutsDir` + `{{ }}` placeholders) replace `transformHtml` as the chrome-customization story; `contentDir` alias for `docsDir`
+
+**What changed:** Introduced a fourth customization layer: file-based HTML layouts modeled on Jekyll / Eleventy. The marketing demo (Cumulus, shipped earlier today) was the forcing function — its `transformHtml` regex contained ~70 lines of fragile string mutation to strip Markbook's `<header>` / sidebar / TOC and inject a top nav + footer + hero. Layouts make that an HTML file instead.
+
+### Core API additions
+
+New `MarkbookConfig` fields:
+
+- **`contentDir?: string`** — preferred name for what was `docsDir`. Defaults to `'docs'` for backward compatibility. `docsDir` is retained as a legacy alias. Setting both throws (silent precedence would be more confusing than an explicit error).
+- **`layoutsDir?: string | string[]`** — directories searched for `<name>.html` layout files. Default `'layouts'`. Mirrors `templatesDir` semantics.
+- **`layout?: string`** — default layout name applied to every page unless overridden by frontmatter.
+
+New page-level frontmatter:
+
+- **`layout: <name>`** — pick a specific layout for this page.
+- **`layout: false`** — force the built-in shell even when `config.layout` provides a default.
+
+### Layout placeholder vocabulary (11 tokens)
+
+Substitution via `applyHtmlLayout` (new export in `template.ts`). Two classes:
+
+| Class | Tokens | Behaviour |
+| --- | --- | --- |
+| Raw HTML | `content`, `head`, `bodyEnd`, `pageActions`, `search`, `themeToggle` | Substituted verbatim. Trusted Markbook-generated markup. |
+| Text (HTML-escaped) | `title`, `description`, `siteTitle`, `browserTitle` | Safe to interpolate into attributes. |
+| Frontmatter | `frontmatter.<dot.path>` | HTML-escaped. Missing paths → empty string. |
+
+Validation (all throw):
+
+- Layout file not found → error names the searched directories.
+- `{{ content }}` missing → error.
+- `{{ content }}` appears more than once → error (duplicate IDs / story mount nodes would break the page).
+- Unknown placeholder names (`{{ titlte }}`) → error (typo guard).
+- Frontmatter `layout:` neither string nor `false` → error.
+
+HTML comments are protected: `{{ }}` mentions inside `<!-- ... -->` are NOT substituted and the comments survive intact in the output. Implementation uses Unicode Private Use Area sentinels (`\uE000`) to mask comments during regex substitution. This lets layout authors document their own placeholder vocabulary in comments without tripping the "exactly one `{{ content }}`" rule.
+
+### Built-in shell refactor
+
+`generateHtml` was decomposed into composable partial-builders so the layout and built-in paths share code:
+
+- `buildPageRenderContext(...)` — computes shared per-page state (resolveHref, pagefindBase, browserTitle, brandText) once.
+- `buildHeadInjections(prc)` — Markbook-required `<head>` content (boot scripts + Pagefind CSS + base CSS + user CSS). Used by both paths and exposed via `{{ head }}`.
+- `buildBodyEndInjections(prc)` — Pagefind UI script + init + story entry. Exposed via `{{ bodyEnd }}`.
+- `buildSearchSlot(prc)` — the `<div id="markbook-search-ui">` slot. Exposed via `{{ search }}`.
+- `buildThemeToggle()` — the toggle button. Exposed via `{{ themeToggle }}`.
+- `renderBuiltinShell(prc)` — emits the original Markbook shell using the partials above.
+- `renderLayout(prc, layoutName, layoutBody)` — builds the substitution map and calls `applyHtmlLayout`.
+
+`writePages` resolves the layout via `resolvePageLayout(page, ctx.defaultLayout)` and dispatches. `transformHtml` runs LAST regardless — it now patches either the built-in or layout output uniformly.
+
+### Dev watcher
+
+`chokidar.watch` now includes `ctx.layoutDirs`. The `onChange` filter recognises `.html` files in `layoutDirs` (`isHtmlLayout`) alongside `.md` / CSS / story files. Editing a layout triggers a full reload, same as editing content.
+
+### Marketing demo rewrite
+
+`examples/marketing-demo/` was rebuilt against the new API:
+
+- `docs/` → `pages/`, `contentDir: 'pages'` in config.
+- New `layouts/default.html` (top nav + footer + content article) and `layouts/landing.html` (default + hero section). Index page sets `layout: landing` in frontmatter; everything else uses the config default.
+- `transformHtml` is gone. `markbook.config.ts` shrank from ~100 lines (mostly regex) to ~35 lines (pure config).
+- The layout's top nav drops `{{ search }}` into a `.cumulus-topnav-search` wrapper. The footer's Resources column links to `/llms.txt` — showing how marketing sites opt in to both features without buttons on every page.
+- An inline `<script>` in `default.html` flips `aria-current="page"` on the active nav link client-side (layouts are shared across pages, so per-page active state has to happen at runtime).
+
+### Tests
+
+`packages/core/src/template.test.ts` gained 13 new tests for `applyHtmlLayout`: substitution of all eleven canonical tokens, HTML-escaping of text tokens AND frontmatter (XSS guard), nested dot-path frontmatter access, missing-path → empty, comment-preservation, validation of all four failure modes (missing content, duplicate content, unknown placeholder, comment-only mentions still failing). Total tests: 113 in core (was 100) + 19 in CLI = 132. All green.
+
+### Verified end-to-end
+
+- `pnpm example:marketing:build` produces 5 HTML pages; per-page layout dispatch works (landing.html only for index; default.html for everything else); search slot rendered; pagefind UI assets loaded; `/llms.txt` + `llms/<page>.txt` mirrors emitted; footer link to `/llms.txt` clickable.
+- All 5 example demos still build (react, vue, wc, static, marketing).
+- Lint clean. Typecheck clean.
+
+**Why:** Three reasons.
+
+1. **The regex pattern was obviously the wrong tool.** The user articulated this directly: "the html customization through the config file looks very dirty." That feedback maps perfectly onto the Jekyll / Eleventy model — chrome customization is an HTML concern that belongs in HTML files, not in JS string mutations.
+
+2. **`contentDir`'s rename is part of the same arc.** Markbook started as a component-library docs tool, and `docsDir` was the right name then. Today the engine renders docs sites, static markdown sites, and now marketing sites — `docs/` as the default content folder is conventional, but hardcoding the *config name* to that convention is a fossil. `contentDir` is generic enough to fit any use case; the legacy alias keeps every existing project working.
+
+3. **Search and llms.txt were always on; the marketing demo just couldn't reach them.** Removing the chrome stripped away the UI surfaces where those features lived. The fix isn't to opt them out — it's to expose them as placeholders (`{{ search }}`, `{{ pageActions }}`) that layouts can place however they like. Marketing sites that want a search box just drop `{{ search }}` in their top nav; sites that want pages-as-markdown just link `/llms.txt` from the footer. The marketing demo demonstrates both patterns.
+
+Rubber-duck pass before implementation caught several blind spots that made it into the final design:
+
+- Layout-not-found must throw (not silently fall back). Otherwise typos render the built-in shell silently and are impossible to debug.
+- Text tokens AND frontmatter values must be HTML-escaped. Otherwise frontmatter becomes an XSS vector.
+- `{{ content }}` must appear exactly once. Duplication breaks heading IDs and story mounts.
+- Unknown placeholders must throw. Otherwise typos render empty silently.
+- `{{ head }}` should NOT include `<title>` / charset / viewport. Otherwise users get duplicate tags when they write their own. Expose `{{ browserTitle }}` as the string instead.
+- Option B for `{{ content }}` (inner HTML; layout supplies the article wrapper) is more flexible than Option A (full article element). The layout author chooses where `data-pagefind-body` goes.
+
+**Next:** No specific follow-up. The four-layer customization story is now complete. Potential future tightening:
+
+- Add a soft-deprecation warning on `docsDir` once enough users have migrated to `contentDir`.
+- Consider adding `{{ nav }}` / `{{ toc }}` placeholders if real demand surfaces (current marketing demo handles its own nav).
+- If layout authors want includes/partials for shared chrome (e.g. nav repeated across multiple layouts), add a `{{ include name }}` syntax. Skipped for v1 — copy-paste between two layouts is fine.

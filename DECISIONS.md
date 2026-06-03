@@ -351,3 +351,119 @@ Both have to land cleanly without breaking existing setups (every demo + every c
 - **Skipping the entry script for zero-story pages is a real perf win for pure markdown sites.** Each page used to load an empty ESM module just to satisfy the template; now it loads nothing JS-bundled (the inline boot scripts remain, ~1.5 KB total).
 - **`emitPerPageLlmsTxt` running in dev** means a per-page regenerate writes 2× the file count (HTML + txt). Both are tiny; total write cost on the React demo's 6 pages is sub-1ms.
 - **No new example workspace** — the markdown-only path is validated by a quick manual smoke (build a tmpdir site, verify dist + button + llms.txt land) and the existing demo continues to exercise the full adapter path. A dedicated `examples/markdown-only-demo/` was considered but rejected as workspace bloat (the rubber-duck flagged it explicitly: "an example is bloat unless it's wired into CI; an integration test is the correctness gate").
+
+## ADR-0024 — HTML layout files replace `transformHtml` as the chrome-customization story
+
+**Status:** Accepted (2026-06-03).
+
+**Context.** Markbook shipped with three customization layers (`css`,
+`disableBaseCss`, `transformHtml`). The first two are clean — they swap or
+augment CSS. The third (`transformHtml`) is an async post-processor that
+takes the fully-generated HTML string and returns a new string. It was
+designed as an escape hatch but ended up being the only way to do "I want
+my own page chrome" — and `examples/marketing-demo/` proved the result is
+ugly: ~70 lines of regex-over-HTML in `markbook.config.ts` to strip
+Markbook's `<header>`/`<aside>`/`.markbook-shell` and inject a top-nav +
+footer + hero.
+
+Three problems with that pattern:
+1. Brittle: regex over HTML fails when the engine emits unexpected
+   whitespace, attribute order, or class permutations.
+2. Hard to maintain: the chrome and the JS that mutates it live in two
+   different mental spaces.
+3. Wrong tool: chrome customization is an HTML concern. It belongs in HTML
+   files, not JS strings.
+
+**Decision.** Introduce a fourth customization layer — file-based HTML
+layouts, modeled on Jekyll / Eleventy. New config:
+
+```ts
+defineConfig({
+  layoutsDir: 'layouts',     // string | string[]; default 'layouts'
+  layout: 'default',         // default layout name applied to every page
+});
+```
+
+Per-page opt-in via frontmatter (`layout: landing`), or opt-out with
+`layout: false` (forces the built-in shell even when a default is set).
+
+Layouts are `.html` files with eleven well-defined `{{ }}` placeholders
+that Markbook substitutes:
+
+- **Raw HTML tokens** (substituted verbatim, trusted Markbook-generated
+  markup): `{{ content }}`, `{{ head }}`, `{{ bodyEnd }}`,
+  `{{ pageActions }}`, `{{ search }}`, `{{ themeToggle }}`.
+- **Text tokens** (HTML-escaped — safe to interpolate into attributes):
+  `{{ title }}`, `{{ description }}`, `{{ siteTitle }}`,
+  `{{ browserTitle }}`.
+- **Frontmatter access** (HTML-escaped): `{{ frontmatter.<key.path> }}`.
+
+Strict validation throws on any of: missing `{{ content }}`, more than
+one `{{ content }}`, unknown placeholder names (typo guard), or a named
+layout file that doesn't exist (no silent fallback). HTML comments are
+preserved verbatim — placeholders inside `<!-- ... -->` are NOT
+substituted, so layout files can document their own placeholder
+vocabulary in comments.
+
+`transformHtml` survives unchanged as the escape hatch for narrow
+post-processing (analytics injection, attribute rewrites, etc.). It now
+runs AFTER layout substitution — so it can patch either the built-in
+shell or a layout's output uniformly.
+
+Simultaneously, introduce `contentDir` as the preferred name for what
+was `docsDir` (kept as a legacy alias). If both are set, Markbook throws
+— silent precedence is more confusing than an explicit error.
+
+**Alternatives considered.**
+
+- **Just keep `transformHtml`.** Rejected. Solves the wrong problem at
+  the wrong layer. Doesn't get easier with more pages.
+- **Markdown-level templates (existing `templatesDir`) extended to HTML
+  shell.** Rejected. Templates wrap markdown with markdown before
+  parsing; layouts replace the HTML shell after rendering. Different
+  lifecycle stages; conflating them surprises users.
+- **Conditionals / loops in the layout (e.g., Liquid or Handlebars).**
+  Rejected. KISS — string substitution is enough for a static-site
+  shell. If users need branching, they can ship two layouts and pick
+  via frontmatter.
+- **Per-page nav / TOC / brand text as placeholders.** Held back.
+  Including `{{ nav }}` / `{{ toc }}` / `{{ brandText }}` etc. would
+  bind layout authors to Markbook's docs conventions (sidebar nav,
+  on-this-page TOC, single brand). Marketing layouts hard-code their
+  own nav structure anyway. Reconsider per concrete demand.
+- **Silent fallback to built-in shell on missing layout file.** Rejected
+  (rubber-duck flag). `layout: landng` (typo) would silently render the
+  default chrome; impossible to debug. Throwing is the better default.
+- **Strip HTML comments before substitution.** Rejected. Many users
+  rely on HTML comments for conditional comments, debugging hints,
+  structured-data hints. The protect-and-restore sentinel approach
+  preserves them while neutralizing in-comment placeholder mentions.
+
+**Consequences.**
+
+- **Four customization layers, well-ordered.** `css` < `disableBaseCss` <
+  `layoutsDir` < `transformHtml`, each escalating control. Documented
+  this way in `packages/core/README.md`. The marketing demo uses 2 + 3;
+  the static demo uses 1; the docs demos use the defaults.
+- **The marketing demo shrinks dramatically.** `markbook.config.ts`
+  drops from ~100 lines (mostly regex) to ~35 lines (pure config). The
+  layout HTML is twice as long but lives where it belongs.
+- **Search + llms.txt become composable for non-docs sites.** Both were
+  always on; the missing piece was UI hooks. `{{ search }}` exposes the
+  Pagefind input slot; the layout's footer can link to `/llms.txt` for
+  the per-site mirror. The marketing demo demonstrates both.
+- **Public DOM contract slightly expands.** Layout authors now write
+  `<article data-pagefind-body>` themselves; that attribute moves from
+  "Markbook always emits it" to "Markbook always emits it OR you put it
+  in your layout." Documented.
+- **Eleven placeholders is the public API.** Each one becomes a
+  compatibility promise. The rubber-duck recommended starting smaller
+  and we did — the v1 set is the union of "needed by the marketing
+  demo" + "needed for search / llms" + "needed for theming". Future
+  additions are opt-in and reverse-compatible (unknown placeholders
+  already throw at the layout level).
+- **`contentDir` aliasing.** Old configs (`docsDir: 'docs'`) keep
+  working forever. New examples should use `contentDir`. We may add a
+  soft-deprecation warning on `docsDir` in a future minor.
+- **Dev watcher includes `layoutDirs`.** Editing a layout file
+  triggers a full reload, same as editing markdown or CSS.

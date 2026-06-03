@@ -48,6 +48,16 @@ export function staticAdapter(): MarkbookAdapter {
 
 export interface MarkbookConfig {
   root?: string;
+  /**
+   * Directory (relative to `root`) where Markbook reads markdown content
+   * pages from. Defaults to `'docs'` for backward compatibility. Use
+   * whatever name fits your site — `'pages'`, `'content'`, `'src'`, etc.
+   *
+   * `docsDir` is a legacy alias retained for backward compatibility. If
+   * both `contentDir` and `docsDir` are set, Markbook throws — pick one.
+   */
+  contentDir?: string;
+  /** Legacy alias for {@link contentDir}. Kept for backward compatibility. */
   docsDir?: string;
   outDir?: string;
   title?: string;
@@ -58,6 +68,30 @@ export interface MarkbookConfig {
    * Default: `'templates'`.
    */
   templatesDir?: string | string[];
+  /**
+   * One or more directories (relative to root, or absolute) to search for HTML
+   * layouts. Searched in order; the first `<dir>/<name>.html` that exists wins.
+   * Default: `'layouts'`.
+   *
+   * Layouts REPLACE Markbook's built-in HTML shell — they let you write the
+   * `<html>...</html>` structure yourself, with `{{ }}` placeholders for the
+   * page content and Markbook-required injections. Pick a layout per-page via
+   * frontmatter (`layout: <name>`) or for every page via {@link layout}.
+   *
+   * Layouts are the modern, file-based alternative to writing string-mutation
+   * `transformHtml` callbacks. See the customization section of the README.
+   */
+  layoutsDir?: string | string[];
+  /**
+   * Name of an HTML layout (under {@link layoutsDir}, without the `.html`
+   * extension) to apply to every page by default. Individual pages can
+   * override via frontmatter `layout: <other-name>`, or opt out with
+   * `layout: false` to fall back to Markbook's built-in shell.
+   *
+   * When unset, pages render with the built-in shell unless their own
+   * frontmatter names a layout.
+   */
+  layout?: string;
   /** Options for `markbook dev`. */
   dev?: {
     /** Port to bind the dev server to. Defaults to Vite's default (5173). */

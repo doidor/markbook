@@ -12,6 +12,7 @@
       "!**/dist",
       "!**/.markbook",
       "!**/_layouts",
+      "!**/layouts/**/*.html",
       "!**/*.tsbuildinfo",
       "!pnpm-lock.yaml",
       "!**/llms.txt",

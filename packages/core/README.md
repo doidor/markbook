@@ -111,6 +111,7 @@ TypeScript types via `react-docgen-typescript` (React-only).
 | `title` | `string` | Page title; falls back to first H1, then the file ID |
 | `description` | `string` | Used as muted lede after the H1; appears in nav descriptions |
 | `template` | `string` | Wrap content in `<templatesDir>/<name>.md` |
+| `layout` | `string \| false` | Pick an HTML layout `<layoutsDir>/<name>.html`; `false` to opt out when `config.layout` sets a default |
 | `component` | `string` | Path to the component for `:::props` (relative to page) |
 | `componentExport` | `string` | Named export within `component` |
 
@@ -120,13 +121,16 @@ TypeScript types via `react-docgen-typescript` (React-only).
 export default defineConfig({
   // Project layout
   root: process.cwd(),               // default: cwd
-  docsDir: 'docs',                   // markdown source root
+  contentDir: 'pages',               // markdown source root (default: 'docs')
+                                     // `docsDir` is the legacy alias
   outDir: 'dist',                    // build output
-  templatesDir: ['_layouts'],        // string or string[]; search order
+  templatesDir: ['_layouts'],        // markdown wrappers (string or string[])
+  layoutsDir: 'layouts',             // HTML shells (string or string[])
+  layout: 'default',                 // default HTML layout for every page
   title: 'My Components',
   description: 'A short blurb',
 
-  // Adapter (required)
+  // Adapter (optional — defaults to staticAdapter() for markdown-only sites)
   adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 
   // Dev server
@@ -138,12 +142,49 @@ export default defineConfig({
     packageVersion: '0.1.0',
   },
 
-  // Customization (three layers, escalating)
-  css: ['./markbook.css'],           // inlined AFTER built-in chrome CSS
-  disableBaseCss: false,             // opt out of built-in chrome entirely
-  transformHtml: async (html, page) => html, // post-process per page
+  // Customization (four layers, escalating)
+  css: ['./markbook.css'],           // 1. inlined AFTER built-in chrome CSS
+  disableBaseCss: false,             // 2. opt out of built-in chrome entirely
+  layoutsDir: 'layouts',             // 3. replace the entire HTML shell with
+                                     //    your own files (see "HTML layouts")
+  transformHtml: async (html, page) => html, // 4. post-process per page (escape hatch)
 });
 ```
+
+### HTML layouts
+
+When you outgrow the built-in shell, drop `.html` files into your
+`layoutsDir` and Markbook will use them instead. Layouts own the entire
+`<html>...</html>` structure; Markbook injects content + required bits
+via `{{ placeholders }}`:
+
+| Placeholder       | Substitutes |
+| ----------------- | ----------- |
+| `{{ content }}`   | Rendered page body (REQUIRED; exactly one per layout). Wrap it in `<article data-pagefind-body>` to enable search indexing. |
+| `{{ head }}`      | Markbook-required `<head>` injections (theme boot script, Pagefind CSS, base CSS, user CSS, etc.). Keep this. |
+| `{{ bodyEnd }}`   | Markbook-required body-end scripts (Pagefind UI init, story entry). Keep this. |
+| `{{ search }}`    | The Pagefind search input slot (empty when search is disabled). |
+| `{{ themeToggle }}` | Dark/light toggle button (works with the theme boot script in `{{ head }}`). |
+| `{{ pageActions }}` | "View / Copy as Markdown" buttons (empty when `llmsButtons: false`). |
+| `{{ title }}`     | Page title (HTML-escaped). |
+| `{{ description }}` | Page description from frontmatter (HTML-escaped). |
+| `{{ siteTitle }}` | `config.title` (HTML-escaped; empty if unset). |
+| `{{ browserTitle }}` | What Markbook would put in `<title>` — handles the site-title fallback rules (HTML-escaped). |
+| `{{ frontmatter.x }}` | Arbitrary frontmatter access via dot path (HTML-escaped — safe to interpolate into attributes). |
+
+Validation:
+
+- Unknown placeholders throw (typo guard).
+- Missing `{{ content }}` throws.
+- More than one `{{ content }}` throws.
+- A named layout that doesn't exist throws (no silent fallback).
+- Placeholders inside HTML comments are preserved verbatim and never substituted.
+
+Pick a layout per-page via frontmatter (`layout: landing`) or for every
+page via `config.layout`. Set `layout: false` in frontmatter to opt back
+into the built-in shell when `config.layout` provides a default.
+
+See `examples/marketing-demo/` for a worked example.
 
 ## Adapter contract (`MarkbookAdapter`)
 

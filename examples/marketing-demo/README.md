@@ -9,40 +9,64 @@ landing page with a hero, top nav, feature grids, pricing tiers, and a footer.
 
 ## What it demonstrates
 
-| Layer                | Used here                                                            |
-| -------------------- | -------------------------------------------------------------------- |
-| `css`                | One hand-rolled `cumulus.css` with all the layout + chrome rules.    |
-| `disableBaseCss`     | `true` — Markbook ships zero CSS; every selector is ours.            |
-| `transformHtml`      | Strips the docs chrome (`<header>` / sidebar / TOC), injects a top   |
-|                      | nav, footer, and a hero wrapper on the landing page.                 |
-| `llmsButtons: false` | No "View as Markdown" / "Copy as Markdown" buttons.                  |
-| `title` (omitted)    | Each page provides its own title via frontmatter; the header brand   |
-|                      | renders "Cumulus" from our top-nav markup, not from `config.title`.  |
+| Layer / config            | Used here                                                            |
+| ------------------------- | -------------------------------------------------------------------- |
+| `contentDir: 'pages'`     | Pages live in `pages/`, not the default `docs/`. (`docsDir` is the   |
+|                           | legacy alias — new sites should prefer `contentDir`.)                |
+| `css`                     | One hand-rolled `cumulus.css` with all the layout + chrome rules.    |
+| `disableBaseCss`          | `true` — Markbook ships zero CSS; every selector is ours.            |
+| `layoutsDir: 'layouts'` + | Markbook's default HTML shell is REPLACED by `layouts/default.html`  |
+| `layout: 'default'`       | for every page. `index.md` opts into `layouts/landing.html` for the  |
+|                           | hero treatment via frontmatter `layout: landing`.                    |
+| `llmsButtons: false`      | No per-page "View / Copy as Markdown" buttons; the layout's footer   |
+|                           | exposes a single "All pages as markdown ↓" link to `/llms.txt`.      |
+| `title` (omitted)         | Each page provides its own title via frontmatter; the brand text     |
+|                           | "Cumulus" lives in the layouts' top-nav markup, not in `config.title`.|
 
 ## Run it
 
 ```bash
 # From the repo root:
 pnpm example:marketing:build    # static site under examples/marketing-demo/dist
-pnpm example:marketing:dev      # dev server with watch
+pnpm example:marketing:dev      # dev server with watch (edits to layouts/, pages/, cumulus.css all reload)
 ```
 
 ## Files
 
-- `markbook.config.ts` — turns off base CSS, points at `cumulus.css`, and
-  rewrites every page's HTML in `transformHtml`.
-- `cumulus.css` — ~330 lines, the entire visual surface. No `--mb-*` tokens
+- `markbook.config.ts` — 35 lines, no JS-string-mutation. Points at `pages/`,
+  registers two layouts, disables base CSS, and that's it.
+- `cumulus.css` — ~560 lines, the entire visual surface. No `--mb-*` tokens
   used — we define our own `--c-*` token palette.
-- `docs/` — five markdown pages: index, product, pricing, customers, contact.
+- `layouts/default.html` — the standard shell: top sticky nav (with search
+  slot + active-link JS) + content article + footer (with `/llms.txt` link).
+- `layouts/landing.html` — same shell plus a hero section that pulls
+  `{{ title }}` and `{{ description }}` from frontmatter into a centered
+  marketing block with CTA buttons.
+- `pages/` — five markdown pages: index, product, pricing, customers, contact.
   Page authors use plain markdown for body copy plus a handful of raw HTML
   wrappers (`<div class="feature-grid">`, `<div class="pricing-tier">`, etc.)
   for the marketing-style cards. CommonMark allows raw HTML and Markbook's
   `remark-rehype` is configured with `allowDangerousHtml: true`, so they
   pass through unmodified.
 
+## Layout placeholders used here
+
+| Token              | Where it appears in our layouts                                  |
+| ------------------ | ---------------------------------------------------------------- |
+| `{{ content }}`    | Inside `<article class="cumulus-content" data-pagefind-body>`    |
+| `{{ head }}`       | Inside `<head>`, after our own `<title>` and meta tags           |
+| `{{ bodyEnd }}`    | Just before `</body>` — Pagefind UI init lives here              |
+| `{{ search }}`     | Inside `.cumulus-topnav-search` in the top nav                   |
+| `{{ pageActions }}`| Inside `<main class="cumulus-shell">` (empty since `llmsButtons: false`) |
+| `{{ browserTitle }}` | Inside our own `<title>` tag                                   |
+| `{{ description }}`| Inside `<meta name="description">` and (in landing.html) the hero `<p>` |
+| `{{ title }}`      | Inside the hero `<h1>` on landing.html                           |
+
 ## What this proves
 
-The default Markbook chrome is a convention, not a constraint. Three knobs
-(`css`, `disableBaseCss`, `transformHtml`) are enough to turn the same engine
-into a documentation site, a marketing site, a portfolio, an internal wiki, or
-anything else that's "markdown driven, static HTML out".
+The default Markbook chrome is a convention, not a constraint. Four knobs
+(`css`, `disableBaseCss`, `layoutsDir`, `transformHtml`) are enough to turn
+the same engine into a documentation site, a marketing site, a portfolio, an
+internal wiki, or anything else that's "markdown driven, static HTML out" —
+without writing any JS that mutates Markbook's output.
+
