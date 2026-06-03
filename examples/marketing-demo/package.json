@@ -1,0 +1,14 @@
+{
+  "name": "@markbook/example-marketing-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "markbook build",
+    "dev": "markbook dev"
+  },
+  "devDependencies": {
+    "@markbook/core": "workspace:*",
+    "markbook": "workspace:*"
+  }
+}

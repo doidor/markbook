@@ -110,6 +110,9 @@ examples/
   react-demo/       — Pixie component library — the canonical dogfood
   vue-demo/         — Counter component in Vue
   wc-demo/          — <click-counter> custom element
+  static-demo/      — Skyline: a markdown-only docs site, no adapter
+  marketing-demo/   — Cumulus: a marketing site with a fully custom layout
+                      (disableBaseCss + transformHtml)
   embed-host/       — external consumer of the React demo's embed bundles
 ```
 
@@ -127,6 +130,8 @@ pnpm example:bundle          # bundle React demo stories as ESM embeds
 pnpm example:embed-host:serve  # serve the embed-host pages
 pnpm example:vue:dev|build|bundle
 pnpm example:wc:dev|build|bundle
+pnpm example:static:dev|build      # markdown-only docs site (no adapter)
+pnpm example:marketing:dev|build   # fully custom layout via transformHtml
 ```
 
 ## License

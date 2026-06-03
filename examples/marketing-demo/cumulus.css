@@ -1,0 +1,547 @@
+/*
+ * Cumulus — marketing site stylesheet.
+ *
+ * Since markbook.config.ts sets `disableBaseCss: true`, Markbook ships
+ * zero CSS. Every selector in this file is the visual contract.
+ *
+ * Token surface:
+ *   --c-bg        Deep navy backdrop
+ *   --c-bg-2      Slightly lighter navy for cards
+ *   --c-bg-3      Subtle dark surface for inputs / footer
+ *   --c-fg        White text
+ *   --c-fg-muted  Subdued for secondary copy
+ *   --c-accent    Coral (CTAs, links, accents)
+ *   --c-accent-2  Warmer coral for hover
+ *   --c-border    Hairline borders between sections
+ *   --c-radius    Rounded corner unit
+ *   --c-font      Display + body font stack (system condensed)
+ *   --c-mono      Monospace for code
+ */
+
+:root {
+  --c-bg: #0a1228;
+  --c-bg-2: #0f1a36;
+  --c-bg-3: #07101f;
+  --c-fg: #f0f4ff;
+  --c-fg-muted: #9aa7c7;
+  --c-accent: #ff7264;
+  --c-accent-2: #ff9b8f;
+  --c-border: rgba(255, 255, 255, 0.07);
+  --c-radius: 10px;
+  --c-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --c-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --c-max-width: 1180px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family: var(--c-font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--c-accent);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+a:hover {
+  color: var(--c-accent-2);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 0.6em;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 5vw, 4rem);
+}
+h2 {
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+  margin-top: 3rem;
+}
+h3 {
+  font-size: 1.3rem;
+  margin-top: 2rem;
+}
+h4 {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-fg-muted);
+}
+
+p {
+  margin: 0 0 1.25rem;
+  color: var(--c-fg);
+}
+p + h2,
+p + h3 {
+  margin-top: 2.5rem;
+}
+
+code {
+  font-family: var(--c-mono);
+  font-size: 0.88em;
+  background: var(--c-bg-3);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  color: var(--c-accent-2);
+}
+
+pre {
+  background: var(--c-bg-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+ul,
+ol {
+  padding-left: 1.5rem;
+}
+li {
+  margin: 0.35rem 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  overflow: hidden;
+}
+th,
+td {
+  padding: 0.85rem 1.1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--c-border);
+}
+th {
+  background: var(--c-bg-2);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-fg-muted);
+}
+tr:last-child td {
+  border-bottom: none;
+}
+
+blockquote {
+  margin: 1.5rem 0;
+  padding: 1rem 1.5rem;
+  border-left: 3px solid var(--c-accent);
+  background: var(--c-bg-2);
+  border-radius: 0 var(--c-radius) var(--c-radius) 0;
+  color: var(--c-fg-muted);
+  font-style: italic;
+}
+
+/* === TOP NAV =============================================================== */
+
+.cumulus-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 1rem 2rem;
+  background: rgba(10, 18, 40, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.cumulus-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--c-fg);
+}
+.cumulus-brand:hover {
+  color: var(--c-fg);
+}
+.cumulus-logo {
+  color: var(--c-accent);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.cumulus-topnav-items {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  margin-left: 1rem;
+}
+
+.cumulus-topnav-items a {
+  color: var(--c-fg-muted);
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0.35rem 0;
+  border-bottom: 2px solid transparent;
+}
+.cumulus-topnav-items a:hover {
+  color: var(--c-fg);
+}
+.cumulus-topnav-items a[aria-current="page"] {
+  color: var(--c-fg);
+  border-bottom-color: var(--c-accent);
+}
+
+.cumulus-cta-sm {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--c-accent);
+  white-space: nowrap;
+}
+
+/* === SHELL & CONTENT ====================================================== */
+
+.cumulus-shell {
+  min-height: calc(100vh - 64px);
+}
+
+.cumulus-content {
+  max-width: var(--c-max-width);
+  margin: 0 auto;
+  padding: 3rem 2rem 5rem;
+}
+
+/* === HERO (index.html only) =============================================== */
+
+.cumulus-hero {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 114, 100, 0.18), transparent 50%),
+    radial-gradient(ellipse at 80% 50%, rgba(60, 100, 220, 0.14), transparent 60%),
+    linear-gradient(180deg, var(--c-bg) 0%, var(--c-bg-2) 100%);
+  border-bottom: 1px solid var(--c-border);
+  padding: 6rem 2rem 5rem;
+  text-align: center;
+}
+
+.cumulus-hero-inner {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.cumulus-hero h1 {
+  font-size: clamp(2.8rem, 6vw, 4.8rem);
+  background: linear-gradient(180deg, var(--c-fg) 0%, var(--c-fg-muted) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1.25rem;
+}
+
+.cumulus-hero p {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  color: var(--c-fg-muted);
+  max-width: 620px;
+  margin: 0 auto 2.5rem;
+}
+
+.cumulus-hero-ctas {
+  display: inline-flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cumulus-cta-primary,
+.cumulus-cta-secondary {
+  display: inline-block;
+  padding: 0.9rem 1.6rem;
+  border-radius: var(--c-radius);
+  font-weight: 600;
+  font-size: 1rem;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.cumulus-cta-primary {
+  background: var(--c-accent);
+  color: #1a0a08;
+}
+.cumulus-cta-primary:hover {
+  background: var(--c-accent-2);
+  color: #1a0a08;
+  transform: translateY(-1px);
+}
+.cumulus-cta-secondary {
+  border: 1px solid var(--c-border);
+  color: var(--c-fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+.cumulus-cta-secondary:hover {
+  border-color: var(--c-accent);
+  color: var(--c-fg);
+}
+
+/* === FEATURE / PRICING / CUSTOMER GRIDS ==================================== */
+
+.cumulus-content .feature-grid,
+.cumulus-content .pricing-grid,
+.cumulus-content .quote-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0 3rem;
+}
+
+.cumulus-content .feature-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.cumulus-content .pricing-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.cumulus-content .quote-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.cumulus-content .feature,
+.cumulus-content .pricing-tier,
+.cumulus-content .quote {
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  padding: 1.75rem;
+}
+
+.cumulus-content .feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(255, 114, 100, 0.12);
+  color: var(--c-accent);
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.cumulus-content .feature h3 {
+  font-size: 1.15rem;
+  margin-top: 0;
+}
+.cumulus-content .feature p {
+  color: var(--c-fg-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cumulus-content .pricing-tier {
+  display: flex;
+  flex-direction: column;
+}
+.cumulus-content .pricing-tier.featured {
+  border-color: var(--c-accent);
+  position: relative;
+}
+.cumulus-content .pricing-tier.featured::before {
+  content: "POPULAR";
+  position: absolute;
+  top: -0.65rem;
+  right: 1.5rem;
+  background: var(--c-accent);
+  color: #1a0a08;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+}
+.cumulus-content .pricing-tier h3 {
+  font-size: 1.1rem;
+  margin-top: 0;
+  color: var(--c-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.cumulus-content .price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+}
+.cumulus-content .price-unit {
+  font-size: 0.9rem;
+  color: var(--c-fg-muted);
+}
+.cumulus-content .pricing-tier ul {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+  flex: 1;
+}
+.cumulus-content .pricing-tier li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 0.92rem;
+}
+.cumulus-content .pricing-tier li:last-child {
+  border-bottom: none;
+}
+.cumulus-content .pricing-tier li::before {
+  content: "✓ ";
+  color: var(--c-accent);
+  font-weight: 700;
+}
+.cumulus-content .pricing-tier .cumulus-cta-primary,
+.cumulus-content .pricing-tier .cumulus-cta-secondary {
+  text-align: center;
+  margin-top: auto;
+}
+
+.cumulus-content .quote {
+  font-style: italic;
+}
+.cumulus-content .quote p {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  color: var(--c-fg);
+}
+.cumulus-content .quote-attribution {
+  display: block;
+  font-style: normal;
+  font-size: 0.88rem;
+  color: var(--c-fg-muted);
+  font-weight: 600;
+}
+.cumulus-content .quote-attribution span {
+  font-weight: 400;
+  color: var(--c-fg-muted);
+}
+
+/* === FOOTER ================================================================ */
+
+.cumulus-footer {
+  background: var(--c-bg-3);
+  border-top: 1px solid var(--c-border);
+  padding: 3.5rem 2rem 2rem;
+  margin-top: 4rem;
+}
+
+.cumulus-footer-grid {
+  max-width: var(--c-max-width);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 2rem;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.cumulus-brand-footer {
+  display: inline-flex;
+  margin-bottom: 1rem;
+}
+
+.cumulus-footer-tagline {
+  color: var(--c-fg-muted);
+  font-size: 0.92rem;
+}
+
+.cumulus-footer h4 {
+  font-size: 0.78rem;
+  margin-bottom: 0.8rem;
+}
+
+.cumulus-footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cumulus-footer li {
+  margin: 0.4rem 0;
+}
+.cumulus-footer a {
+  color: var(--c-fg-muted);
+  font-size: 0.9rem;
+}
+.cumulus-footer a:hover {
+  color: var(--c-fg);
+}
+
+.cumulus-footer-bottom {
+  max-width: var(--c-max-width);
+  margin: 0 auto;
+  padding-top: 1.5rem;
+  font-size: 0.82rem;
+  color: var(--c-fg-muted);
+  text-align: center;
+}
+
+/* === RESPONSIVE ============================================================ */
+
+@media (max-width: 760px) {
+  .cumulus-topnav {
+    padding: 0.85rem 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cumulus-topnav-items {
+    gap: 1rem;
+    margin-left: 0;
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .cumulus-cta-sm {
+    margin-left: auto;
+  }
+  .cumulus-content {
+    padding: 2rem 1.25rem 3rem;
+  }
+  .cumulus-hero {
+    padding: 4rem 1.25rem 3rem;
+  }
+  .cumulus-footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* === MARKBOOK CHROME HOOKS ================================================= */
+/*
+ * Markbook always emits an inner `<main class="markbook-main">` wrapper and
+ * heading anchor links. We pass through the wrapper transparently and hide
+ * the heading anchors — they're a docs-site affordance that looks out of
+ * place on a marketing landing page.
+ */
+.markbook-main {
+  display: contents;
+}
+.markbook-heading-anchor {
+  display: none;
+}

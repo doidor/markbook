@@ -544,3 +544,33 @@ Verified end-to-end:
 The `static-demo` workspace was the user's other ask. It serves as both a smoke test for the markdown-only path AND a copy-pasteable starting point for someone setting up their own static site. The Skyline content is fictional but realistic — it shows what real Markbook documentation feels like for a non-component-library use case.
 
 **Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) still wait.
+
+## 2026-06-03 — `examples/marketing-demo/` (Cumulus) — fully custom layout via `disableBaseCss` + `transformHtml`
+
+**What changed:** Added a sixth example workspace, `examples/marketing-demo/`, that proves Markbook isn't locked into the docs-site chrome. It ships a fictional cloud-platform marketing site ("Cumulus") with five pages — landing, product, pricing, customers, contact — laid out with a top nav, a hero on the index, feature/pricing/quote grids, and a footer. None of that is in Markbook's default UI; the demo builds it from the public DOM contract using two knobs the core already exposes:
+
+- **`disableBaseCss: true`** — Markbook ships zero CSS for this site. Every selector lives in `examples/marketing-demo/cumulus.css` (~330 lines, hand-rolled, no `--mb-*` tokens — it defines its own `--c-*` palette: deep navy + coral, condensed display typography).
+- **`transformHtml(html, page)`** — post-processes each page's HTML. The transform strips the docs chrome (`<header class="markbook-header">`, `<aside class="markbook-sidebar">`, `<aside class="markbook-toc">`), renames `.markbook-shell` → `.cumulus-shell`, injects a top-nav `<nav>` immediately after `<body>` and a `<footer>` immediately before `</body>`, and on `index.html` only wraps the H1 + first paragraph in a `<section class="cumulus-hero">` with two CTAs (Start free, See the product →). Nav items get `aria-current="page"` when they match the current page so the active state is correct.
+
+Other deliberate choices in the config:
+- `llmsButtons: false` — a marketing site shouldn't offer "View as Markdown" / "Copy as Markdown" affordances. Those are docs-y.
+- `title` omitted from config — the brand text "Cumulus" comes from our top-nav markup, not from `config.title`. Page-level frontmatter titles still populate `<title>` (so the browser tab reads "Pricing", "Product", etc.), which is exactly the marketing-site convention.
+- The grid wrappers (`feature-grid`, `pricing-grid`, `quote-grid`, `feature`, `pricing-tier`, `pricing-tier.featured`, `quote`, `quote-attribution`) are plain `<div>` blocks the page authors drop into markdown. `remark-rehype` is already configured with `allowDangerousHtml: true`, so they pass through unmodified — no custom directive needed.
+- Two final CSS escape hatches for the unstyled markbook hooks the engine still emits inside the article: `.markbook-main { display: contents; }` makes the inner wrapper transparent for layout, and `.markbook-heading-anchor { display: none; }` hides the docs-style `#` permalinks (out of place on a landing page).
+
+Wiring:
+- New scripts in the root `package.json`: `example:marketing:build`, `example:marketing:dev`.
+- CI workflow gained a "Build marketing demo (custom layout via disableBaseCss + transformHtml)" step so the deep-customization path stays green forever.
+- Root README lists the new example + scripts.
+- Workspace `README.md` inside the demo documents what each layer does and why.
+
+Verified end-to-end:
+- `pnpm example:marketing:build` produces 5 HTML pages + `llms.txt`; no leftover `markbook-header` / `markbook-sidebar` / `markbook-toc` / `markbook-shell` / `markbook-content` / `markbook-page-actions` markup; 60 hits on `cumulus-*` classes on the index alone; nav active state correctly applied per-page (`aria-current="page"` on the current link only); pricing page renders one `.pricing-tier.featured` card with the POPULAR badge.
+- Static-served via `python3 -m http.server`: all five HTML pages + `llms.txt` + `llms/index.txt` return 200.
+- All 5 example demos still build (`react-demo`, `vue-demo`, `wc-demo`, `static-demo`, `marketing-demo`). Lint clean. 119/119 unit tests pass.
+
+**Why:** The static-demo (Skyline) shipped earlier today proved Markbook can power a markdown-only docs site, but it still looked like a docs site — the same default chrome with a different colour preset. The user's natural follow-up was "make a static site demo that has a completely different design and layout, like a company presentation site or something" — i.e. prove the engine isn't *visually* committed to the documentation paradigm. The marketing demo answers that by leaning fully on Layer 2 (`disableBaseCss`) + Layer 3 (`transformHtml`), which is the design we documented in the README customization section but didn't have a worked example of. Cumulus is now that worked example.
+
+It also doubles as the canonical "starter for a non-docs Markbook site" — copy `examples/marketing-demo/`, swap the markdown, restyle the tokens, ship a landing page in an afternoon.
+
+**Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) still wait. With six worked examples (React docs, Vue docs, WC docs, embed-host, static docs, marketing) the demo surface is now broad enough that v1.0 prep can shift to API freeze / Pagefind v0.2 work without needing more demos.

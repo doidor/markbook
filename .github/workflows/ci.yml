@@ -54,3 +54,6 @@ jobs:
 
       - name: Build static demo (markdown-only, no adapter)
         run: pnpm example:static:build
+
+      - name: Build marketing demo (custom layout via disableBaseCss + transformHtml)
+        run: pnpm example:marketing:build
