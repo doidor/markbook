@@ -60,6 +60,16 @@ export interface InstallOptions {
   update?: boolean;
   /** Overwrite ANY existing skill directory (even unmanaged). Use with care. */
   force?: boolean;
+  /**
+   * Override the source skills directory. Tests pass an explicit fixture
+   * path; in production the value comes from `findShippedSkillsDir()`.
+   */
+  sourceSkillsDir?: string;
+  /**
+   * Override the source markbook version stamped into the per-skill
+   * `.markbook-skill.json`. Tests use this to exercise version drift.
+   */
+  sourceVersion?: string;
 }
 
 export interface InstallResult {
@@ -143,8 +153,8 @@ export async function listShippedSkills(skillsDir: string): Promise<string[]> {
  */
 export async function installAll(opts: InstallOptions = {}): Promise<InstallResult[]> {
   const cwd = path.resolve(opts.cwd ?? process.cwd());
-  const skillsDir = await findShippedSkillsDir();
-  const version = await readShippedMarkbookVersion(skillsDir);
+  const skillsDir = opts.sourceSkillsDir ?? (await findShippedSkillsDir());
+  const version = opts.sourceVersion ?? (await readShippedMarkbookVersion(skillsDir));
   const skills = await listShippedSkills(skillsDir);
 
   let surfaces: VendorSurface[];
@@ -296,7 +306,7 @@ async function copyDirectory(src: string, dst: string): Promise<void> {
  * Stable content hash of every file under a directory. Order-independent;
  * file names + contents both feed in so a rename counts as a change.
  */
-async function hashDirectory(dir: string): Promise<string> {
+export async function hashDirectory(dir: string): Promise<string> {
   const files: string[] = [];
   async function walk(d: string, prefix: string): Promise<void> {
     const entries = await fs.readdir(d, { withFileTypes: true });
@@ -371,11 +381,14 @@ export function formatInstallResults(results: InstallResult[]): string {
 }
 
 /** Summary used by `markbook skills list`. */
-export async function listInstalled(cwd: string): Promise<{
+export async function listInstalled(
+  cwd: string,
+  sourceSkillsDir?: string,
+): Promise<{
   shipped: string[];
   perSurface: Array<{ surface: VendorSurface; installed: string[]; outOfDate: string[] }>;
 }> {
-  const skillsDir = await findShippedSkillsDir();
+  const skillsDir = sourceSkillsDir ?? (await findShippedSkillsDir());
   const shipped = await listShippedSkills(skillsDir);
   const surfaces = await detectVendorSurfaces(cwd);
   const perSurface: Array<{
