@@ -1,5 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { capitalize, isIndexHref, sortIndexFirst, type NavItem } from './build.js';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import {
+  capitalize,
+  isIndexHref,
+  makeLoadHtmlLayout,
+  resolvePageLayout,
+  sortIndexFirst,
+  type NavItem,
+} from './build.js';
+import type { ParsedPage } from './parse.js';
 
 const item = (id: string, htmlRelPath: string): NavItem => ({
   id,
@@ -56,5 +67,120 @@ describe('sortIndexFirst', () => {
     const original = [...items];
     sortIndexFirst(items);
     expect(items).toEqual(original);
+  });
+});
+
+describe('makeLoadHtmlLayout', () => {
+  let tmp: string;
+  beforeEach(async () => {
+    tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-loader-'));
+  });
+  afterEach(async () => {
+    await fs.rm(tmp, { recursive: true, force: true });
+  });
+
+  it('loads a layout file from a single directory', async () => {
+    const dir = path.join(tmp, 'layouts');
+    await fs.mkdir(dir);
+    await fs.writeFile(path.join(dir, 'default.html'), '<html>HELLO</html>');
+    const load = makeLoadHtmlLayout([dir], tmp);
+    expect(await load('default')).toBe('<html>HELLO</html>');
+  });
+
+  it('searches directories in order — first match wins', async () => {
+    const a = path.join(tmp, 'a');
+    const b = path.join(tmp, 'b');
+    await fs.mkdir(a);
+    await fs.mkdir(b);
+    await fs.writeFile(path.join(a, 'shared.html'), 'FROM_A');
+    await fs.writeFile(path.join(b, 'shared.html'), 'FROM_B');
+    const load = makeLoadHtmlLayout([a, b], tmp);
+    expect(await load('shared')).toBe('FROM_A');
+  });
+
+  it('falls through to the next directory when the first lacks the file', async () => {
+    const a = path.join(tmp, 'a');
+    const b = path.join(tmp, 'b');
+    await fs.mkdir(a);
+    await fs.mkdir(b);
+    await fs.writeFile(path.join(b, 'only-in-b.html'), 'B');
+    const load = makeLoadHtmlLayout([a, b], tmp);
+    expect(await load('only-in-b')).toBe('B');
+  });
+
+  it('throws a clear error mentioning the searched dirs when not found', async () => {
+    const dir = path.join(tmp, 'layouts');
+    await fs.mkdir(dir);
+    const load = makeLoadHtmlLayout([dir], tmp);
+    await expect(load('missing')).rejects.toThrow(/HTML layout 'missing' not found in: layouts\./);
+  });
+
+  it('error message names "no layoutsDir configured" when given an empty list', async () => {
+    const load = makeLoadHtmlLayout([], tmp);
+    await expect(load('whatever')).rejects.toThrow(/no layoutsDir configured/);
+  });
+
+  it('rethrows non-ENOENT filesystem errors instead of falling through', async () => {
+    // Use a path that exists as a FILE (so reading <file>/foo.html throws ENOTDIR,
+    // not ENOENT — should surface).
+    const file = path.join(tmp, 'not-a-dir');
+    await fs.writeFile(file, 'x');
+    const load = makeLoadHtmlLayout([file], tmp);
+    await expect(load('any')).rejects.toThrow();
+  });
+});
+
+describe('resolvePageLayout', () => {
+  function makePage(frontmatter: Record<string, unknown>) {
+    const parsed: ParsedPage = {
+      frontmatter,
+      html: '',
+      plainText: '',
+      plainMarkdown: '',
+      stories: [],
+      headings: [],
+      title: 'x',
+    };
+    return {
+      file: '/x/index.md',
+      relPath: 'index.md',
+      htmlRelPath: 'index.html',
+      entryRelPath: 'index.entry.ts',
+      txtRelPath: 'index.txt',
+      fileId: 'index',
+      groupKey: null,
+      parsed,
+    };
+  }
+
+  it('returns null when no frontmatter layout and no default', () => {
+    expect(resolvePageLayout(makePage({}), null)).toBeNull();
+  });
+
+  it('falls back to the config default when frontmatter has no layout', () => {
+    expect(resolvePageLayout(makePage({}), 'default')).toBe('default');
+  });
+
+  it('frontmatter layout string overrides the config default', () => {
+    expect(resolvePageLayout(makePage({ layout: 'landing' }), 'default')).toBe('landing');
+  });
+
+  it('frontmatter layout: false forces null (opts out of the default)', () => {
+    expect(resolvePageLayout(makePage({ layout: false }), 'default')).toBeNull();
+  });
+
+  it('throws on invalid frontmatter layout types (number, object, etc.)', () => {
+    expect(() => resolvePageLayout(makePage({ layout: 42 }), 'default')).toThrow(
+      /invalid `layout:` frontmatter — expected a string layout name or `false`/,
+    );
+    expect(() => resolvePageLayout(makePage({ layout: { name: 'x' } }), null)).toThrow(
+      /invalid `layout:` frontmatter/,
+    );
+  });
+
+  it('treats frontmatter layout: true as invalid (not a string)', () => {
+    expect(() => resolvePageLayout(makePage({ layout: true }), null)).toThrow(
+      /invalid `layout:` frontmatter/,
+    );
   });
 });

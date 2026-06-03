@@ -31,6 +31,7 @@ constitution for the repo.
 | "What's planned next?" | `ROADMAP.md` |
 | "What's the package's public API?" | `packages/<name>/README.md` |
 | "How is the repo structured?" | `README.md` (directory map at the bottom) |
+| "How do I customize a Markbook site's chrome?" | Four layers in `packages/core/README.md`: `css` → `disableBaseCss` → `layoutsDir` → `transformHtml`. Worked example in `examples/marketing-demo/`. |
 
 ## Directory map
 
@@ -50,6 +51,8 @@ packages/
 examples/
   react-demo/                       ← Pixie component library (canonical dogfood)
   vue-demo/  wc-demo/               ← framework-agnostic proofs
+  static-demo/                      ← markdown-only docs site (no adapter)
+  marketing-demo/                   ← marketing site via disableBaseCss + layouts/
   embed-host/                       ← external consumer of embed/package bundles
 .copilot/                           ← canonical agent surface (skills/rules/wiki)
 .claude/.codex/.opencode/.agents/   ← vendor mirrors (symlinks into .copilot)

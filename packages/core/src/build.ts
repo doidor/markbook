@@ -225,7 +225,13 @@ interface WritePagesResult {
   storyFiles: string[];
 }
 
-async function writePages(
+/**
+ * Render every markdown page under `ctx.docsDir` into `ctx.tmpDir`.
+ * Exported for integration tests that need to assert per-page HTML output
+ * without invoking Vite. `build()` and `dev()` call this internally; most
+ * consumers should use those instead.
+ */
+export async function writePages(
   ctx: BuildContext,
   opts: { clean: boolean; searchEnabled: boolean },
 ): Promise<WritePagesResult> {

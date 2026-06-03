@@ -41,6 +41,7 @@ A new wiki entry must:
 | [`css-in-ts-template-literal`](css-in-ts-template-literal.md) | Backticks in CSS comments inside a TS template literal break parsing |
 | [`vite-tmpdir-watching`](vite-tmpdir-watching.md) | Vite's watcher won't pick up files outside its `root`; chokidar handles user content |
 | [`parallel-mkdir-then-create`](parallel-mkdir-then-create.md) | `mkdir` and `create` in the same tool batch can race; serialize directory creation |
+| [`html-layout-gotchas`](html-layout-gotchas.md) | HTML layout authoring — required placeholders, strict validation, escaping, comment preservation |
 
 ## Session-end discipline
 

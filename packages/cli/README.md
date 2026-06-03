@@ -112,6 +112,7 @@ Shipped skills (v1):
 | `markbook-add-component-page` | Generate one docs page for one component |
 | `markbook-bulk-generate` | Bulk-generate docs pages for every component under a directory (dry-run default) |
 | `markbook-style` | Apply a visual preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) + optional `--accent` / `--font` overrides |
+| `markbook-layout` | Scaffold a custom HTML layout (`docs` / `marketing` / `blog` / `minimal` template) with all required `{{ }}` placeholders pre-wired, and register it in `markbook.config.ts` |
 | `markbook-bundle-story` | Walk through `markbook bundle` for embedding stories externally |
 
 After running `markbook skills install`, agents that auto-discover skills from those vendor directories will pick them up. Invocation syntax depends on the agent — `/markbook-init`, `@markbook-init`, etc.

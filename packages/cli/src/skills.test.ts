@@ -303,3 +303,37 @@ describe('formatInstallResults', () => {
     expect(out).toContain('— pass --force');
   });
 });
+
+describe('shipped skills (real package)', () => {
+  /**
+   * Smoke test against the actual `packages/cli/skills/` directory.
+   * Ensures every shipped skill is well-formed and that the canonical
+   * skill set hasn't shrunk accidentally. When you add a new skill,
+   * also add it to the EXPECTED list below.
+   */
+  it('lists exactly the canonical set of shipped skills', async () => {
+    // Test file lives at packages/cli/src/skills.test.ts → skills dir is sibling.
+    const shippedDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../skills');
+    const { listShippedSkills } = await import('./skills.js');
+    const found = await listShippedSkills(shippedDir);
+    expect(found.sort()).toEqual(
+      ['add-component-page', 'bulk-generate', 'bundle-story', 'init', 'layout', 'style'].sort(),
+    );
+  });
+
+  it('each shipped skill has a SKILL.md with the required frontmatter fields', async () => {
+    const shippedDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../skills');
+    const { listShippedSkills } = await import('./skills.js');
+    const found = await listShippedSkills(shippedDir);
+    for (const name of found) {
+      const skillMd = await fs.readFile(path.join(shippedDir, name, 'SKILL.md'), 'utf8');
+      const fmMatch = skillMd.match(/^---\n([\s\S]*?)\n---/);
+      expect(fmMatch, `${name}/SKILL.md is missing a frontmatter block`).toBeTruthy();
+      const block = fmMatch![1]!;
+      expect(block, `${name} name field`).toMatch(/^name:\s*markbook-/m);
+      expect(block, `${name} description field`).toMatch(/^description:\s+\S/m);
+      expect(block, `${name} trigger field`).toMatch(/^trigger:\s+\S/m);
+      expect(block, `${name} allowed-tools field`).toMatch(/^allowed-tools:\s+\S/m);
+    }
+  });
+});

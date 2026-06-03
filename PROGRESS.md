@@ -672,3 +672,102 @@ Rubber-duck pass before implementation caught several blind spots that made it i
 - Add a soft-deprecation warning on `docsDir` once enough users have migrated to `contentDir`.
 - Consider adding `{{ nav }}` / `{{ toc }}` placeholders if real demand surfaces (current marketing demo handles its own nav).
 - If layout authors want includes/partials for shared chrome (e.g. nav repeated across multiple layouts), add a `{{ include name }}` syntax. Skipped for v1 — copy-paste between two layouts is fine.
+
+## 2026-06-03 — Test backfill for layouts + contentDir + integration; new `markbook-layout` skill; wiki entry
+
+**What changed:** Three rounds of work in one push, all in service of "make sure the layout system is bulletproof and discoverable."
+
+### 1. Test backfill (+47 tests; 132 → 179 total)
+
+Earlier today's layout commit (`f598173`) shipped with 13 unit tests for `applyHtmlLayout`. This commit fills the remaining gaps:
+
+**`packages/core/src/build.test.ts`** — 12 new tests covering:
+- `makeLoadHtmlLayout(layoutDirs, root)` — single-dir hit; multi-dir first-match-wins; fallthrough to second dir when first lacks file; not-found error names searched dirs; explicit "no layoutsDir configured" message; ENOTDIR (non-ENOENT) error surfaces instead of falling through.
+- `resolvePageLayout(page, defaultLayout)` — null when nothing set; falls back to config default; frontmatter string overrides default; `layout: false` opts back into built-in; throws on invalid frontmatter types (number, object, `true`).
+
+**`packages/core/src/config.test.ts`** — 14 new tests covering `createContext`:
+- `docsDir` legacy alias works.
+- `contentDir` new field works and takes precedence equivalently.
+- Both-set throws with a clear error message.
+- `layoutsDir` defaults to `'layouts'`; accepts string OR array; preserves order; resolves to absolute paths; absolute inputs pass through unchanged.
+- `defaultLayout` null when unset; stored from `config.layout` when set.
+- `siteTitle: null` when title unset (per-page titles take over).
+- `llmsButtons` defaults to true; explicit `false` flips it.
+- `disableBaseCss` defaults to false; explicit `true` flips it.
+- `staticAdapter()` used implicitly when no adapter configured.
+
+**`packages/core/src/build-integration.test.ts`** (NEW FILE) — 19 end-to-end build tests. Each test sets up a minimal site under a fresh tmpdir, calls `createContext` + `writePages`, and asserts on the generated HTML. Covers:
+
+- *Built-in shell path*: default chrome renders; per-page title fallback when `config.title` is unset; entry script omitted for markdown-only pages; `disableBaseCss` actually suppresses BASE_CSS; `llmsButtons` default vs. false.
+- *Layout dispatch path*: `config.layout` applies to every page; per-page frontmatter `layout: <name>` overrides; `layout: false` forces built-in; missing layout file throws clear error; missing `{{ content }}` throws; frontmatter HTML-escape verified (XSS guard); `{{ pageActions }}` empty vs. populated; `{{ search }}` expanded vs. empty; `contentDir` alias works end-to-end (`pages/`); HTML comments preserved verbatim (with placeholders inside them).
+- *transformHtml integration*: confirmed to run AFTER both built-in shell AND layout output (`transformHtml` receives the already-rendered HTML and Page metadata; the layout's `data-pagefind-body` is present at that point).
+- *Misconfiguration gate*: `:::story` directive + no adapter throws the friendly error.
+
+To make integration testable, `writePages` was promoted from private to `export` (with a TSDoc note that it's the same code `build()` runs before Vite, exposed for integration tests).
+
+**`packages/cli/src/skills.test.ts`** — 2 new tests:
+- The shipped skills directory contains exactly the canonical set (`add-component-page`, `bulk-generate`, `bundle-story`, `init`, `layout`, `style`). Adding/removing a shipped skill now requires updating the test, preventing accidental removals.
+- Every shipped `SKILL.md` has the required frontmatter (`name`, `description`, `trigger`, `allowed-tools`). Catches malformed skills before they ship.
+
+**Totals:** 158 in `@markbook/core` (was 113) + 21 in `markbook` CLI (was 19) = **179 tests**, all passing. The four-layer customization story (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) is now exercised at the unit, integration, and CLI-distribution levels.
+
+### 2. New user-facing skill: `markbook-layout`
+
+`packages/cli/skills/layout/SKILL.md` — scaffolds an HTML layout for a Markbook site. Ships four starting templates:
+
+- `minimal` — the smallest layout that passes validation; useful for marketing/portfolio sites.
+- `marketing` — top nav (with `{{ search }}` slot, `{{ themeToggle }}`) + content + footer. Includes the active-nav client-side script (since layouts are shared, per-page active state needs runtime detection).
+- `blog` — title + author/date meta from frontmatter + content + back link. For post-style pages.
+- `docs` — header + nav placeholder + content + TOC placeholder. Matches the built-in shell's structural intent but lets you restyle every wrapper class without `disableBaseCss`. (Documents that `{{ nav }}` / `{{ toc }}` placeholders are intentionally not exposed in v1; users either hand-roll, populate via JS, or stick with the built-in shell.)
+
+The skill walks the user through:
+1. Choose layout name + style + destination (defaults to `layouts/<name>.html`).
+2. Write the template; prompt before clobbering.
+3. Update `markbook.config.ts` to register `layoutsDir` and (with `--set-default`) `layout`.
+4. Confirm dev server picks up live reloads.
+
+Includes a placeholder cheat sheet (safe to paste into layout comments — placeholders inside `<!-- ... -->` are preserved verbatim) and a gotchas section pointing back to the wiki entry below.
+
+Registered in `packages/cli/README.md`'s shipped-skills table. Auto-discoverable by `markbook skills install`.
+
+### 3. New wiki entry: `html-layout-gotchas`
+
+`.copilot/wiki/html-layout-gotchas.md` — captures the failure modes that already came up while building / testing the layout system:
+
+- Layout omits `{{ head }}` → theme toggle / Pagefind / copy-code broken.
+- Layout omits `{{ bodyEnd }}` → search init / story mount broken.
+- Layout outside `layoutsDir` → dev watcher doesn't reload.
+- Duplicate `{{ content }}` placeholders in comments → resolved by Unicode-Private-Use-Area sentinels.
+- Typo in placeholder name → strict validator throws (intentional, not a bug).
+- Missing search box in custom marketing layout → `{{ search }}` is opt-in per-layout.
+- Typo'd `layout: landng` → throws "not found", doesn't silently fall back.
+
+Includes the "unbreakable rules" (exactly one `{{ content }}`; wrap with `data-pagefind-body`; keep `{{ head }}`/`{{ bodyEnd }}` in their natural homes; don't write your own `<title>` AND include `{{ head }}` expecting Markbook to inject the title; frontmatter is HTML-escaped) and a known-good minimal layout to copy-paste.
+
+Listed in `.copilot/wiki/README.md`'s catalogue. Cross-referenced from ADR-0024 and the `markbook-layout` skill.
+
+### 4. Documentation tightening
+
+- `AGENTS.md`: added a row to the "Where to look first" table pointing at the four customization layers; added `static-demo` and `marketing-demo` to the directory map (was missing).
+- `packages/cli/README.md`: added `markbook-layout` to the shipped-skills table.
+- `packages/core/README.md`: already updated in `f598173` with the full placeholder table + Layouts section; no further changes needed.
+- `examples/marketing-demo/README.md`: already updated in `f598173`; no further changes.
+
+### Verified
+
+- 179 tests pass (158 core + 21 CLI).
+- Lint clean (2 pre-existing `noImportantStyles` warnings on `examples/embed-host/shadow.html`).
+- Typecheck clean across all packages.
+- Core rebuilt; marketing demo rebuilt (still produces the 5-page Cumulus site correctly).
+
+**Why:** The user asked: "make sure you write tests for everything and update docs accordingly." Specifically, the layout system shipped with unit tests for the substitution logic but no integration tests for the dispatch pipeline, no tests for `contentDir` precedence, no tests for the loader's error-path semantics, and no user-facing skill for "create a custom layout" (which was already a documented capability but had no scaffolding helper).
+
+The integration tests are the highest-leverage addition — they verify the actual contract users care about: "if I configure a layout, what HTML do I get?" Unit tests for `applyHtmlLayout` confirm the substitution behaves correctly; integration tests confirm the whole pipeline (layout-not-found → throws clear error; frontmatter `layout: landing` actually picks `landing.html`; HTML-escaped frontmatter blocks XSS in real-world output; transformHtml still runs after layout) works end-to-end. Promoting `writePages` to a tested-but-internal export was the right tradeoff — it's the same code the production `build()` runs before invoking Vite, and asserting on its output gives near-`build()` confidence at unit-test speed.
+
+The skills + wiki additions are about closing the discovery loop. The `markbook-layout` skill turns "I need a custom layout" from "read the docs and write HTML from scratch" into a four-template scaffolding prompt. The wiki entry collects the failure modes I personally hit while implementing + testing (typo'd `layout:`, comments-with-placeholders, missing-`{{ bodyEnd }}` breaking search) so the next person doesn't re-discover them.
+
+**Next:** None specific. The four-layer customization story is now: documented (core README), demonstrated (marketing demo), tested (179 tests across unit + integration + CLI distribution), scaffolded (`markbook-layout` skill), and journaled (ADR-0024 + this entry). Potential follow-ups, all opt-in:
+
+- A "create a layout from a screenshot" skill (uses an LLM to walk DOM → layout). Probably better as a vendor-specific agent capability than a Markbook skill.
+- `{{ nav }}` / `{{ toc }}` placeholders if real demand surfaces (the docs-style template in the skill is currently aspirational).
+- A `<dest>/<layout-name>.html` argument in the `markbook-layout` skill that points at a remote URL → fetches and adapts. Not needed yet.

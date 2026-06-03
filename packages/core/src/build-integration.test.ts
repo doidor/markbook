@@ -1,0 +1,380 @@
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import { afterEach, describe, it, expect } from 'vitest';
+import { createContext, writePages } from './build.js';
+
+/**
+ * End-to-end build integration tests. Each test sets up a minimal site
+ * under a fresh tmpdir, runs `writePages` (the same code `build()` runs
+ * before invoking Vite), and asserts on the generated HTML output.
+ *
+ * Search is disabled (`searchEnabled: false`) to keep the assertions
+ * focused on chrome / layout / placeholder behaviour — Pagefind is
+ * tested separately by `build()`'s end-of-pipeline `runPagefind`.
+ */
+
+interface Fixture {
+  root: string;
+  read: (relPath: string) => Promise<string>;
+  exists: (relPath: string) => Promise<boolean>;
+}
+
+async function setupFixture(files: Record<string, string>): Promise<Fixture> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-build-'));
+  for (const [rel, body] of Object.entries(files)) {
+    const abs = path.join(root, rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, body);
+  }
+  return {
+    root,
+    read: async (relPath) => fs.readFile(path.join(root, '.markbook', relPath), 'utf8'),
+    exists: async (relPath) => {
+      try {
+        await fs.access(path.join(root, '.markbook', relPath));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+describe('writePages — built-in shell (no layout)', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('renders the default Markbook chrome when no layout is configured', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n\n# Home\n\nWelcome.',
+    });
+    const ctx = await createContext({ root: fx.root, title: 'My Site' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<header class="markbook-header">');
+    expect(html).toContain('<aside class="markbook-sidebar">');
+    expect(html).toContain('<article class="markbook-content" data-pagefind-body>');
+    expect(html).toContain('<title>Home — My Site</title>');
+    expect(html).toContain('class="markbook-brand"');
+    expect(html).toContain('My Site');
+  });
+
+  it('uses per-page title for both browser tab and brand when config.title is unset', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Skyline\n---\n\n# Skyline\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // No site title suffix
+    expect(html).toContain('<title>Skyline</title>');
+    expect(html).not.toContain(' — ');
+    // Brand text uses the page title
+    expect(html).toMatch(/class="markbook-brand"[\s\S]*?Skyline[\s\S]*?<\/a>/);
+  });
+
+  it('omits the entry script when a page has no stories (markdown-only)', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Static only\n\nNo stories here.',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).not.toContain('<script type="module"');
+  });
+
+  it('includes Markbook base CSS by default; omits it when disableBaseCss: true', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# X',
+    });
+    let ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    let html = await fx.read('index.html');
+    expect(html).toMatch(/<style>[\s\S]*--mb-bg/); // base CSS contains --mb-* tokens
+
+    ctx = await createContext({ root: fx.root, disableBaseCss: true });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    html = await fx.read('index.html');
+    expect(html).not.toMatch(/<style>[\s\S]*--mb-bg/);
+  });
+
+  it('renders "View as Markdown" / "Copy as Markdown" buttons by default', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n\n# Home\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('markbook-page-actions');
+    expect(html).toContain('View as Markdown');
+    expect(html).toContain('Copy as Markdown');
+  });
+
+  it('llmsButtons: false suppresses the page-actions block entirely', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n\n# Home\n',
+    });
+    const ctx = await createContext({ root: fx.root, llmsButtons: false });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Structural markup absent (BASE_CSS still mentions .markbook-page-actions selectors;
+    // we care about the actual DOM, not the stylesheet rules).
+    expect(html).not.toContain('<div class="markbook-page-actions"');
+    expect(html).not.toContain('View as Markdown');
+    expect(html).not.toContain('Copy as Markdown');
+    // And the click-handler boot script is omitted.
+    expect(html).not.toContain('data-markbook-copy-md');
+  });
+});
+
+describe('writePages — HTML layout dispatch', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  const minimalLayout = (extra = '') => `<!doctype html>
+<html><head><title>{{ browserTitle }}</title>${extra}{{ head }}</head>
+<body>
+<header>HOME-LINK</header>
+<article data-pagefind-body>{{ content }}</article>
+{{ bodyEnd }}
+</body></html>`;
+
+  it('uses config.layout for every page; built-in chrome is suppressed', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'docs/about.md': '# About\n',
+      'layouts/default.html': minimalLayout(),
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+
+    for (const page of ['index.html', 'about.html']) {
+      const html = await fx.read(page);
+      // Built-in structural chrome absent (BASE_CSS may still mention the
+      // selectors; we assert on the DOM, not the inline stylesheet).
+      expect(html).not.toContain('<header class="markbook-header">');
+      expect(html).not.toContain('<aside class="markbook-sidebar">');
+      expect(html).not.toContain('<aside class="markbook-toc">');
+      // Layout markup present
+      expect(html).toContain('<header>HOME-LINK</header>');
+      expect(html).toContain('<article data-pagefind-body>');
+    }
+  });
+
+  it('per-page frontmatter layout overrides the config default', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\nlayout: landing\n---\n# Hero\n',
+      'docs/about.md': '# About\n',
+      'layouts/default.html': minimalLayout('<!-- DEFAULT_MARKER -->'),
+      'layouts/landing.html': minimalLayout('<!-- LANDING_MARKER -->'),
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+
+    expect(await fx.read('index.html')).toContain('<!-- LANDING_MARKER -->');
+    expect(await fx.read('about.html')).toContain('<!-- DEFAULT_MARKER -->');
+  });
+
+  it('frontmatter `layout: false` opts back into the built-in shell', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\nlayout: false\n---\n# Home\n',
+      'layouts/default.html': minimalLayout(),
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('markbook-header');
+    expect(html).not.toContain('HOME-LINK');
+  });
+
+  it('throws a clear error when a named layout file does not exist', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\nlayout: missing\n---\n# Home\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await expect(writePages(ctx, { clean: true, searchEnabled: false })).rejects.toThrow(
+      /HTML layout 'missing' not found/,
+    );
+  });
+
+  it('throws when a layout omits the required {{ content }} placeholder', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\nlayout: broken\n---\n# Home\n',
+      'layouts/broken.html': '<html><body>no content slot</body></html>',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await expect(writePages(ctx, { clean: true, searchEnabled: false })).rejects.toThrow(
+      /missing a \{\{ content \}\} placeholder/,
+    );
+  });
+
+  it('substitutes frontmatter via {{ frontmatter.x }} and HTML-escapes it', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\nauthor: "<script>alert(1)</script>"\n---\n# Home\n',
+      'layouts/default.html': `<!doctype html><html><head><title>{{ browserTitle }}</title>{{ head }}</head>
+<body><meta name="author" content="{{ frontmatter.author }}">
+<article data-pagefind-body>{{ content }}</article>
+{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('content="&lt;script&gt;alert(1)&lt;/script&gt;"');
+    expect(html).not.toContain('content="<script>alert(1)</script>"');
+  });
+
+  it('{{ pageActions }} is empty when llmsButtons: false; populated otherwise', async () => {
+    const layoutBody = `<!doctype html><html><head>{{ head }}<title>{{ browserTitle }}</title></head>
+<body><div class="actions-zone">[{{ pageActions }}]</div>
+<article data-pagefind-body>{{ content }}</article>
+{{ bodyEnd }}</body></html>`;
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': layoutBody,
+    });
+
+    let ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    let html = await fx.read('index.html');
+    expect(html).toContain('actions-zone');
+    expect(html).toContain('View as Markdown');
+
+    // Re-setup (writePages doesn't clean if same ctx; use fresh fixture)
+    await fs.rm(fx.root, { recursive: true, force: true });
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': layoutBody,
+    });
+    ctx = await createContext({ root: fx.root, layout: 'default', llmsButtons: false });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    html = await fx.read('index.html');
+    expect(html).toContain('<div class="actions-zone">[]</div>');
+    expect(html).not.toContain('View as Markdown');
+  });
+
+  it('{{ search }} expands when search is enabled and is empty otherwise', async () => {
+    const layoutBody = `<!doctype html><html><head>{{ head }}<title>{{ browserTitle }}</title></head>
+<body><nav>[{{ search }}]</nav>
+<article data-pagefind-body>{{ content }}</article>
+{{ bodyEnd }}</body></html>`;
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': layoutBody,
+    });
+
+    let ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: true });
+    let html = await fx.read('index.html');
+    expect(html).toContain('<div id="markbook-search-ui"');
+
+    await fs.rm(fx.root, { recursive: true, force: true });
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': layoutBody,
+    });
+    ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    html = await fx.read('index.html');
+    // The search slot expanded to '' — our wrapper shows '[]'.
+    expect(html).toContain('<nav>[]</nav>');
+    // The structural search element is absent (BASE_CSS selectors don't count).
+    expect(html).not.toContain('<div id="markbook-search-ui"');
+    // And the Pagefind init script is omitted.
+    expect(html).not.toContain('new PagefindUI(');
+  });
+
+  it('contentDir alias works end-to-end (pages/ instead of docs/)', async () => {
+    fx = await setupFixture({
+      'pages/index.md': '---\ntitle: PageDir\n---\n# Hi\n',
+    });
+    const ctx = await createContext({ root: fx.root, contentDir: 'pages' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    expect(await fx.exists('index.html')).toBe(true);
+    const html = await fx.read('index.html');
+    expect(html).toContain('<title>PageDir</title>');
+  });
+
+  it('HTML comments inside the layout are preserved verbatim (placeholders inert)', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': `<!doctype html>
+<!-- author note: use {{ content }} and {{ head }} as below; do NOT touch {{ tilte }} -->
+<html><head>{{ head }}<title>{{ browserTitle }}</title></head>
+<body><article data-pagefind-body>{{ content }}</article>{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // The comment survives unchanged — even the typo `{{ tilte }}` inside
+    // it is preserved because the comment was protected during substitution.
+    expect(html).toContain(
+      '<!-- author note: use {{ content }} and {{ head }} as below; do NOT touch {{ tilte }} -->',
+    );
+  });
+});
+
+describe('writePages — transformHtml integration', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('runs transformHtml as a final post-process AFTER the built-in shell', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({
+      root: fx.root,
+      transformHtml: async (html) => html.replace('</body>', '<!--POST-TRANSFORM--></body>'),
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<!--POST-TRANSFORM-->');
+    // And the built-in shell still ran first
+    expect(html).toContain('markbook-header');
+  });
+
+  it('runs transformHtml as a final post-process AFTER an HTML layout', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'layouts/default.html': `<!doctype html><html><head>{{ head }}<title>{{ browserTitle }}</title></head>
+<body><article data-pagefind-body>{{ content }}</article>{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({
+      root: fx.root,
+      layout: 'default',
+      transformHtml: async (html, page) => {
+        // Confirm the layout had already produced its output by the time
+        // transformHtml runs (the article wrapper from the layout is here).
+        expect(html).toContain('data-pagefind-body');
+        // Page metadata is passed in alongside the HTML.
+        expect(page.relPath).toBe('index.md');
+        expect(page.htmlRelPath).toBe('index.html');
+        return html.replace('</body>', `<!--POST:${page.title}--></body>`);
+      },
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<!--POST:Home-->');
+  });
+});
+
+describe('writePages — markdown-only error gate', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('throws when a page uses a :::story directive without an adapter', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n\n:::story{src=./Foo.tsx export=Default}\n:::\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await expect(writePages(ctx, { clean: true, searchEnabled: false })).rejects.toThrow(
+      /no adapter is configured/,
+    );
+  });
+});
