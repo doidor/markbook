@@ -342,7 +342,8 @@ export async function parseMarkdown(
 
         // Append a hover-revealed permalink to H2/H3 (skip H1 — only one per
         // page, the URL fragment is implicit). Clicking copies the
-        // canonical anchor URL via PERMALINK_BOOT_SCRIPT.
+        // canonical anchor URL via PERMALINK_BOOT_SCRIPT. `data-pagefind-ignore`
+        // keeps the literal `#` glyph out of search-result snippets.
         if (level === 2 || level === 3) {
           const anchor = {
             type: 'element',
@@ -352,6 +353,7 @@ export async function parseMarkdown(
               className: ['markbook-heading-anchor'],
               'aria-label': `Permalink to ${text}`,
               'data-markbook-permalink': '',
+              'data-pagefind-ignore': '',
             },
             children: [{ type: 'text', value: '#' }],
           };

@@ -856,3 +856,59 @@ $ curl http://localhost:5173/ | grep markbook-page-actions
 Edit `pages/contact.md` → regenerates in ~80ms → `/llms.txt` reflects the change → Pagefind reindexes.
 
 **Next:** None. The dev/build parity gap is closed; the marketing demo's defaults match its docs.
+
+## 2026-06-03 — Design polish: search dropdown styling, page actions positioning, `data-pagefind-ignore` on heading anchors
+
+**What changed:** Three visual fixes after the user's screenshot review of the marketing demo.
+
+### 1. Heading-anchor `#` glyphs no longer pollute search snippets (core fix)
+
+Symptom: searching for "container" in the Cumulus demo returned a result reading `Containers# Run any OCI image…` — the literal `#` from the markdown-heading permalink anchor was being indexed as part of the heading text.
+
+Root cause: the `<a class="markbook-heading-anchor">` appended to every H2/H3 (in `parse.ts`) contains the text `#` as its only child. Pagefind walks the entire DOM under `data-pagefind-body` and indexed that glyph alongside the heading text.
+
+Fix: add `data-pagefind-ignore=""` to the anchor's properties. Pagefind respects this and skips the element entirely. The glyph still renders for sighted users (and remains clickable for copying permalinks); it just doesn't appear in search results.
+
+This is a small but universal benefit — any Markbook site with Pagefind enabled gets cleaner result snippets now.
+
+New test in `parse.test.ts`: confirms the anchor markup carries both `data-markbook-permalink` AND `data-pagefind-ignore` on H2/H3, and that H1 still has no anchor (intentional — the URL fragment for the page H1 is implicit).
+
+### 2. Marketing demo: page-action buttons moved INSIDE the article column
+
+Symptom: "View as Markdown" / "Copy as Markdown" buttons floated at the FAR LEFT edge of the page, breaking out of the centered content column.
+
+Root cause: I had positioned `{{ pageActions }}` inside `<main class="cumulus-shell">` but OUTSIDE `<article class="cumulus-content">`. Since `cumulus-shell` is full-width and `cumulus-content` is what carries the `max-width` + `margin: 0 auto` + padding, the buttons inherited the shell's full width and left-aligned at x=0.
+
+Fix: moved `{{ pageActions }}` INSIDE the `<article>` wrapper in both `layouts/default.html` and `layouts/landing.html`. They now render at the top of the content article, within the constrained max-width column with proper side padding. Matches the built-in shell's positioning.
+
+### 3. Marketing demo: search dropdown fully restyled
+
+Symptom (from the screenshot):
+- "Clear" button rendered as a bare white card outside the input border.
+- Default bright-yellow match highlight (`Containers#`) clashing with the navy + coral palette.
+- Result-list text barely readable (muted gray on dark navy).
+- No card / border / shadow on the dropdown — felt detached from the search input above it.
+
+Root cause: with `disableBaseCss: true`, Markbook's built-in Pagefind UI styling (the `--pagefind-ui-*` CSS variable block + dropdown chrome) doesn't apply. The marketing demo never set its own.
+
+Fix: ~140 lines of `cumulus.css` covering the full Pagefind UI surface:
+- **Token vars** (`--pagefind-ui-primary`, `--pagefind-ui-text`, `--pagefind-ui-background`, `--pagefind-ui-border`, `--pagefind-ui-tag`, `--pagefind-ui-border-width`, `--pagefind-ui-border-radius`, `--pagefind-ui-font`) set on both `.cumulus-topnav-search` AND `#markbook-search-ui` so Pagefind reads them regardless of which ancestor it queries.
+- **Search input**: pill-shaped, transparent → 6% white background, accent border on focus, magnifying-glass icon position adjusted.
+- **Clear button**: stripped of native chrome, restyled as a subtle text button inside the input's right edge.
+- **Dropdown drawer**: floated as a real popover (`position: absolute`, `top: calc(100% + 0.5rem)`, `right: 0`), `width: min(420px, 90vw)`, `max-height: 70vh`, card background, hairline border, deep box-shadow. Hidden when `pagefind-ui__hidden`.
+- **Result rows**: padded list items with hover background + border, fg-color titles that turn accent on hover, muted excerpt text.
+- **Match highlight**: `<mark>` replaced with subtle coral tint at 22% alpha + brand foreground color (no more eye-burning yellow).
+- **Sub-results**: indented under their parent result with an accent border-left.
+- **Pagination button**: matches the brand button style.
+
+Verified: search input, results dropdown, highlighting, and clear button all sit inside the cumulus-topnav-search slot and respect the brand palette in both dev and build.
+
+### Tests + lint
+
+- 162 tests in `@markbook/core` (was 161, +1 for the heading-anchor markup) + 21 in `markbook` CLI = 183 total. All green.
+- Lint clean (2 pre-existing `noImportantStyles` warnings on `examples/embed-host/shadow.html`).
+- All 5 example demos still build.
+
+**Why:** The Cumulus demo is the most-visible showcase of Markbook's customization range. A screenshot worth of polish issues damages that demo's credibility — and by extension, Markbook's. The heading-anchor fix benefits everyone; the marketing-demo styles are scoped to that demo only (they're inside the `.cumulus-*` selectors).
+
+**Next:** None.

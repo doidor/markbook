@@ -84,6 +84,21 @@ More body.`;
     expect(h3?.slug).toBe('sub-section');
   });
 
+  it('appends a permalink anchor to H2/H3 carrying data-pagefind-ignore (keeps the `#` glyph out of search snippets)', async () => {
+    const source = `# Title
+
+## Containers
+
+Run any OCI image.`;
+    const result = await parseMarkdown(source, 'test', { pageFile: '/tmp/test.md' });
+    // H2 gets the permalink anchor with both metadata attributes.
+    expect(result.html).toMatch(
+      /<h2[^>]*>Containers<a[^>]*class="markbook-heading-anchor"[^>]*data-markbook-permalink=""[^>]*data-pagefind-ignore=""[^>]*>#<\/a>/,
+    );
+    // H1 does NOT get a permalink (we intentionally skip it).
+    expect(result.html).not.toMatch(/<h1[^>]*>.*markbook-heading-anchor/);
+  });
+
   it('applies template when frontmatter.template + loadTemplate are set', async () => {
     const source = `---
 title: Wrapped

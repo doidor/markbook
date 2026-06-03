@@ -230,12 +230,32 @@ blockquote {
    expands to <div id="markbook-search-ui"> which Pagefind's UI mounts into.
    We just constrain its width so it doesn't dominate the nav. */
 .cumulus-topnav-search {
-  flex: 0 1 240px;
+  flex: 0 1 280px;
   min-width: 0;
+  position: relative;
 }
 .cumulus-topnav-search:empty {
   display: none;
 }
+
+/* Pagefind UI design tokens — Pagefind reads these from the closest
+   ancestor element and we set them on the slot. Anchors our Pagefind UI
+   look fully into the Cumulus palette so it doesn't ship with Pagefind's
+   defaults (light theme, yellow highlight, blue accent). */
+.cumulus-topnav-search,
+#markbook-search-ui {
+  --pagefind-ui-scale: 0.85;
+  --pagefind-ui-primary: var(--c-accent);
+  --pagefind-ui-text: var(--c-fg);
+  --pagefind-ui-background: var(--c-bg-2);
+  --pagefind-ui-border: var(--c-border);
+  --pagefind-ui-tag: var(--c-bg-3);
+  --pagefind-ui-border-width: 1px;
+  --pagefind-ui-border-radius: 10px;
+  --pagefind-ui-font: var(--c-font);
+}
+
+/* === Search input === */
 .cumulus-topnav-search .pagefind-ui__form {
   margin: 0;
 }
@@ -243,12 +263,162 @@ blockquote {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--c-border);
   color: var(--c-fg);
-  border-radius: 8px;
-  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  padding: 0.45rem 2.25rem 0.45rem 2.4rem;
   font-size: 0.9rem;
+  width: 100%;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.cumulus-topnav-search .pagefind-ui__search-input:focus {
+  outline: none;
+  border-color: var(--c-accent);
+  background: rgba(255, 255, 255, 0.09);
 }
 .cumulus-topnav-search .pagefind-ui__search-input::placeholder {
   color: var(--c-fg-muted);
+}
+/* Pagefind injects a magnifying-glass SVG via ::before on the form. */
+.cumulus-topnav-search .pagefind-ui__form::before {
+  background-color: var(--c-fg-muted);
+  left: 0.85rem;
+  top: calc(50% - 0.55rem);
+  width: 0.95rem;
+  height: 0.95rem;
+}
+/* The native "Clear" button Pagefind renders as a real <button> on the
+   right of the input. Strip its default chrome and style as a subtle
+   text link. */
+.cumulus-topnav-search .pagefind-ui__search-clear {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--c-fg-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.cumulus-topnav-search .pagefind-ui__search-clear:hover {
+  color: var(--c-accent);
+  background: rgba(255, 114, 100, 0.1);
+}
+
+/* === Results dropdown ===
+   Pagefind renders results inline (not as a popover); we float the whole
+   drawer underneath the input to feel like a real dropdown menu. */
+.cumulus-topnav-search .pagefind-ui__drawer {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: min(420px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius);
+  padding: 0.75rem;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+}
+/* Hide the drawer when there's nothing to show (no query / no results / no input). */
+.cumulus-topnav-search .pagefind-ui__drawer.pagefind-ui__hidden {
+  display: none;
+}
+
+.cumulus-topnav-search .pagefind-ui__message {
+  color: var(--c-fg-muted);
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.cumulus-topnav-search .pagefind-ui__results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cumulus-topnav-search .pagefind-ui__result {
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.cumulus-topnav-search .pagefind-ui__result:hover {
+  background: var(--c-bg-3);
+  border-color: var(--c-border);
+}
+.cumulus-topnav-search .pagefind-ui__result-thumb {
+  display: none;
+}
+.cumulus-topnav-search .pagefind-ui__result-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+}
+.cumulus-topnav-search .pagefind-ui__result-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.cumulus-topnav-search .pagefind-ui__result-title a {
+  color: var(--c-fg);
+  text-decoration: none;
+}
+.cumulus-topnav-search .pagefind-ui__result-title a:hover {
+  color: var(--c-accent);
+}
+.cumulus-topnav-search .pagefind-ui__result-excerpt {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--c-fg-muted);
+}
+/* Pagefind wraps matched substrings in <mark>. Override the default
+   bright-yellow with a subtle coral tint that fits the palette. */
+.cumulus-topnav-search mark {
+  background: rgba(255, 114, 100, 0.22);
+  color: var(--c-fg);
+  padding: 0 0.15em;
+  border-radius: 3px;
+  font-weight: 600;
+}
+/* Sub-results (anchor-deep hits inside a page). */
+.cumulus-topnav-search .pagefind-ui__result-nested {
+  margin-top: 0.5rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--c-border);
+}
+.cumulus-topnav-search .pagefind-ui__result-link {
+  color: var(--c-fg);
+}
+.cumulus-topnav-search .pagefind-ui__button {
+  background: var(--c-bg-3);
+  color: var(--c-fg);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+.cumulus-topnav-search .pagefind-ui__button:hover {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
 }
 
 /* === SHELL & CONTENT ====================================================== */
