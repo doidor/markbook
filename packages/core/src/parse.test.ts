@@ -93,7 +93,7 @@ Run any OCI image.`;
     const result = await parseMarkdown(source, 'test', { pageFile: '/tmp/test.md' });
     // H2 gets the permalink anchor with both metadata attributes.
     expect(result.html).toMatch(
-      /<h2[^>]*>Containers<a[^>]*class="markbook-heading-anchor"[^>]*data-markbook-permalink=""[^>]*data-pagefind-ignore=""[^>]*>#<\/a>/,
+      /<h2[^>]*>Containers<a[^>]*class="markbook-heading-anchor"[^>]*data-markbook-permalink=""[^>]*data-pagefind-ignore="all"[^>]*>#<\/a>/,
     );
     // H1 does NOT get a permalink (we intentionally skip it).
     expect(result.html).not.toMatch(/<h1[^>]*>.*markbook-heading-anchor/);

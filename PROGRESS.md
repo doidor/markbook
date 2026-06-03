@@ -912,3 +912,46 @@ Verified: search input, results dropdown, highlighting, and clear button all sit
 **Why:** The Cumulus demo is the most-visible showcase of Markbook's customization range. A screenshot worth of polish issues damages that demo's credibility — and by extension, Markbook's. The heading-anchor fix benefits everyone; the marketing-demo styles are scoped to that demo only (they're inside the `.cumulus-*` selectors).
 
 **Next:** None.
+
+## 2026-06-03 — Search polish round 2: `data-pagefind-ignore="all"` (not `""`), matched radii, sub-result hierarchy
+
+**What changed:** Two iterations on the marketing-demo search dropdown after the user's second screenshot review.
+
+### 1. `data-pagefind-ignore` needs the explicit `"all"` value (core fix)
+
+Earlier today I set `data-pagefind-ignore=""` on heading permalink anchors to keep the `#` glyph out of Pagefind snippets. The first screenshot review showed `Containers#` STILL appearing in result excerpts — confirming the empty-string value doesn't trigger Pagefind's ignore handling.
+
+Pagefind's contract: the attribute value must be `"all"` (excludes element from index AND excerpts) or `"index"` (excludes from index only). An empty string is treated as unconfigured — exactly the silent failure mode you'd expect from a string-equality check.
+
+Fix: changed `'data-pagefind-ignore': ''` → `'data-pagefind-ignore': 'all'` in `parse.ts`. The parse test was updated to assert the new value. Pagefind's actual search index (verified by decompressing `pagefind/fragment/*.pf_fragment` for the product page) now contains `"Containers"` only — zero `Containers#` matches.
+
+This is another universal benefit — every Markbook+Pagefind site with headings now gets clean snippets without the `#` glyph polluting them.
+
+### 2. Search dropdown layout + corner-radius mismatch
+
+Screenshots showed:
+- Search input rendered as a fully-rounded pill (border-radius: 999px) while the drawer below it had border-radius: 10px → visually disjoint.
+- A faint half-width divider line under "1 result for container" that didn't span the full drawer width.
+- Top-level result title and nested sub-result title rendered at nearly the same visual weight, making the hierarchy unclear.
+- Generous interior padding (0.75rem on drawer, 0.75rem on each result row) made the drawer feel sparse.
+
+Fixes in `cumulus.css`:
+
+- **Corner radii harmonized at 12px** — search input and drawer match. Pill input felt disconnected from the boxy drawer; 12px reads as "rounded card" for both.
+- **`--pagefind-ui-scale: 0.7`** (was 0.85) — Pagefind's own internal sizes scale down too. Reads more like a focused command palette than a chunky widget.
+- **`.pagefind-ui__message` restyled** as a small all-caps "1 RESULT FOR …" header, padding-only, no divider. Stray `<hr>` / `::before` decorations from Pagefind's stock UI explicitly hidden.
+- **Top-level vs nested results differentiated visually**:
+  - Top result title: `0.92rem`, `font-weight: 600`, foreground color.
+  - Nested sub-result title: `0.8rem`, `font-weight: 500`, muted color. Indented under a hairline `border-left` to read as a child element. The leading `↳` glyph Pagefind prepends now feels supplementary instead of dominant.
+- **Tighter padding** on drawer (0.5rem) and result rows (0.6rem 0.75rem); 2px gap between rows. Less air, more density.
+- **No `!important`** — relying on compound-selector specificity (`.cumulus-topnav-search .pagefind-ui__result` etc.) to win over Pagefind's stylesheet.
+
+### Verified
+
+- `pnpm example:marketing:build` produces a fresh Pagefind index; decompressing fragments confirms `Containers#` is absent everywhere (only `Containers` indexed).
+- `<input>` and `.pagefind-ui__drawer` both carry `border-radius: 12px` in the generated CSS.
+- Lint clean (no `!important`); 162 tests in `@markbook/core` (unchanged); all 5 example demos build.
+
+**Why:** Search is the most-touched UI element on a docs/marketing site after the page content itself. Subtle misalignments (mismatched radii, weak hierarchy, polluted snippets) accumulate into "this site feels janky." Fixing them is high-leverage polish.
+
+**Next:** None — the user should re-screenshot to verify.
