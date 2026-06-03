@@ -320,3 +320,34 @@ Two related questions: (1) where do the skills live — inside the npm package, 
 - This pattern doesn't require any vendor CLI to support a special "load from npm" convention — it works with any CLI that auto-discovers `<vendor>/skills/<name>/SKILL.md`. As more agent CLIs emerge, supporting them is "add the surface dir name to `VENDOR_SURFACES` in `skills.ts`."
 - Pure addition to the public API. `markbook build` / `dev` / `bundle` are unaffected. Existing consumers ignore `skills install` if they don't want it.
 - Risk: agents may eventually grow vendor-specific package skill conventions (e.g. Claude reading skills from `node_modules` directly). When that happens, `markbook skills install` becomes a redundant shim; we can deprecate it without breaking anyone (their installed copies keep working until they manually clean them up).
+
+---
+
+## ADR-0023 — Markdown-only sites (optional adapter) + per-page "View / Copy as Markdown" buttons
+
+**Context:** Two distinct asks from a consumer trying Markbook on a non-component-library use case. First: "can I use Markbook to publish a static website that's just markdown-driven, no stories or component framework?" Second: "I'd like a button on each page showing the llms.txt version of that page."
+
+Both have to land cleanly without breaking existing setups (every demo + every consumer with React/Vue/WC adapters).
+
+**Decision:**
+
+1. **`MarkbookConfig.adapter` becomes optional.** When omitted, Markbook supplies an internal `staticAdapter()` (also exported publicly so users can declare it explicitly). The static adapter has no `vitePlugins`, no `decoratorModules`, no `hasControls`, and an `isStatic: true` marker that flips a guard at build time.
+
+2. **The guard catches story directives + static adapter early.** `writePages` checks `ctx.adapter.isStatic && page.parsed.stories.length > 0` for every page and throws a single, structured error pointing at the first three offending pages and suggesting the right adapter (`reactAdapter` / `vueAdapter` / `wcAdapter`). The alternative — letting Vite explode on the generated entry's missing import — produces obscure errors mid-build with no clear recovery path.
+
+3. **Zero-story pages emit no entry script at all.** `generateEntry` used to return `'export {};\n'` for empty pages; the HTML template still loaded that empty module. Now `writePages` skips writing the entry file entirely when `stories.length === 0`, and `generateHtml` accepts `entryBasename: string | null` so it omits the `<script type="module">` tag. Pure markdown pages render with zero JS module loads (just the inline boot scripts for theme/permalinks/copy/etc.).
+
+4. **Per-page llms.txt mirrors get emitted in both `build` AND `dev`.** Extracted `emitPerPageLlmsTxt(pages, baseDir)` from the existing `emitLlms`. Called once from `writePages` against `ctx.tmpDir` (so the dev server and the pre-Vite-build snapshot both have them) and once from `emitLlms` against `ctx.outDir` (the dist copy). This is what makes the "View as Markdown" link resolve in dev — without it the button would 404 against tmpDir which Vite serves.
+
+5. **Two action buttons per page, just below the H1:** "View as Markdown" (plain `<a target="_blank">` to the `.txt`) and "Copy as Markdown" (a `<button>` whose delegated click handler `fetch()`-es the `.txt` and writes to `navigator.clipboard`). The buttons sit in a `<div class="markbook-page-actions" data-pagefind-ignore>` so they don't pollute Pagefind's search index. The boot script also detects `location.protocol === 'file:'` and disables the copy button with a tooltip ("Serve this site over http(s) to copy markdown") — fetch can't reach the .txt over `file://`, and a silently-failing button is worse than a clearly-disabled one.
+
+6. **`MarkbookConfig.llmsButtons?: boolean`** — default `true`. Set `false` to suppress both buttons site-wide. No per-page control (overengineered for v1).
+
+**Consequences:**
+
+- **Zero-config markdown sites become a real Markbook use case.** A user with a `docs/` dir of plain `.md` files and a 4-line `markbook.config.ts` (just `title`) gets a fully-featured static site: chrome, search, dark mode, `--mb-*` theme tokens, page actions, llms.txt mirror. No React/Vue/WC dependency needed.
+- **Existing consumers see ONE visible UI change** (the two new buttons appear under every H1). Opt out via `llmsButtons: false`. The button row is small (~28px tall, hover-revealed accent) and styled with the same token system as everything else.
+- **The static-adapter-plus-stories error is a one-time correctness gate**, not an ongoing maintenance cost. The check costs O(pages) at build time and produces a copy-pasteable fix.
+- **Skipping the entry script for zero-story pages is a real perf win for pure markdown sites.** Each page used to load an empty ESM module just to satisfy the template; now it loads nothing JS-bundled (the inline boot scripts remain, ~1.5 KB total).
+- **`emitPerPageLlmsTxt` running in dev** means a per-page regenerate writes 2× the file count (HTML + txt). Both are tiny; total write cost on the React demo's 6 pages is sub-1ms.
+- **No new example workspace** — the markdown-only path is validated by a quick manual smoke (build a tmpdir site, verify dist + button + llms.txt land) and the existing demo continues to exercise the full adapter path. A dedicated `examples/markdown-only-demo/` was considered but rejected as workspace bloat (the rubber-duck flagged it explicitly: "an example is bloat unless it's wired into CI; an integration test is the correctness gate").

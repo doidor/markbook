@@ -12,8 +12,13 @@
  * against, but their signatures may change at any minor release.
  */
 
-export { defineConfig } from './config.js';
-export type { MarkbookConfig, MarkbookAdapter } from './config.js';
+export { defineConfig, staticAdapter } from './config.js';
+export type {
+  MarkbookConfig,
+  MarkbookAdapter,
+  PlaygroundConfig,
+  PlaygroundProvider,
+} from './config.js';
 
 export { build, dev } from './build.js';
 export { bundleEmbed } from './embed.js';

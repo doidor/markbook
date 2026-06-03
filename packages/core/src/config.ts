@@ -24,6 +24,26 @@ export interface MarkbookAdapter {
    * React adapter sets this.
    */
   hasControls?: boolean;
+  /**
+   * Internal marker. Set by `staticAdapter()` (the default when no adapter
+   * is configured) to enable a clear error when a markdown-only site tries
+   * to use a `:::story` / `:::stories` directive.
+   */
+  isStatic?: boolean;
+}
+
+/**
+ * Default adapter for markdown-only sites — no Vite plugins, no decorators,
+ * no controls. Markbook uses this implicitly when `MarkbookConfig.adapter`
+ * is omitted. If a page tries to use `:::story` / `:::stories` directives
+ * with this adapter, the builder throws a clear error pointing at the
+ * framework-specific adapters (`reactAdapter`, `vueAdapter`, `wcAdapter`).
+ */
+export function staticAdapter(): MarkbookAdapter {
+  return {
+    packageName: '@markbook/core',
+    isStatic: true,
+  };
 }
 
 export interface MarkbookConfig {
@@ -93,7 +113,21 @@ export interface MarkbookConfig {
    * the reader rewrite the imports themselves.
    */
   playground?: PlaygroundConfig | false;
-  adapter: MarkbookAdapter;
+  /**
+   * Whether to show "View as Markdown" / "Copy as Markdown" action buttons
+   * on every page (just below the H1). The buttons link to / fetch the
+   * per-page `llms/<path>.txt` mirror. Default: `true`. Set to `false` to
+   * suppress.
+   */
+  llmsButtons?: boolean;
+  /**
+   * Markbook ships with an internal `staticAdapter()` (no framework, no
+   * Vite plugins) for markdown-only sites. Supply an explicit adapter
+   * (`reactAdapter`, `vueAdapter`, `wcAdapter`) when pages use `:::story`
+   * or `:::stories` directives — Markbook throws a clear error if a page
+   * tries to mount stories without one.
+   */
+  adapter?: MarkbookAdapter;
 }
 
 export type PlaygroundProvider = 'codesandbox' | 'stackblitz';

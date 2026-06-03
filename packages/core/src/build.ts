@@ -11,8 +11,9 @@ import { extractComponentProps } from './props.js';
 import { buildPlaygroundDescriptors } from './playground.js';
 import { resolveInlinedSources } from './inline-sources.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
+import { staticAdapter } from './config.js';
 import type { ParsedPage, StoryRef } from './parse.js';
-import type { MarkbookConfig, PlaygroundConfig } from './config.js';
+import type { MarkbookConfig, MarkbookAdapter, PlaygroundConfig } from './config.js';
 
 interface PageRecord {
   file: string;
@@ -46,6 +47,7 @@ export interface BuildContext {
   decoratorPaths: string[];
   siteTitle: string;
   siteDescription: string | undefined;
+  adapter: MarkbookAdapter;
   adapterPackageName: string;
   adapterPlugins: unknown[];
   hasControls: boolean;
@@ -54,6 +56,8 @@ export interface BuildContext {
   disableBaseCss: boolean;
   /** Resolved playground configuration. `undefined` when disabled or omitted. */
   playground: PlaygroundConfig | undefined;
+  /** Whether to render "View as Markdown" / "Copy as Markdown" buttons on every page. */
+  llmsButtons: boolean;
 }
 
 export function makeLoadTemplate(
@@ -86,7 +90,8 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     const list = Array.isArray(raw) ? raw : [raw];
     return list.map((d) => path.resolve(root, d));
   })();
-  const decoratorPaths = (config.adapter.decoratorModules ?? []).map((m) => {
+  const adapter = config.adapter ?? staticAdapter();
+  const decoratorPaths = (adapter.decoratorModules ?? []).map((m) => {
     const resolved = resolveSpec(m, root);
     if (!resolved) {
       throw new Error(
@@ -96,7 +101,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     }
     return resolved;
   });
-  const adapterPlugins = config.adapter.vitePlugins ? await config.adapter.vitePlugins() : [];
+  const adapterPlugins = adapter.vitePlugins ? await adapter.vitePlugins() : [];
   const cssPaths = (() => {
     const raw = config.css;
     if (!raw) return [];
@@ -124,13 +129,15 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     decoratorPaths,
     siteTitle,
     siteDescription,
-    adapterPackageName: config.adapter.packageName,
+    adapter,
+    adapterPackageName: adapter.packageName,
     adapterPlugins,
-    hasControls: !!config.adapter.hasControls,
+    hasControls: !!adapter.hasControls,
     cssPaths,
     userCss,
     disableBaseCss: !!config.disableBaseCss,
     playground: config.playground === false || !config.playground ? undefined : config.playground,
+    llmsButtons: config.llmsButtons !== false,
   };
 }
 
@@ -204,28 +211,56 @@ async function writePages(
 
   const nav = buildNav(pages);
 
+  // Static adapter + stories is a misconfiguration we surface here so the
+  // user gets a single clear error instead of an obscure Vite failure.
+  if (ctx.adapter.isStatic) {
+    const offending = pages.filter((p) => p.parsed.stories.length > 0);
+    if (offending.length > 0) {
+      const sample = offending
+        .slice(0, 3)
+        .map(
+          (p) =>
+            `  - ${p.relPath} (${p.parsed.stories.length} ${p.parsed.stories.length === 1 ? 'story' : 'stories'})`,
+        )
+        .join('\n');
+      throw new Error(
+        `Markbook: ${offending.length} page${offending.length === 1 ? '' : 's'} ` +
+          `${offending.length === 1 ? 'uses' : 'use'} \`:::story\` or \`:::stories\` directives but no adapter is configured.\n${sample}\n` +
+          `Add \`adapter: reactAdapter()\` (or vueAdapter / wcAdapter) to markbook.config.ts.`,
+      );
+    }
+  }
+
   const htmlInputs: Record<string, string> = {};
   for (const page of pages) {
     const htmlAbs = path.join(ctx.tmpDir, page.htmlRelPath);
     const entryAbs = path.join(ctx.tmpDir, page.entryRelPath);
     await fs.mkdir(path.dirname(htmlAbs), { recursive: true });
 
-    const entryCode = generateEntry(
-      page.parsed.stories,
-      path.dirname(page.file),
-      ctx.adapterPackageName,
-      path.dirname(entryAbs),
-      ctx.decoratorPaths,
-      ctx.hasControls,
-    );
+    // Zero-story pages don't need an entry script at all — pure markdown.
+    // Skip writing the entry file AND omit the module script from the HTML.
+    const hasStories = page.parsed.stories.length > 0;
+    if (hasStories) {
+      const entryCode = generateEntry(
+        page.parsed.stories,
+        path.dirname(page.file),
+        ctx.adapterPackageName,
+        path.dirname(entryAbs),
+        ctx.decoratorPaths,
+        ctx.hasControls,
+      );
+      await fs.writeFile(entryAbs, entryCode);
+    }
+
     let html = generateHtml(
       page,
       nav,
       ctx.siteTitle,
-      path.basename(entryAbs),
+      hasStories ? path.basename(entryAbs) : null,
       opts.searchEnabled,
       ctx.userCss,
       ctx.disableBaseCss,
+      ctx.llmsButtons,
     );
 
     if (ctx.config.transformHtml) {
@@ -237,10 +272,16 @@ async function writePages(
       });
     }
 
-    await fs.writeFile(entryAbs, entryCode);
     await fs.writeFile(htmlAbs, html);
     htmlInputs[page.fileId] = htmlAbs;
   }
+
+  // Always write per-page `llms/<path>.txt` mirrors next to the HTML in
+  // tmpDir so the "View as Markdown" / "Copy as Markdown" buttons work in
+  // both build and dev modes. `emitLlms` (called from `build`) re-writes
+  // them to outDir after Vite copies tmpDir → outDir, plus generates the
+  // top-level llms.txt index.
+  await emitPerPageLlmsTxt(pages, ctx.tmpDir);
 
   const storyFiles = collectStoryFiles(pages);
   return { pages, htmlInputs, storyFiles };
@@ -463,16 +504,7 @@ async function emitLlms(
   siteTitle: string,
   siteDescription: string | undefined,
 ): Promise<void> {
-  const llmsDir = path.join(outDir, 'llms');
-  for (const page of pages) {
-    const txtAbs = path.join(llmsDir, page.txtRelPath);
-    await fs.mkdir(path.dirname(txtAbs), { recursive: true });
-    const startsWithH1 = /^#\s/.test(page.parsed.plainMarkdown);
-    const txtContent = startsWithH1
-      ? page.parsed.plainMarkdown
-      : `# ${page.parsed.title}\n\n${page.parsed.plainMarkdown}`;
-    await fs.writeFile(txtAbs, `${txtContent}\n`);
-  }
+  await emitPerPageLlmsTxt(pages, outDir);
 
   const lines: string[] = [];
   lines.push(`# ${siteTitle}`);
@@ -497,6 +529,24 @@ async function emitLlms(
   }
 
   await fs.writeFile(path.join(outDir, 'llms.txt'), `${lines.join('\n')}\n`);
+}
+
+/**
+ * Write every page's plain-markdown mirror to `<base>/llms/<page>.txt`.
+ * Used both by `emitLlms` (for the static dist output) and `writePages`
+ * (for the dev/build tmpDir so the "View as Markdown" buttons resolve).
+ */
+async function emitPerPageLlmsTxt(pages: PageRecord[], baseDir: string): Promise<void> {
+  const llmsDir = path.join(baseDir, 'llms');
+  for (const page of pages) {
+    const txtAbs = path.join(llmsDir, page.txtRelPath);
+    await fs.mkdir(path.dirname(txtAbs), { recursive: true });
+    const startsWithH1 = /^#\s/.test(page.parsed.plainMarkdown);
+    const txtContent = startsWithH1
+      ? page.parsed.plainMarkdown
+      : `# ${page.parsed.title}\n\n${page.parsed.plainMarkdown}`;
+    await fs.writeFile(txtAbs, `${txtContent}\n`);
+  }
 }
 
 function formatLinkText(page: PageRecord): string {
@@ -688,10 +738,11 @@ function generateHtml(
   page: PageRecord,
   nav: NavGroup[],
   siteTitle: string,
-  entryBasename: string,
+  entryBasename: string | null,
   searchEnabled: boolean,
   userCss: string,
   disableBaseCss: boolean,
+  llmsButtons: boolean,
 ): string {
   const fromDir = path.dirname(page.htmlRelPath);
 
@@ -764,6 +815,7 @@ function generateHtml(
 <script>${PLAYGROUND_BOOT_SCRIPT}</script>
 <script>${COPY_BOOT_SCRIPT}</script>
 <script>${PERMALINK_BOOT_SCRIPT}</script>
+${llmsButtons ? `<script>${COPY_MD_BOOT_SCRIPT}</script>` : ''}
 ${searchEnabled ? `<script>${SEARCH_KBD_BOOT_SCRIPT}</script>` : ''}
 ${pagefindLink}
 ${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
@@ -781,16 +833,26 @@ ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
   </aside>
   <main class="markbook-main">
     <article class="markbook-content" data-pagefind-body>
-${page.parsed.html}
+${llmsButtons ? renderPageActions(page, resolveHref) : ''}${page.parsed.html}
     </article>
   </main>
   ${tocBlock}
 </div>
 ${pagefindScripts}
-<script type="module" src="./${entryBasename}"></script>
+${entryBasename ? `<script type="module" src="./${entryBasename}"></script>` : ''}
 </body>
 </html>
 `;
+}
+
+/**
+ * Render the "View as Markdown" / "Copy as Markdown" action buttons that
+ * point at the page's per-page llms.txt mirror. Wrapped in
+ * `data-pagefind-ignore` so Pagefind doesn't index the button labels.
+ */
+function renderPageActions(page: PageRecord, resolveHref: (target: string) => string): string {
+  const llmsHref = resolveHref(`llms/${page.txtRelPath}`);
+  return `<div class="markbook-page-actions" role="group" aria-label="Page actions" data-pagefind-ignore><a class="markbook-page-action" href="${llmsHref}" target="_blank" rel="noopener" title="View this page as plain markdown (opens in a new tab)">View as Markdown</a><button type="button" class="markbook-page-action" data-markbook-copy-md data-url="${llmsHref}" title="Copy this page's markdown to clipboard"><span class="markbook-copy-md-label">Copy as Markdown</span></button></div>`;
 }
 
 function escapeHtml(s: string): string {
@@ -840,6 +902,15 @@ const PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',fun
  * enabled — handler is omitted from the HTML in dev mode.
  */
 const SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
+
+/**
+ * "Copy as Markdown" button handler. Delegated click reads the button's
+ * data-url, fetches the per-page llms.txt mirror, writes the content to
+ * the clipboard, and flips the label to "Copied!" for ~1.2s. Detects
+ * file:// (where fetch can't reach the .txt file) and shows a tooltip
+ * instead of silently failing.
+ */
+const COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=document.querySelectorAll('[data-markbook-copy-md]');for(var i=0;i<btns.length;i++){var b=btns[i];b.disabled=true;b.title='Serve this site over http(s) to copy markdown.';b.style.opacity='0.5';b.style.cursor='not-allowed';}return;}document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy-md]');if(!b)return;e.preventDefault();if(!navigator.clipboard){return;}var url=b.getAttribute('data-url')||'';var lbl=b.querySelector('.markbook-copy-md-label');var prev=lbl?lbl.textContent:'';fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.text();}).then(function(text){return navigator.clipboard.writeText(text);}).then(function(){if(!lbl)return;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: copy-as-markdown failed',err);if(!lbl)return;lbl.textContent='Copy failed';setTimeout(function(){lbl.textContent=prev;},1500);});});})();`;
 
 const BASE_CSS = `
 :root {
@@ -1219,6 +1290,38 @@ a:hover { text-decoration: underline; }
 .markbook-playground-btn:focus-visible {
   outline: 2px solid var(--mb-accent);
   outline-offset: 2px;
+}
+.markbook-page-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin: -0.5rem 0 1.5rem;
+}
+.markbook-page-action {
+  appearance: none;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-bg-soft);
+  color: var(--mb-fg-muted);
+  font-family: var(--mb-font-sans);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color .12s ease, color .12s ease, background .12s ease;
+}
+.markbook-page-action:hover {
+  border-color: var(--mb-accent);
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
+}
+.markbook-page-action:focus-visible {
+  outline: 2px solid var(--mb-accent);
+  outline-offset: 2px;
+}
+.markbook-page-action.is-copied {
+  border-color: var(--mb-accent);
+  color: var(--mb-accent);
 }
 .markbook-control { display: contents; }
 .markbook-control label {

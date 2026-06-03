@@ -182,7 +182,7 @@ async function bundlePackageOne(
   outRoot: string,
   isolation: BundleIsolation | undefined,
 ): Promise<void> {
-  const peerDeps = ctx.config.adapter.packagePeerDeps ?? [];
+  const peerDeps = ctx.adapter.packagePeerDeps ?? [];
   const scope = ctx.config.bundle?.packageScope;
   const version = ctx.config.bundle?.packageVersion ?? '0.0.1';
   const pkgName = scope ? `${scope}/${story.slug}` : story.slug;
