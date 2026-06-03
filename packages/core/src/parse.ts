@@ -313,6 +313,25 @@ export async function parseMarkdown(
         const text = textOf(node);
         const slug = (node.properties?.id as string | undefined) ?? slugify(text);
         headings.push({ level, text, slug });
+
+        // Append a hover-revealed permalink to H2/H3 (skip H1 — only one per
+        // page, the URL fragment is implicit). Clicking copies the
+        // canonical anchor URL via PERMALINK_BOOT_SCRIPT.
+        if (level === 2 || level === 3) {
+          const anchor = {
+            type: 'element',
+            tagName: 'a',
+            properties: {
+              href: `#${slug}`,
+              className: ['markbook-heading-anchor'],
+              'aria-label': `Permalink to ${text}`,
+              'data-markbook-permalink': '',
+            },
+            children: [{ type: 'text', value: '#' }],
+          };
+          if (!Array.isArray(node.children)) node.children = [];
+          node.children.push(anchor);
+        }
       });
     })
     .use(rehypeStringify, { allowDangerousHtml: true })
@@ -447,9 +466,11 @@ function escapeHtml(s: string): string {
 }
 
 function renderCodeDisclosure(storyId: string, files: StoryCodeFile[]): string {
+  const copyBtn =
+    '<button type="button" class="markbook-code-copy" data-markbook-copy aria-label="Copy code"><span class="markbook-copy-label">Copy</span></button>';
   if (files.length === 1) {
     const f = files[0]!;
-    return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div>${f.codeHtml}</div></details>`;
+    return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div><div class="markbook-code-pre-wrap">${copyBtn}${f.codeHtml}</div></div></details>`;
   }
   const tabs = files
     .map(
@@ -460,7 +481,7 @@ function renderCodeDisclosure(storyId: string, files: StoryCodeFile[]): string {
   const panels = files
     .map(
       (f, i) =>
-        `<div role="tabpanel" id="panel-${storyId}-${i}" aria-labelledby="tab-${storyId}-${i}"${i === 0 ? '' : ' hidden'}>${f.codeHtml}</div>`,
+        `<div role="tabpanel" id="panel-${storyId}-${i}" aria-labelledby="tab-${storyId}-${i}"${i === 0 ? '' : ' hidden'}><div class="markbook-code-pre-wrap">${copyBtn}${f.codeHtml}</div></div>`,
     )
     .join('');
   return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-tabs" data-markbook-tabs="${storyId}"><div class="markbook-code-tablist" role="tablist" aria-label="Story files">${tabs}</div>${panels}</div></details>`;

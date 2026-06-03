@@ -698,6 +698,9 @@ function generateHtml(
 <script>${THEME_BOOT_SCRIPT}</script>
 <script>${TABS_BOOT_SCRIPT}</script>
 <script>${PLAYGROUND_BOOT_SCRIPT}</script>
+<script>${COPY_BOOT_SCRIPT}</script>
+<script>${PERMALINK_BOOT_SCRIPT}</script>
+${searchEnabled ? `<script>${SEARCH_KBD_BOOT_SCRIPT}</script>` : ''}
 ${pagefindLink}
 ${disableBaseCss ? '' : `<style>${BASE_CSS}</style>`}
 ${userCss ? `<style data-markbook-user-css>${userCss}</style>` : ''}
@@ -751,6 +754,28 @@ const TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closes
  * docs page is not navigated away from.
  */
 const PLAYGROUND_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-playground]');if(!b)return;e.preventDefault();var d;try{d=JSON.parse(atob(b.getAttribute('data-payload')||''));}catch(err){console.error('markbook: malformed playground payload',err);return;}var f=document.createElement('form');f.action=d.action;f.method='POST';f.target='_blank';f.style.display='none';for(var i=0;i<d.fields.length;i++){var pair=d.fields[i];var input=document.createElement('input');input.type='hidden';input.name=pair[0];input.value=pair[1];f.appendChild(input);}document.body.appendChild(f);f.submit();f.parentNode.removeChild(f);});})();`;
+
+/**
+ * Copy-code button. Delegated click handler reads the nearest `<pre>` block,
+ * extracts its textContent, copies via navigator.clipboard, briefly flips
+ * the button label to "Copied!" for ~1.2s.
+ */
+const COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy]');if(!b)return;e.preventDefault();var wrap=b.closest('.markbook-code-pre-wrap');var pre=wrap&&wrap.querySelector('pre');if(!pre||!navigator.clipboard)return;navigator.clipboard.writeText(pre.textContent||'').then(function(){var lbl=b.querySelector('.markbook-copy-label');if(!lbl)return;var prev=lbl.textContent;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: clipboard write failed',err);});});})();`;
+
+/**
+ * Heading permalinks. Click on a [data-markbook-permalink] anchor copies the
+ * canonical page URL + fragment to the clipboard (still navigates, so the
+ * URL bar updates as expected). Modifier-clicks (cmd/ctrl/shift) skip the
+ * clipboard write so users can open in a new tab via standard browser UX.
+ */
+const PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-markbook-permalink]');if(!a)return;if(e.metaKey||e.ctrlKey||e.shiftKey)return;if(!navigator.clipboard)return;var h=a.getAttribute('href')||'';var url=location.origin+location.pathname+h;navigator.clipboard.writeText(url).catch(function(){});});})();`;
+
+/**
+ * Cmd-K / Ctrl-K opens the Pagefind search input. Slash key also works
+ * (Algolia DocSearch / GitHub convention). Only active when search is
+ * enabled — handler is omitted from the HTML in dev mode.
+ */
+const SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
 
 const BASE_CSS = `
 :root {
@@ -1183,6 +1208,42 @@ a:hover { text-decoration: underline; }
   background: var(--mb-bg-soft);
   border-bottom: 1px solid var(--mb-border);
 }
+.markbook-code-pre-wrap { position: relative; }
+.markbook-code-copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  appearance: none;
+  border: 1px solid var(--mb-border);
+  background: var(--mb-bg);
+  color: var(--mb-fg-muted);
+  font-family: var(--mb-font-sans);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease, color .12s ease, border-color .12s ease;
+}
+.markbook-code-pre-wrap:hover .markbook-code-copy,
+.markbook-code-copy:focus-visible { opacity: 1; }
+.markbook-code-copy:hover { color: var(--mb-fg); border-color: var(--mb-accent); }
+.markbook-code-copy.is-copied { opacity: 1; color: var(--mb-accent); border-color: var(--mb-accent); }
+.markbook-code-copy:focus-visible { outline: 2px solid var(--mb-accent); outline-offset: 2px; }
+.markbook-heading-anchor {
+  display: inline-block;
+  margin-left: 0.35rem;
+  color: var(--mb-fg-muted);
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity .12s ease, color .12s ease;
+}
+.markbook-content h2:hover .markbook-heading-anchor,
+.markbook-content h3:hover .markbook-heading-anchor,
+.markbook-heading-anchor:focus-visible { opacity: 1; }
+.markbook-heading-anchor:hover { color: var(--mb-accent); }
+.markbook-heading-anchor:focus-visible { outline: 2px solid var(--mb-accent); outline-offset: 2px; border-radius: 3px; }
 .markbook-code-tablist {
   display: flex;
   flex-wrap: wrap;

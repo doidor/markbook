@@ -358,3 +358,23 @@ Tests: 7 new in `playground.test.ts` covering descriptor count per provider conf
 **Why:** "Open in CodeSandbox" / "Open in StackBlitz" has been on every Storybook user's wishlist forever. Providing both buttons (configurable to ship one, the other, or both) lets users pick the playground they prefer. Using the POST-form API for each provider rather than an SDK keeps dependencies at zero and bundle size impact at ~280 bytes of inline JS plus per-button base64 payloads. The conservative scope (React-only for v1) ships the feature for the canonical use case while leaving Vue/WC support as a future per-adapter `playgroundTemplate` hook — easy additive change with no rework. ADR-0020 captures the design.
 
 **Next:** E — UX polish batch (copy-code button on disclosures, hover-revealed heading permalinks, Pagefind index extended with story export names).
+
+---
+
+## 2026-06-03 — UX polish: copy-code button, heading permalinks, Cmd-K search
+
+**What changed:** Three small UX wins that compound — none individually transformative, all routinely useful when reading docs. Five pieces:
+
+1. **Copy-code button** inside every `<pre>` block in the code disclosure (`packages/core/src/parse.ts` `renderCodeDisclosure`). The button is positioned absolute top-right of a new `<div class="markbook-code-pre-wrap">` that wraps each `<pre>`. Opacity 0 until hover; opacity 1 on focus-visible so keyboard users get it too. Inline boot script (`COPY_BOOT_SCRIPT`, ~280 bytes) delegates clicks, reads `closest('.markbook-code-pre-wrap').querySelector('pre').textContent`, writes via `navigator.clipboard`, flips label to "Copied!" for 1.2s. Works in single-file disclosures and inside each tab panel of multi-file disclosures.
+
+2. **Heading permalinks** for H2/H3. The rehype walker in `parseMarkdown` (which was already collecting heading slugs for the TOC) now also appends an `<a class="markbook-heading-anchor" href="#slug" data-markbook-permalink>#</a>` to every H2/H3. CSS hides the anchor until the heading is hovered. Boot script (`PERMALINK_BOOT_SCRIPT`, ~270 bytes) lets unmodified clicks copy the canonical URL+fragment to the clipboard while preserving normal browser scroll-to-anchor behavior; modifier-clicks (cmd/ctrl/shift) skip the clipboard write so "open in new tab" still works as expected.
+
+3. **Cmd-K / Ctrl-K (and `/`) opens search** (`SEARCH_KBD_BOOT_SCRIPT`, ~340 bytes). Wired only when `searchEnabled` (so dev mode, which doesn't bundle Pagefind, doesn't ship a handler that would 404 looking for the input). The `/` shortcut skips when focus is already in an input/textarea/contentEditable. Matches the convention every reader expects from Algolia DocSearch, GitHub, and most modern docs sites.
+
+4. **CSS additions** (~50 lines in `BASE_CSS`) for `.markbook-code-pre-wrap`, `.markbook-code-copy`, and `.markbook-heading-anchor`. Hover-revealed UI, accent-coloured focus rings, `is-copied` state flip.
+
+5. **Two boot scripts wired into the page** (`COPY_BOOT_SCRIPT`, `PERMALINK_BOOT_SCRIPT`) plus the conditional third (`SEARCH_KBD_BOOT_SCRIPT`). Total inline JS added: ~900 bytes. Verified end-to-end on the Pixie demo — the Button page now ships 8 copy buttons (one per `<pre>` across all disclosures, including the multi-file Variants/Sizes ones), 7 heading anchors (one per H2/H3 the page author wrote, including the auto-generated H3s from `:::stories` fan-outs on Avatar), and the Cmd-K handler. All 76 unit tests still pass.
+
+**Why:** Each of these is the kind of polish a reader doesn't notice when it's there but resents when it isn't. Copy-code is the most-used button on any Storybook site. Heading permalinks are how docs get shared in Slack/issues without screenshots. Cmd-K to search is muscle memory at this point — search-via-mouse-click is friction that compounds across every visit. Implementing all three as small inline boot scripts (no runtime deps, no bundled JS payload to load) keeps the cost at <1 KB of additional shipped JS per page.
+
+**Next:** No specific follow-up. The earlier deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators) remain on the post-freeze list, plus a possible `playground.inlineSourceImports` hook if in-repo-imports-in-sandboxes turns out to matter.
