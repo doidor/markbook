@@ -217,3 +217,29 @@ Both modes share:
 - **Runtime CSS-in-JS is out of scope.** Griffel, vanilla-extract, emotion, and friends do their work at mount time inside the user's component tree; Markbook never touches them. Confirming this means we don't need a "css-in-js" config field; not having one is the contract.
 
 **Consequences:** The chrome surface is three knobs: `css`, `disableBaseCss`, `transformHtml`. The story surface is zero knobs — every Vite-supported tool works because Vite (and PostCSS, when configured) is in the path. Adding a new chrome customization requires real justification — there's a clear escalation ladder for users to point at when reaching for a fourth knob ("can I do it with `css`? if not, `disableBaseCss`? if not, `transformHtml`?"). The downside: `transformHtml` is a string-in / string-out function — there's no DOM-API affordance — so users reach for `cheerio` or regex. That's a feature: it's framework-agnostic and Markbook never has to ship a DOM parser. **A real constraint surfaces:** `css` only inlines static files; if a user wants their CSS to be *built* (Sass, Stylus, PostCSS-transformed) before inlining, they must run that build themselves and point `css` at the output. Tailwind users are already accustomed to this, so it's the right default; if Sass authoring becomes common we can grow `css` into accepting build-output handlers, but YAGNI for now.
+
+---
+
+## ADR-0018 — `:::stories` is a separate directive (not a `:::story` overload)
+
+**Context:** Markbook's "one story per file with default export" convention works for small libraries but multiplies file count once a component has many variants. The Storybook CSF v3 idiom (one file, many named exports) is the obvious fit. Two designs were possible: (a) overload `:::story` so it fans out when no `export=` is given and the file has multiple named exports; (b) introduce a distinct `:::stories` directive.
+
+**Decision:** Add a distinct `:::stories` directive. `:::story` always renders exactly one story (default or named via `export=`); `:::stories` always fans out to all (or `only=`/`exclude=`-filtered) named exports. Each `:::stories` export is rendered with its own H3 heading, its own placeholder, its own controls slot, and **its own code disclosure showing only that export's slice** of the source (imports + non-export helpers + the named export only — implemented via TS AST in `code.ts`).
+
+CSF-object detection (a named export may be `{ render, args, argTypes, parameters, name }` instead of a plain render function) is enabled in the entry generator for both singleton and fan-out paths. The detector requires `render` AND at least one of `args` / `argTypes` / `parameters` / `name` so Vue's `defineComponent({ render })` and React's `forwardRef` (which both return objects with `render`) are not misclassified.
+
+For `markbook bundle`, fan-out stories always promote their slug to `${baseSlug}-${kebab(exportName)}` (singleton `:::story` keeps the bare slug). Duplicate slugs across the workspace throw at discovery time.
+
+**Consequences:** Two directives are slightly more grammar surface than one but the semantics are unambiguous — a reader knows from the directive name whether to expect one story or many. The slug-always-promote rule means a `:::stories` file with one named export ships as `<path>-<exportname>` instead of `<path>`, which is verbose but bulletproof against future renames. The TS-AST slicer in `code.ts` adds the TypeScript compiler API as a runtime dependency for code disclosure (it was already a dep for export discovery), which keeps Markbook robust against type-only exports, JSDoc preservation, and re-export edge cases that a regex would mangle.
+
+---
+
+## ADR-0019 — Public vs. internal API split (`@markbook/core` exports map)
+
+**Context:** Before v1.0 every symbol in `@markbook/core` was re-exported from `index.ts`. Tests imported directly from source modules (`./parse.js`, etc.), but the barrel made `extractStoryCode`, `slugify`, `sortIndexFirst`, and a dozen other internals look like part of the contract. Without a deliberate split, the v1.0 freeze would either lock in too much surface or break advanced consumers who started depending on now-renamed internals.
+
+**Decision:** `package.json` `exports` map has two keys: `.` (stable, semver-guaranteed) and `./internal` (best-effort, may change in minor releases). The main entry exports only `defineConfig`, `build`, `dev`, `bundleEmbed`, and the matching types. The `./internal` entry re-exports parser, code/props extractors, template, exports discovery, nav helpers, slugify, and cache invalidators — anything useful for power tooling but too tied to internal implementation to freeze.
+
+Test files keep importing from sibling source modules (no path change). Cross-package consumers in the workspace (adapter packages, CLI) only use the main entry — verified by grep.
+
+**Consequences:** A user writing a custom CLI around Markbook (e.g. an alternative bundler) can `import { parseMarkdown } from '@markbook/core/internal'` and accept the contract that the function may grow new options at any minor release. The split also informs README writing — `packages/core/README.md` documents only the main-entry surface, while internals are listed in `internal.ts`'s top-of-file comment for discoverability. Future API audits become a refactoring exercise rather than a breaking change: anything that should have been internal can be moved to `./internal` without bumping major.

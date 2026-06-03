@@ -4,17 +4,22 @@ This file is loaded into every Claude Code session in this repo.
 
 ## What Markbook is
 
-A lightweight Storybook alternative. Authors write Markdown; stories live in adjacent `.tsx` / `.js` files referenced from markdown via `:::story{src=… export=…}` directives. Output is a static HTML site (Starlight-inspired layout — top header, grouped left nav, content, right TOC), with full-text search (Pagefind, v0.2) and an `llms.txt` mirror. Framework support is via thin mount adapters (React first; Vue and web components later).
+A lightweight Storybook alternative. Authors write Markdown; stories live in adjacent `.tsx` / `.ts` / `.js` files referenced from markdown via two directives:
+
+- `:::story{src=… [export=…] [id=…]}` — one rendered story per directive. The story file's `export default` is the renderer; the disclosure shows the **whole file**.
+- `:::stories{src=… [only=A,B] [exclude=C] [id=…]}` — multi-export CSF v3 file. Fans out to one rendered story per named export, each with its OWN sliced disclosure (imports + non-export helpers + just that export's declaration). Each export may be a render function or a CSF object `{ render, args?, argTypes?, parameters?, name? }`; detection requires `render` AND at least one metadata field so Vue `defineComponent` / React `forwardRef` are not misclassified.
+
+Output is a static HTML site (Starlight-inspired layout — top header, grouped left nav, content, right TOC), with full-text search (Pagefind) and an `llms.txt` mirror. Framework support is via thin mount adapters (React, Vue, web components).
 
 Pages may also embed:
 - A **props table** generated from a TypeScript component file via `react-docgen-typescript`. Set `component:` and optionally `componentExport:` in frontmatter; place a `:::props\n:::` directive where the table should render. The same table appears in the per-page `llms/<path>.txt`.
-- A **code disclosure** under every rendered story showing the **whole story file** (imports + export) Shiki-highlighted. The convention is **one story per file**: each story lives in its own `.stories.{tsx,ts}` (typically grouped under a `<Component>/` folder next to the page) and uses `export default`, so directives can be just `:::story{src=./Foo/Bar.stories.tsx}` with no `export=` attribute. The same source is embedded as a fenced code block in `llms/<path>.txt`.
+- A **code disclosure** under every rendered story, Shiki-highlighted with dual light/dark themes. Singleton `:::story` shows the whole file; `:::stories` slices each export. Sibling CSS imports (`*.module.css`, etc.) are surfaced as additional tabs in the disclosure.
 
 Stories are **portable** via `markbook bundle`:
 - Default (embed mode): `dist/embed/<slug>.js` — fully self-contained ESM that auto-mounts on `<div data-markbook-embed="<slug>">` placeholders. No iframe.
 - `--mode package`: `dist/packages/<slug>/` — a publishable npm package directory with the framework as a peer dep (declared in each adapter's `packagePeerDeps`).
 - `--isolation=shadow`: each mount runs inside an open shadow root so host-page CSS doesn't leak in.
-- Slugs default to a kebab-case version of the story file path relative to `docsDir`. Override per-story by adding `id=stable-name` to the directive: `:::story{src=./Foo.stories.tsx id=stable-name}` — useful when you rename files but want external embeds to keep working.
+- Slugs default to a kebab-case version of the story file path relative to `docsDir`. Singleton `:::story` keeps that bare slug; `:::stories` always promotes to `${baseSlug}-${kebab(exportName)}` so adding/removing exports never silently renames an existing embed. Override per-story by adding `id=stable-name` to the directive: `:::story{src=./Foo.stories.tsx id=stable-name}`. Duplicate slugs across the workspace throw a clear error at bundle time.
 
 Stories share global providers (theme, i18n, router, ...) via **decorators** — an array of modules whose default exports wrap every story. Configure on the adapter, e.g. `reactAdapter({ decorators: ['./theme.tsx', './i18n.tsx'] })`. Decorators apply outer-to-inner, so the first array element becomes the outermost wrapper. The same decorator stack is inlined into embed and package mode bundles, so portable stories render identically out of context. WC stories don't have decorators (vanilla custom elements use a different composition model).
 
@@ -29,9 +34,11 @@ Stories share global providers (theme, i18n, router, ...) via **decorators** —
 
 A story file may also export `args`, `argTypes`, and `parameters`:
 - `parameters` — display options for the placeholder element. `{ layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. All adapters honour them.
-- `args` — initial prop values. The default export becomes a render function `(args) => …`. React + Vue adapters honour them; WC ignores.
+- `args` — initial prop values. The default export becomes a render function `(args) => …`. React + Vue adapters honour them; WC does not pass them through to function stories.
 - `argTypes` — optional control-type metadata for each arg: `{ control: 'text' | 'number' | 'boolean' | 'select'; options?: [...] }`. If omitted, types are inferred from runtime values (boolean → checkbox, number → number input, else text).
 - React's adapter exposes a `setupControls(controlsEl, args, argTypes, onChange)` helper, and `markbook build` / `markbook dev` wire up an interactive controls panel under every story whose source exports `args`. Changing a control re-mounts with new props (state preserved through React reconciliation).
+
+In `:::stories` files each named export may be a CSF v3 object — `{ render, args?, argTypes?, parameters?, name? }` — and the adapter's entry generator reads `args`/`argTypes`/`parameters` off the export itself, falling back to module-level exports only when the export is a plain function.
 
 Pages may also opt into a **template**: a markdown file in a templates directory that wraps the page's content with a shared shell. Opt in with `template: <name>` in frontmatter; the template uses `{{ title }}`, `{{ description }}`, `{{ content }}`, and `{{ frontmatter.x }}` substitution (no conditionals/loops — KISS). Pages without `template:` render their full markdown unchanged.
 
@@ -63,26 +70,42 @@ The harness reminds you (PostToolUse hook) and warns at session-end (Stop hook) 
 **Next:** the one or two follow-ups that should come after this.
 ```
 
+## Public API
+
+`@markbook/core` ships two entry points:
+
+- **`@markbook/core`** — the stable public surface: `defineConfig`, `build`, `dev`, `bundleEmbed`, plus the matching types (`MarkbookConfig`, `MarkbookAdapter`, `BundleEmbedOptions`, `BundleMode`, `BundleIsolation`). Treat these as semver-stable from v1.0 on.
+- **`@markbook/core/internal`** — everything else (parser, code/props extractors, template engine, exports discovery, nav helpers, slugify, cache invalidators). Public enough to write tools against but not stability-guaranteed; signatures may change in minor releases.
+
+Tests in `packages/core/src/*.test.ts` import directly from sibling source modules (`./parse.js`, `./code.js`, etc.) — not via the barrel — so the API split has no test cost.
+
 ## Repo layout
 
 ```
 packages/
-  core/             — parser, builder, dev server (framework-agnostic)
+  core/             — parser, builder, dev server, embed bundler (framework-agnostic)
   cli/              — `markbook` binary
-  adapter-react/    — React mount adapter (+ Vite plugin glue)
+  adapter-react/    — React mount adapter (+ decorators + controls)
+  adapter-vue/      — Vue 3 mount adapter (+ decorators)
+  adapter-wc/       — Web components mount adapter (no framework runtime)
 examples/
-  react-demo/       — dogfood example
+  react-demo/       — Pixie component library — the canonical dogfood
+  vue-demo/         — Counter component in Vue
+  wc-demo/          — <click-counter> custom element
+  embed-host/       — external consumer of the React demo's embed bundles
 ```
 
 ## Commands
 
 - `pnpm install` — install workspace
 - `pnpm build` — build all packages
-- `pnpm test` — run `@markbook/core` Vitest unit tests (parse, template, code, build helpers, embed slug)
+- `pnpm test` — run `@markbook/core` Vitest suite (parse, template, code, build helpers, embed slug, exports discovery)
 - `pnpm typecheck` — type-check all packages
-- `pnpm example:build` — build the React demo
-- `pnpm example:bundle` — bundle React demo stories as embeddable ESM
-- `pnpm example:embed-host:serve` — serve the embed-host workspace at `http://localhost:4500/embed-host/` (demonstrates both embed and package mode consumption)
+- `pnpm lint` / `pnpm lint:fix` — biome
+- `pnpm example:build` / `pnpm example:dev` / `pnpm example:bundle` — React demo
+- `pnpm example:vue:build` / `pnpm example:vue:dev` / `pnpm example:vue:bundle`
+- `pnpm example:wc:build` / `pnpm example:wc:dev` / `pnpm example:wc:bundle`
+- `pnpm example:embed-host:serve` — serve embed-host at `http://localhost:4500/embed-host/`
 
 ## Style
 
