@@ -58,7 +58,12 @@ examples/
 
 ## Adding a skill, rule, or wiki entry
 
-A **skill** is procedural: "how to do X." Write one when you find yourself doing the same multi-step thing twice. Format: `.copilot/skills/<name>/SKILL.md` with YAML frontmatter (`name`, `description`, `trigger`).
+This repo has **two skill categories** — pick the right one:
+
+- **Contributor skills** (`.copilot/skills/<name>/SKILL.md`) — for developing Markbook itself. Loaded when an agent is working inside the Markbook source tree; mirrored into `.claude/`, `.codex/`, `.opencode/`, `.agents/` via symlinks. Examples: `add-stories`, `verify-build`, `progress-log`.
+- **User-facing skills** (`packages/cli/skills/<name>/SKILL.md`) — shipped inside the published `markbook` npm package. Consumers install them via `markbook skills install`; they land at `<vendor>/skills/markbook-<name>/` in the consumer's repo. Examples: `init`, `bulk-generate`, `style`. See [ADR-0022](DECISIONS.md) for the distribution design.
+
+A **skill** is procedural: "how to do X." Write one when you find yourself doing the same multi-step thing twice. Format: SKILL.md with YAML frontmatter (`name`, `description`, `trigger`).
 
 A **rule** is reflexive: "when editing files matching `<glob>`, always/never do X." Format: `.copilot/rules/<name>.md` with YAML frontmatter (`glob`, `priority`). Keep rules short — if a rule grows past one screen, convert it into a skill.
 

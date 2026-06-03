@@ -78,6 +78,44 @@ external as a peer dependency, so the consumer's React/Vue is reused.
 `--isolation=shadow` wraps each mount in `attachShadow({ mode: 'open' })` so
 host-page CSS doesn't leak in.
 
+### `markbook skills <action>`
+
+Distribute Markbook's user-facing agent skills (procedural how-tos for
+agent CLIs like Claude Code, Codex, OpenCode, Cursor) into the consumer
+project's vendor surfaces. See [ADR-0022](../../DECISIONS.md) for design.
+
+```
+markbook skills install      # copy shipped skills into <vendor>/skills/markbook-<name>/
+markbook skills list         # show shipped + installed, flag out-of-date
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--root <path>` | `cwd` | Project root |
+| `--surface <name>` | detected | Limit to `.claude` / `.codex` / `.opencode` / `.agents` |
+| `--symlink` | off (copy) | Symlink rather than copy. Avoid on Windows or pnpm. |
+| `--update` | off | Refresh installed skills whose shipped content changed |
+| `--force` | off | Overwrite skill dirs that lack our `.markbook-skill.json` metadata |
+
+**Behaviour:**
+
+- **Copy by default.** Symlinks dangle on pnpm's `.pnpm/<hash>` paths and on Windows. Each install drops a `.markbook-skill.json` recording the source hash + markbook version so `--update` is deterministic.
+- **Flat namespace.** Skills land at `<surface>/skills/markbook-init/` (not `<surface>/skills/markbook/init/`) for cross-vendor portability.
+- **Detect surfaces; don't create all four.** If your repo has only `.claude/`, only that gets a copy. If none exist, defaults to `.claude/`.
+- **Refuses to clobber unmanaged content.** A pre-existing `<surface>/skills/markbook-init/` without our metadata is reported `skipped-unmanaged` — `--force` to override.
+
+Shipped skills (v1):
+
+| Skill | Purpose |
+| --- | --- |
+| `markbook-init` | Scaffold a new Markbook docs site (config + first page + sample story) |
+| `markbook-add-component-page` | Generate one docs page for one component |
+| `markbook-bulk-generate` | Bulk-generate docs pages for every component under a directory (dry-run default) |
+| `markbook-style` | Apply a visual preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) + optional `--accent` / `--font` overrides |
+| `markbook-bundle-story` | Walk through `markbook bundle` for embedding stories externally |
+
+After running `markbook skills install`, agents that auto-discover skills from those vendor directories will pick them up. Invocation syntax depends on the agent — `/markbook-init`, `@markbook-init`, etc.
+
 ## Exit codes
 
 | Code | Meaning |

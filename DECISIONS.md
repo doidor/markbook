@@ -285,3 +285,38 @@ Applied at every parse/build boundary call site so downstream consumers (code ex
 - Relative-path consumers see zero behaviour change. The five existing demo pages with `component: '../../src/pixie/Button.tsx'` etc. continue rendering identically.
 - The `:::story` / `:::stories` `src=` change opens up two new patterns: stories live in published npm packages (`src=@my-org/btn/stories/Primary`), and stories live in a workspace package addressed via `#subpath` imports. Both render and bundle correctly; the embed bundle's entry imports the bare specifier directly, leaving Vite to do final module resolution at bundle time.
 - `inlineSourceImports` (playground) still operates against `MarkbookConfig.root`-relative globs; it does NOT follow bare-specifier imports into `node_modules`. That's intentional — published packages bring their own resolution to the sandbox via `dependencies` in `playground.dependencies`.
+
+---
+
+## ADR-0022 — User-facing agent skills ship with the npm package, installed via `markbook skills install`
+
+**Context:** Markbook is itself written with agent skills (the `.copilot/skills/` we ship for contributors), but consumers — users running `npm install markbook` — get none of that procedural memory. Documenting a real component library benefits from skills like "scaffold a new project", "generate a docs page for one component", "bulk-generate pages for every component in a directory", "apply a visual preset", "bundle a story for embedding." Hand-rolling these in every consumer's repo wastes everyone's time.
+
+Two related questions: (1) where do the skills live — inside the npm package, on a marketplace, somewhere else? (2) how do they reach the consumer's vendor-CLI surfaces (`.claude/skills/`, `.codex/skills/`, etc.)?
+
+**Decision:**
+
+1. **Skills ship inside the published `markbook` npm package** at `packages/cli/skills/<name>/SKILL.md`. The package's `files` field includes `skills` so npm publishes them. One source of truth, version-pinned with the package.
+
+2. **A new CLI subcommand, `markbook skills install`, distributes them.** Reads `node_modules/markbook/skills/` and copies (or symlinks with `--symlink`) each skill into the consumer's vendor surfaces under a flat namespace: `<surface>/skills/markbook-<name>/`.
+
+3. **Copy by default; symlink opt-in.** Symlinks dangle on pnpm's `node_modules/.pnpm/<hash>` paths and break on Windows. Copying is more robust. Each install drops a `.markbook-skill.json` metadata file recording the source hash + markbook version, so `--update` is deterministic (refresh when the source hash differs from the stored one).
+
+4. **Flat namespace, not nested.** Skills land at `<surface>/skills/markbook-init/SKILL.md`, not `<surface>/skills/markbook/init/SKILL.md`. Cross-vendor support for nested namespaces is uneven; the flat form works everywhere.
+
+5. **Detect existing vendor surfaces; don't create all four.** If the consumer has `.claude/` and `.codex/` in their repo, install to both. If they have none, install to `.claude/` (the most common today) and rely on the user to opt into other surfaces via `--surface`.
+
+6. **Refuse to clobber unmanaged content.** A pre-existing `<surface>/skills/markbook-init/` without our `.markbook-skill.json` is reported as `skipped-unmanaged` unless `--force` is supplied. Protects user-customized or hand-rolled skills that happen to share a name.
+
+7. **Five skills shipped in v1:** `init`, `add-component-page`, `bulk-generate`, `style`, `bundle-story`. `bulk-generate` is dry-run by default — never writes without explicit `--write` after the user reviews the candidate list.
+
+8. **The contributor skill `style-markbook` is now a thin shim** pointing at the canonical user-facing `style` skill under `packages/cli/skills/style/`. The preset CSS files live in one place; no dual-maintenance drift risk.
+
+**Consequences:**
+
+- Consumers run `markbook skills install` once after `npm install markbook`. The 5 skills land in their vendor surfaces; agents (Claude Code, Codex, OpenCode, Cursor) auto-discover them by directory convention. Invocation is via the vendor's own namespacing UI (`/markbook-init`, etc.).
+- Updating `markbook` to a newer version doesn't auto-update installed skills — the consumer re-runs `markbook skills install --update` when they want fresh content. `markbook skills list` shows which installed skills drifted from the shipped version (`!out-of-date` flag).
+- The shipped skills are markdown text; bundle size impact on the `markbook` package is tiny (~10 KB across the 5 SKILL.md files + 5 CSS preset files for `style`).
+- This pattern doesn't require any vendor CLI to support a special "load from npm" convention — it works with any CLI that auto-discovers `<vendor>/skills/<name>/SKILL.md`. As more agent CLIs emerge, supporting them is "add the surface dir name to `VENDOR_SURFACES` in `skills.ts`."
+- Pure addition to the public API. `markbook build` / `dev` / `bundle` are unaffected. Existing consumers ignore `skills install` if they don't want it.
+- Risk: agents may eventually grow vendor-specific package skill conventions (e.g. Claude reading skills from `node_modules` directly). When that happens, `markbook skills install` becomes a redundant shim; we can deprecate it without breaking anyone (their installed copies keep working until they manually clean them up).

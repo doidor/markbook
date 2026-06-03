@@ -437,3 +437,53 @@ Tests: 8 new in `resolve.test.ts` (isPathLikeSpec coverage, absolute/relative/ba
 **Why:** "Document a real npm-published component library" is the canonical Markbook use case, and `component: '@my-org/button'` is the natural way to write that. The previous silent failure made the feature look broken with no indication of cause. Closing the gap also unlocks the `decoratorModules` and `css` extension points for npm-distributed shared infrastructure — a theme provider, a corporate brand CSS sheet — without each consumer needing to hand-write relative paths into `node_modules`. ADR-0021 captures the design.
 
 **Next:** No specific follow-up. The deferred carve-outs (Vue/WC props tables, Vue/WC controls, WC decorators, v1.0 freeze) still wait.
+
+---
+
+## 2026-06-03 — `/style-markbook` skill + 5 named visual presets
+
+**What changed:** New skill at `.copilot/skills/style-markbook/SKILL.md` plus five preset CSS files under `presets/`. Each preset is a self-contained stylesheet of `--mb-*` token overrides (light + dark variants) — Layer 1 of the three-layer customization model (ADR-0017), no `disableBaseCss` or `transformHtml` involved.
+
+Presets shipped:
+
+| Preset | Feel | Accent |
+| --- | --- | --- |
+| `minimal` | Quiet, low-contrast, narrow, serif | `#444` |
+| `vibrant` | Bold purple, generous spacing, modern | `#7c3aed` |
+| `corporate` | Muted blue/gray, traditional, denser | `#1e40af` |
+| `github` | Mimics GitHub Docs, system font stack | `#0969da` |
+| `nord` | Cool Nord palette, designer-y | `#5e81ac` |
+
+Skill flow: pick preset by name → read `presets/<name>.css` → optionally apply `--accent` / `--font` / `--dest` overrides → write to `./markbook.css` (or supplied dest) → wire `css: ['./markbook.css']` into `markbook.config.ts` → run `/verify-build`. Marker comment `/* markbook style preset: <name> */` at the top of each preset file lets repeat-runs detect-and-overwrite without prompting.
+
+Vendor mirrors automatically pick up the new skill via the existing `.claude/skills`, `.codex/skills`, `.opencode/skills`, `.agents/skills` symlinks into `.copilot/skills`.
+
+Dogfooded end-to-end: copied `vibrant.css` next to the demo's existing `markbook.css`, rebuilt, confirmed the rendered HTML contains the preset's accent `#7c3aed`, then restored. Lint surfaced `quotes` warnings on the `'Inter'` / `'JetBrains Mono'` font-family declarations across all five presets; `pnpm lint:fix` rewrote them to double quotes per the project's biome config.
+
+**Why:** The earlier conversation about "how do I customize the look" had a precise answer (three layers, escalation order) but a high latency to actually trying it — the user would have to read the doc, pick tokens, write CSS, wire it in. A skill collapses that to "apply nord" or "apply vibrant with `--accent '#ff6b6b'`" and produces a working starting point in seconds. The presets serve double duty as worked examples of the token surface — opening `nord.css` shows every override Layer 1 supports in one place.
+
+**Next:** Nothing specific. Adding more presets is the natural follow-up — drop a CSS file into `presets/`, list it in the skill's table, ship. Could also extend the skill with a `--dark <off|inverted>` flag if presets ever want to disable dark mode entirely, or a `--from <existing-preset>` flag for branched starting points. Both speculative until someone asks.
+
+---
+
+## 2026-06-03 — User-facing agent skills ship with the npm package + `markbook skills install`
+
+**What changed:** Markbook now ships five user-facing agent skills as part of the published `markbook` npm package, plus a new CLI subcommand that distributes them into the consumer's vendor-CLI surfaces. Six pieces:
+
+1. **`packages/cli/skills/`** (new) — canonical user-facing skills shipped via `files: ["dist", "bin", "skills"]` in `packages/cli/package.json`. Five skills land in v1:
+   - `init` — scaffold markbook.config.ts + first docs page + first story + suggested package.json scripts
+   - `add-component-page` — generate one docs page (frontmatter + `:::stories` + `:::props`) for one component
+   - `bulk-generate` — scan a directory, identify component-like files, generate pages for all. **Dry-run by default** (`--write` to commit); explicit `--from` directory required (no whole-repo scanning).
+   - `style` — apply a named preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) with optional `--accent` / `--font` overrides. Preset CSS files canonical at `packages/cli/skills/style/presets/`.
+   - `bundle-story` — walk through `markbook bundle` (embed vs package) + host-page setup
+2. **`packages/cli/src/skills.ts`** (new, ~340 lines) — installer logic. `installAll({ cwd, surface?, symlink?, update?, force? })` returns one `InstallResult` per vendor surface with per-skill outcomes (`installed` / `updated` / `skipped-up-to-date` / `skipped-unmanaged` / `skipped-modified`). `listInstalled` for the list command. Plus helpers: `findShippedSkillsDir`, `detectVendorSurfaces`, `hashDirectory`, `readMetadata`, `writeMetadata`.
+3. **CLI: `markbook skills <action>`** (`packages/cli/src/index.ts`) — single command with positional `action` (`install` | `list`). Cac's multi-word command syntax (`'skills install'`) doesn't actually dispatch — the help text lies. Worked around by using a single command with a positional `<action>` arg and branching internally. Flags: `--root`, `--surface`, `--symlink`, `--update`, `--force`.
+4. **Distribution decisions** (ADR-0022): copy by default (symlinks dangle on pnpm's `.pnpm/<hash>` paths and Windows), flat namespace `<vendor>/skills/markbook-<name>/`, detect existing surfaces don't create all four, per-skill `.markbook-skill.json` metadata for deterministic `--update`, refuse to clobber unmanaged dirs without `--force`.
+5. **Contributor `style-markbook` skill** — replaced with a thin shim at `.copilot/skills/style-markbook/SKILL.md` pointing at the canonical user-facing `style` skill. Presets moved from `.copilot/skills/style-markbook/presets/` to `packages/cli/skills/style/presets/` — one source of truth, no dual-maintain drift.
+6. **Docs sweep:** new ADR-0022; new "Agent skills" section in `packages/cli/README.md` documenting all five shipped skills + flag semantics; root README install snippet now mentions `markbook skills install`; `AGENTS.md` distinguishes contributor (`.copilot/skills/`) vs user-facing (`packages/cli/skills/`) skill categories explicitly; `.gitignore` excludes `examples/*/.{claude,codex,opencode,agents}/skills/markbook-*/` so installer artifacts don't get committed.
+
+Verified end-to-end against the React demo: `markbook skills install` lands 5 skills in `.claude/skills/`, with each skill carrying a `.markbook-skill.json` recording version + content hash. Re-runs report all `skipped-up-to-date`. `markbook skills list` shows shipped + installed. `npm pack --dry-run` confirms all 5 SKILL.md files + 5 preset CSS files ship in the tarball. 96 tests still pass; lint clean; all 3 example builds clean.
+
+**Why:** Markbook's docs-first approach is great in theory but high-friction in practice for someone setting up a real component library — you write `markbook.config.ts`, scaffold one page, scaffold one story, then realize you need to do this 30 more times. The user-facing skills collapse that work: `/markbook-bulk-generate --from src/components --write` does in 30 seconds what previously took an hour. Same for restyling (`/markbook-style nord`) and bundling for embed (`/markbook-bundle-story components-button-variants`). The CLI command + flat-namespace + metadata-file distribution pattern is intentionally vendor-agnostic — works with any agent CLI that auto-discovers `<vendor>/skills/<name>/SKILL.md`, with no vendor-specific extensions required.
+
+**Next:** Could ship per-vendor invocation hints (e.g. "in Claude Code, run `/markbook-init`") in the install command's output. Could also add an `agents/`-style index file pointing at all 5 skills for vendors that prefer a manifest. Both speculative — gated on real consumer feedback.

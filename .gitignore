@@ -5,3 +5,11 @@ dist/
 *.log
 .vite/
 *.tsbuildinfo
+
+# Skills installed by `markbook skills install` into the React demo (and any
+# other consumer project). The canonical sources live at
+# `packages/cli/skills/`; the installed copies are derivable artifacts.
+examples/*/.claude/skills/markbook-*/
+examples/*/.codex/skills/markbook-*/
+examples/*/.opencode/skills/markbook-*/
+examples/*/.agents/skills/markbook-*/

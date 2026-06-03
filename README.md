@@ -33,6 +33,8 @@ pnpm add -D markbook @markbook/core @markbook/adapter-react
 pnpm add react react-dom  # or vue, or nothing for web components
 ```
 
+After installing, run `markbook skills install` to drop agent-CLI skills (`markbook-init`, `markbook-add-component-page`, `markbook-bulk-generate`, `markbook-style`, `markbook-bundle-story`) into your project's `.claude/skills/` (or `.codex/`, `.opencode/`, `.agents/`). Then your agent can scaffold pages, bulk-generate from an existing component library, apply visual presets, etc. — see [`packages/cli/README.md`](packages/cli/README.md#markbook-skills-action) for the full skill catalogue.
+
 ## Hello world
 
 ```
