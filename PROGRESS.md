@@ -288,3 +288,23 @@ Tests: 6 new code.test.ts cases (slice keeps imports + helpers + JSDoc; excludes
 **Why:** The original "one shared disclosure per group" was a deliberate simplification that turned out to be the wrong UX trade-off — a reader looking at the `Secondary` variant shouldn't have to scroll past every other export's source to find it. Per-export slicing keeps each disclosure self-contained: read the imports, skim any shared helpers, read the export. Slicing via the TS compiler API rather than regex was important — JSDoc preservation, type-only filtering, and the `getFullStart()` trivia handling all fall out of doing it the right way. The CSS revert is a nice side benefit: the visual model for `:::stories` is now just "N singletons stacked together with a shared `data-markbook-group` attribute," which is easier to reason about than the previous two-tier rendering.
 
 **Next:** No specific follow-up. The earlier deferred carve-outs (shadow-DOM CSS, Vue/WC props tables, Vue/WC controls) still wait their turn pre-freeze.
+
+---
+
+## 2026-06-03 — Lightweight agent harness (skills + rules + wiki + AGENTS.md)
+
+**What changed:** Added a small agent harness scoped to the practical needs of a solo TypeScript library. Five pieces:
+
+1. **Constitution.** New `AGENTS.md` at repo root carries the Critical Rules block + directory map + a "where to look first" table. `CLAUDE.md` slimmed to a thin pointer at `AGENTS.md` (Claude Code reads it by filename). Selective package-local AGENTS in `packages/core/` (no-framework rule, internal vs. public surface) and `packages/adapter-react/` (the ADR-0005 two-entry split). `cli`/`adapter-vue`/`adapter-wc` don't need their own — every rule that applies to them already lives in the root constitution.
+
+2. **Skills** (`.copilot/skills/<name>/SKILL.md`). Four entries with YAML frontmatter (`name`, `description`, `trigger`, optional `allowed-tools`, `argument-hint`): `add-stories` (scaffold a multi-export `:::stories` file end-to-end), `verify-build` (the lint→typecheck→test→build→demos cycle with the N=3 iteration cap formalized), `progress-log` (replaces the legacy `.claude/commands/markbook-log.md` slash command), `bundle-story` (produce + smoke-test an embed in the embed-host workspace). Each ends with a "Prevention tests" block that justifies the skill's existence.
+
+3. **Rules** (`.copilot/rules/<name>.md`). Three glob-scoped reflexes that auto-load when matching files are edited: `core-no-framework` (`packages/core/**/*.ts` — forbids React/Vue/WC runtime imports), `tests-co-located` (`packages/**/*.test.ts` — sibling-source imports, Vitest, tmpDir cleanup), `progress-on-package-edit` (`packages/**/*` — references the existing hook-driven reminder).
+
+4. **Wiki** (`.copilot/wiki/<topic>.md`). Three real gotchas captured in-the-moment from this session: `css-in-ts-template-literal` (backticks in CSS comments inside `BASE_CSS` break esbuild — actually broke the build today), `vite-tmpdir-watching` (why dev-mode needs the chokidar + Vite split), `parallel-mkdir-then-create` (tool batches run in parallel — serialize directory creation in a separate turn). README documents admission tests (single root cause, no duplication, prevention suggestion required) and the session-end discipline.
+
+5. **Multi-vendor mirrors.** `.claude/{skills,rules,wiki}`, `.codex/{skills,rules,wiki}`, `.opencode/{skills,rules,wiki}`, `.agents/{skills,rules,wiki}` all symlinked to `../.copilot/<kind>`. Any vendor CLI sees the same canonical content; updating a skill once propagates everywhere. The existing `.claude/{hooks,settings.json}` are preserved (the legacy `.claude/commands/markbook-log.md` was deleted in favour of the `/progress-log` skill).
+
+**Why:** The full epichan-style harness (state machine, role-separated agents, 11-axis scoring, polling scripts, hermetic worktrees) is overkill for a solo TypeScript library — it's infrastructure for a multi-agent issue-processing pipeline that doesn't exist here. The lightweight version captures the ~30% of agent-harness principles that pay back immediately for solo development: procedural memory (skills), file-class reflexes (rules), and post-mortem accretion (wiki). All future tooling can grow from these primitives without rework — the `.copilot/` canonical directory is the contract.
+
+**Next:** No specific follow-up. Continue adding skills/rules/wiki entries opportunistically as the same problems re-appear. If multi-agent throughput ever becomes a need, the deferred carve-outs (engine config, role agents, rubrics, MCP layer) plug in alongside without redesign.
