@@ -1151,3 +1151,63 @@ The `scrollbar-gutter: stable` fix also helps the CLS (Cumulative Layout Shift) 
 The scrollbar-gutter fix is a one-line CSS change that closes a real visual annoyance. Universal benefit, zero downside on modern browsers (well-supported in all Chromium/Firefox/Safari versions from 2022+).
 
 **Next:** None specific. Future polish could include: theme-color per-media (`<meta name="theme-color" media="(prefers-color-scheme: dark)" content="...">`); RSS/Atom feed generation; structured-data (JSON-LD) injection per page type.
+
+## 2026-06-03 — `public/` static asset dir + sitemap/robots emit in dev (parity with build)
+
+**What changed:** Two follow-ups based on user questions about SEO defaults.
+
+### 1. `markbook dev` now emits sitemap.xml + robots.txt
+
+Previously `build()` called `emitSitemapAndRobots` and `dev()` did not — a deliberate "they're for crawlers, no human use in dev" call. The user wanted parity, so `dev()`'s initial emission chain AND its on-change handler both now invoke `emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl)` alongside `emitLlms` and `runPagefind`. The function early-returns when `siteUrl` is null (same gate as build), so sites without a configured origin still see no output. Vite serves the resulting `/sitemap.xml` and `/robots.txt` from `tmpDir`.
+
+### 2. New `MarkbookConfig.publicDir` — static-asset folder
+
+Added a first-class `public/` convention so users can drop favicons, OG images, `.well-known/` files, fonts, downloads, etc. and have them appear at `/<filename>` without touching the markdown pipeline.
+
+Config:
+- **`publicDir?: string | false`** — defaults to `'public'`. Resolved to an absolute path against the project root (so Vite, whose cwd is `tmpDir`, reads from the right place). Set to `false` to disable the entire mechanism.
+
+Wired into both Vite calls:
+- `build()`: `viteBuild({ ..., publicDir: ctx.publicDir })` — Vite copies contents to `outDir` at build time.
+- `dev()`: `createServer({ ..., publicDir: ctx.publicDir })` — Vite serves contents at `/` during dev.
+
+Vite handles the actual file traversal and copy, so behaviour matches what users expect from Astro / Next / Vite itself. A missing `public/` directory is gracefully ignored.
+
+### Marketing demo: real-world `public/` example
+
+To make the feature visible (and to give the Cumulus demo proper browser chrome), `examples/marketing-demo/public/` now contains:
+- `favicon.svg` — a 173-byte coral-on-navy triangle matching the brand. Both layouts now reference it via `<link rel="icon" type="image/svg+xml" href="/favicon.svg">`.
+- `humans.txt` — the web-standard `humanstxt.org` file. Demonstrates a real arbitrary text file in `public/`.
+
+Both files appear at `https://localhost:5173/favicon.svg` / `humans.txt` in dev and at `dist/favicon.svg` / `humans.txt` after build — verified via `curl`.
+
+### Tests (+6 new, total 186 in core + 21 CLI = 207)
+
+`config.test.ts` (+4): `createContext` publicDir resolution — defaults to `<root>/public`; accepts custom relative path; accepts absolute path unchanged; `false` opts out.
+
+`build-integration.test.ts` (+2): "dev-mode emit parity" describe block exercising the same `writePages` → `emitLlms` → `emitSitemapAndRobots` chain `dev()` runs. Verifies tmpDir gets HTML + llms.txt + sitemap.xml + robots.txt when siteUrl is set; sitemap+robots skipped when siteUrl is unset (matching build's gate).
+
+### Documentation
+
+- `packages/core/README.md`: new "Static assets (`public/`)" section under Configuration; updated SEO section to mention sitemap/robots emit in both dev and build.
+- `examples/marketing-demo/README.md`: new "public/" entry in the files list explaining the convention with the favicon.svg + humans.txt examples.
+
+### Verified end-to-end
+
+```
+$ pnpm example:marketing:build
+$ ls dist/
+contact.html  customers.html  favicon.svg  humans.txt  index.html
+llms          llms.txt        pagefind     pricing.html  product.html
+robots.txt    sitemap.xml
+
+$ pnpm example:marketing:dev
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5173/favicon.svg     # 200
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5173/humans.txt      # 200
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5173/sitemap.xml     # 200
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5173/robots.txt      # 200
+```
+
+**Why:** Both fixes are about closing inconsistencies — same emissions in dev as in build, and a first-class spot for static assets. The user asked the questions in a way that revealed both were gaps. The cost is small (Vite already supports `publicDir`; we just needed to thread it through); the user-facing benefit is large (favicons, OG images, `.well-known/`, etc. all "just work").
+
+**Next:** None specific. Auto-generation of OG images via Satori is still available as a future feature; for now users can drop a real `og.png` into `public/` and reference `https://<siteUrl>/og.png` via `config.ogImage`.

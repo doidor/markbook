@@ -656,3 +656,45 @@ describe('build — sitemap.xml + robots.txt emission', () => {
     expect(sitemap).toContain('<loc>https://example.com/q-and-a.html</loc>');
   });
 });
+
+describe('dev-mode emit parity (writePages → emitLlms → emitSitemapAndRobots → runPagefind)', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('replicates dev() emission chain: tmpDir gets HTML + llms.txt + sitemap.xml + robots.txt when siteUrl is set', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+      'docs/about.md': '---\ntitle: About\n---\n# About\n',
+    });
+    const ctx = await createContext({ root: fx.root, siteUrl: 'https://example.com' });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: true });
+    const { emitLlms, emitSitemapAndRobots } = await import('./build.js');
+    await emitLlms(pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+    await emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl);
+
+    // HTML lives in tmpDir (Vite root in dev).
+    expect(await fx.exists('index.html')).toBe(true);
+    expect(await fx.exists('about.html')).toBe(true);
+    // llms.txt + per-page mirrors.
+    expect(await fx.exists('llms.txt')).toBe(true);
+    expect(await fx.exists('llms/index.txt')).toBe(true);
+    expect(await fx.exists('llms/about.txt')).toBe(true);
+    // sitemap.xml + robots.txt now alongside (same call chain as dev()).
+    expect(await fx.exists('sitemap.xml')).toBe(true);
+    expect(await fx.exists('robots.txt')).toBe(true);
+    const sitemap = await fx.read('sitemap.xml');
+    expect(sitemap).toContain('<loc>https://example.com/about.html</loc>');
+  });
+
+  it('skips sitemap + robots in the dev chain when siteUrl is unset (same gate as build)', async () => {
+    fx = await setupFixture({ 'docs/index.md': '---\ntitle: Home\n---\n# Home\n' });
+    const ctx = await createContext({ root: fx.root });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: true });
+    const { emitSitemapAndRobots } = await import('./build.js');
+    await emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl);
+    expect(await fx.exists('sitemap.xml')).toBe(false);
+    expect(await fx.exists('robots.txt')).toBe(false);
+  });
+});

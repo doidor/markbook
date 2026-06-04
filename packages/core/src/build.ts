@@ -50,6 +50,12 @@ export interface BuildContext {
   docsDir: string;
   outDir: string;
   tmpDir: string;
+  /**
+   * Absolute path to the static-asset directory, or `false` if the user
+   * opted out. When set, Vite copies its contents to `outDir` at build
+   * time and serves them at `/` during dev. See `MarkbookConfig.publicDir`.
+   */
+  publicDir: string | false;
   templateDirs: string[];
   /**
    * Absolute paths of HTML layout directories, searched in order for
@@ -149,6 +155,11 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   const docsDir = path.resolve(root, config.contentDir ?? config.docsDir ?? 'docs');
   const outDir = path.resolve(root, config.outDir ?? 'dist');
   const tmpDir = path.resolve(root, '.markbook');
+  // `publicDir: false` opts out entirely; otherwise resolve to an absolute
+  // path so Vite (whose cwd is tmpDir) reads from the project root, not
+  // from inside .markbook/.
+  const publicDir =
+    config.publicDir === false ? false : path.resolve(root, config.publicDir ?? 'public');
   const siteTitle = config.title ?? null;
   const siteDescription = config.description;
   const siteUrl = normalizeSiteUrl(config.siteUrl);
@@ -200,6 +211,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     docsDir,
     outDir,
     tmpDir,
+    publicDir,
     templateDirs,
     layoutDirs,
     defaultLayout,
@@ -400,6 +412,7 @@ export async function build(config: MarkbookConfig): Promise<void> {
   await viteBuild({
     root: ctx.tmpDir,
     base: './',
+    publicDir: ctx.publicDir,
     plugins: ctx.adapterPlugins as never,
     css: {
       postcss: ctx.root,
@@ -436,12 +449,14 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   // markdown" link (and any per-page `View as Markdown` button) work in
   // dev — not just in `markbook build`.
   await emitLlms(initial.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+  await emitSitemapAndRobots(initial.pages, ctx.tmpDir, ctx.siteUrl);
   await runPagefind(ctx.tmpDir);
 
   const server = await createServer({
     root: ctx.tmpDir,
     base: '/',
     appType: 'mpa',
+    publicDir: ctx.publicDir,
     plugins: [...(ctx.adapterPlugins as never[]), utf8TxtPlugin()],
     css: {
       postcss: ctx.root,
@@ -502,6 +517,7 @@ export async function dev(config: MarkbookConfig): Promise<void> {
       }
       const result = await writePages(ctx, { clean: false, searchEnabled: true });
       await emitLlms(result.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+      await emitSitemapAndRobots(result.pages, ctx.tmpDir, ctx.siteUrl);
       await runPagefind(ctx.tmpDir);
 
       // Add newly-referenced story files to the watcher (e.g. a markdown

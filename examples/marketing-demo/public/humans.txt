@@ -1,0 +1,13 @@
+/* TEAM */
+  Site:          Cumulus Cloud Inc.
+  Contact:       hello [at] cumulus.example
+  Location:      San Francisco · London · Singapore
+
+/* SITE */
+  Last update:   2026/06/03
+  Standards:     HTML5, CSS3, ARIA
+  Components:    Markbook (https://github.com/microsoft/markbook)
+  Note:          This file is served from `public/` — drop any static
+                 assets there (favicons, og images, downloads, .well-known/
+                 files, etc.) and Markbook copies them to the dist root
+                 at build time.

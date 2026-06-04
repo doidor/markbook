@@ -53,6 +53,11 @@ pnpm example:marketing:dev      # dev server with watch (edits to layouts/, page
   for the marketing-style cards. CommonMark allows raw HTML and Markbook's
   `remark-rehype` is configured with `allowDangerousHtml: true`, so they
   pass through unmodified.
+- `public/` — static assets Markbook copies verbatim to the build output's
+  root. We ship a coral-tinted `favicon.svg` (referenced from both layouts)
+  and a `humans.txt` (web-standard `humanstxt.org` file). Drop OG images,
+  fonts, `.well-known/`, or any other static file here and it appears at
+  `/<filename>` in both dev and build.
 
 ## Layout placeholders used here
 

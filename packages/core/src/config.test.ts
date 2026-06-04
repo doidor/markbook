@@ -121,4 +121,25 @@ describe('createContext — content + layouts wiring', () => {
     expect(ctx.adapter.isStatic).toBe(true);
     expect(ctx.adapterPackageName).toBe('@markbook/core');
   });
+
+  it('publicDir defaults to <root>/public when unset', async () => {
+    const ctx = await createContext({ root: tmp });
+    expect(ctx.publicDir).toBe(path.resolve(tmp, 'public'));
+  });
+
+  it('publicDir accepts a custom relative path', async () => {
+    const ctx = await createContext({ root: tmp, publicDir: 'static' });
+    expect(ctx.publicDir).toBe(path.resolve(tmp, 'static'));
+  });
+
+  it('publicDir accepts an absolute path unchanged', async () => {
+    const absolute = path.resolve(tmp, 'somewhere/assets');
+    const ctx = await createContext({ root: tmp, publicDir: absolute });
+    expect(ctx.publicDir).toBe(absolute);
+  });
+
+  it('publicDir: false opts out of any public directory', async () => {
+    const ctx = await createContext({ root: tmp, publicDir: false });
+    expect(ctx.publicDir).toBe(false);
+  });
 });

@@ -60,6 +60,21 @@ export interface MarkbookConfig {
   /** Legacy alias for {@link contentDir}. Kept for backward compatibility. */
   docsDir?: string;
   outDir?: string;
+  /**
+   * Directory (relative to `root`, or absolute) of static assets that get
+   * copied verbatim to the build output's root. Files placed here are also
+   * served at `/` during `markbook dev`. The default is `'public'` — match
+   * the conventional name used by Vite, Next, Astro, etc.
+   *
+   * Use this for OG images (`/og.png`), favicons, font files, robots-style
+   * static files, or anything else you want hosted alongside your built
+   * site without going through Markbook's markdown pipeline.
+   *
+   * Set `publicDir: false` to disable entirely (no public directory is
+   * looked for or served). Backed by Vite's own `publicDir` so behaviour
+   * matches what users expect from other static-site tools.
+   */
+  publicDir?: string | false;
   title?: string;
   description?: string;
   /**

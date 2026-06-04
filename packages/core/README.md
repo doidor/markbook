@@ -127,6 +127,8 @@ export default defineConfig({
   templatesDir: ['_layouts'],        // markdown wrappers (string or string[])
   layoutsDir: 'layouts',             // HTML shells (string or string[])
   layout: 'default',                 // default HTML layout for every page
+  publicDir: 'public',               // static assets copied to dist root
+                                     //   (default; set to false to disable)
   title: 'My Components',
   description: 'A short blurb',
 
@@ -157,6 +159,27 @@ export default defineConfig({
 });
 ```
 
+### Static assets (`public/`)
+
+Files placed in `<root>/public/` (or whatever you set `publicDir` to) are
+copied verbatim to the build output's root and served at `/` during
+`markbook dev`. Backed by Vite's own `publicDir` so behaviour matches
+what users expect from Astro / Next / Vite itself.
+
+Typical uses:
+
+- **Favicons** — drop `favicon.svg` (or `.ico`) and reference as
+  `<link rel="icon" type="image/svg+xml" href="/favicon.svg">` from your
+  HTML layout or via `transformHtml`.
+- **Open Graph images** — the OG image URL has to be absolute, so pair
+  a static `public/og.png` with `config.ogImage: 'https://your.site/og.png'`.
+- **`.well-known/`, `humans.txt`, ads.txt, security.txt** — any
+  web-standard sibling file goes here.
+- **Download bundles, PDFs, datasets** — anything Markdown shouldn't
+  rewrite.
+
+Set `publicDir: false` to disable entirely. Default: `'public'`.
+
 ### SEO + Open Graph (automatic)
 
 Markbook always injects a complete SEO meta block into every page's `<head>`
@@ -177,9 +200,10 @@ layouts). The block contains:
 - `<meta name="twitter:card|title|description|image">` — always emitted;
   the card type bumps to `summary_large_image` when an image is set.
 
-When `siteUrl` is set, `markbook build` also generates `dist/sitemap.xml`
-(listing every page with `<lastmod>`) and `dist/robots.txt` (referencing
-the sitemap). `index.html` collapses to its directory URL in the sitemap
+When `siteUrl` is set, both `markbook build` and `markbook dev` generate
+`sitemap.xml` (listing every page with `<lastmod>`) and `robots.txt`
+(referencing the sitemap) — in `dist/` for build, served from `/` in
+dev. `index.html` collapses to its directory URL in the sitemap
 for a cleaner canonical form.
 
 Per-page frontmatter:
