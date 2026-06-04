@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
-import { build as viteBuild, createServer } from 'vite';
+import { build as viteBuild, createLogger, createServer } from 'vite';
 import * as pagefind from 'pagefind';
 import chokidar from 'chokidar';
 import { parseMarkdown } from './parse.js';
@@ -429,12 +429,68 @@ export async function build(config: MarkbookConfig): Promise<void> {
       },
     },
     logLevel: 'warn',
+    customLogger: buildQuietLogger(),
     configFile: false,
   });
 
   await emitLlms(pages, ctx.outDir, ctx.siteTitle, ctx.siteDescription);
   await emitSitemapAndRobots(pages, ctx.outDir, ctx.siteUrl);
   await runPagefind(ctx.outDir);
+}
+
+/**
+ * A custom Vite logger that filters out the two cosmetic warnings Markbook
+ * builds always produce:
+ *
+ *   1. `<script src="./pagefind/pagefind-ui.js"> in "X.html" can't be
+ *      bundled without type="module" attribute` — Pagefind UI ships as a
+ *      classic IIFE that registers `window.PagefindUI`, NOT an ES module.
+ *      Vite warns because it can't fold it into the bundle, but passes
+ *      the reference through unchanged, which is exactly what we want.
+ *
+ *   2. `./pagefind/pagefind-ui.css doesn't exist at build time, it will
+ *      remain unchanged to be resolved at runtime` — the pagefind/
+ *      directory is produced by `runPagefind()` AFTER viteBuild() returns,
+ *      so the file is genuinely missing during Vite's transform pass.
+ *      Vite passes the link through; the file is on disk by the time the
+ *      browser loads the HTML.
+ *
+ * Both behaviours are intentional, and printing them on every build is
+ * just noise. Real warnings (typos, missing modules, etc.) still surface.
+ */
+function buildQuietLogger() {
+  const logger = createLogger('warn', { allowClearScreen: false });
+  const isPagefindNoise = (msg: unknown): boolean => {
+    if (typeof msg !== 'string') return false;
+    if (msg.includes('/pagefind/pagefind-ui.js') && msg.includes("can't be bundled")) return true;
+    if (msg.includes('/pagefind/pagefind-ui.css') && msg.includes("doesn't exist at build time")) {
+      return true;
+    }
+    return false;
+  };
+  // Vite routes these warnings through different logger methods depending
+  // on the rule that produced them; wrap them all to be safe.
+  const originalWarn = logger.warn.bind(logger);
+  const originalWarnOnce = logger.warnOnce.bind(logger);
+  const originalInfo = logger.info.bind(logger);
+  const originalError = logger.error.bind(logger);
+  logger.warn = (msg, opts) => {
+    if (isPagefindNoise(msg)) return;
+    originalWarn(msg, opts);
+  };
+  logger.warnOnce = (msg, opts) => {
+    if (isPagefindNoise(msg)) return;
+    originalWarnOnce(msg, opts);
+  };
+  logger.info = (msg, opts) => {
+    if (isPagefindNoise(msg)) return;
+    originalInfo(msg, opts);
+  };
+  logger.error = (msg, opts) => {
+    if (isPagefindNoise(msg)) return;
+    originalError(msg, opts);
+  };
+  return logger;
 }
 
 export async function dev(config: MarkbookConfig): Promise<void> {
