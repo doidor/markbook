@@ -5,7 +5,9 @@ description: The custom :::directives Markbook recognizes — built-in (story, s
 
 # Markdown directives
 
-Markbook understands a few [`remark-directive`](https://github.com/remarkjs/remark-directive) blocks beyond standard markdown. Each one looks like:
+Markbook recognizes `:::name` and `::name` directive blocks beyond standard markdown. The syntax itself comes from [`remark-directive`](https://github.com/remarkjs/remark-directive); Markbook layers a registry + dispatcher on top so handlers can be registered by name from `markbook.config.ts`.
+
+Each one looks like:
 
 ```markdown
 :::name{key=value other=value}

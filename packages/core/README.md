@@ -30,10 +30,31 @@ may change between minor releases.
 
 ## Directives
 
-Markdown-level container directives expand at build time. Three are
-supported.
+Markdown directive blocks (`:::name{attr=value}\nbody\n:::` or `::name{attr=value}` for leaf form) expand at build time. The syntax itself is provided by [`remark-directive`](https://github.com/remarkjs/remark-directive); Markbook layers a registry + dispatcher on top.
 
-### `:::story` — single story per file
+**Three built-in directives** ship with Markbook (story / stories / props) — see below. They cannot be overridden by `config.directives`.
+
+**Arbitrary user directives** can be registered from `markbook.config.ts`:
+
+```ts
+import { defineConfig, escapeAttribute } from '@markbook/core';
+
+export default defineConfig({
+  directives: {
+    youtube: ({ attributes }) =>
+      `<iframe src="https://youtube.com/embed/${escapeAttribute(attributes.id ?? '')}" allowfullscreen></iframe>`,
+
+    callout: ({ attributes, innerHtml }) =>
+      `<aside class="callout callout-${attributes.type ?? 'info'}">${innerHtml ?? ''}</aside>`,
+  },
+});
+```
+
+Handlers can be inline (as above), or imported from external modules (jiti loads the whole config tree transparently — TypeScript imports work through to `directives/callout.ts` etc.). Both leaf + container forms are supported. Handlers can be async; results can include `markdown` (for the `llms.txt` mirror) and `dependencies` (for dev-mode re-rendering on external-file changes). Errors are wrapped with `file:line:col` and preserve the original via `Error.cause`.
+
+See the [custom directives guide](https://microsoft.github.io/markbook/guides/custom-directives.html) for the full surface (descriptor form, type pinning, llms.txt fallback, dev-mode dependency tracking, etc.) and ADR-0025 for the design rationale.
+
+### `:::story` — single story per file (built-in)
 
 ```
 :::story{src=./Button.stories.tsx [export=Default] [id=stable-slug]}
@@ -47,7 +68,7 @@ supported.
 The story file's default export is the renderer (a function returning JSX, a
 Vue component, or an HTML string for web components).
 
-### `:::stories` — multi-export story file (CSF v3)
+### `:::stories` — multi-export story file (CSF v3) (built-in)
 
 ```
 :::stories{src=./Button.stories.tsx [only=A,B] [exclude=C] [id=base-slug]}
@@ -89,7 +110,7 @@ Embed slugs for `:::stories` always promote with the export name
 (`${baseSlug}-${kebab(exportName)}`) — adding/removing exports later never
 silently renames an existing embed.
 
-### `:::props` — props table
+### `:::props` — props table (built-in)
 
 ```
 ---

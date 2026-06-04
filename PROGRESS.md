@@ -1566,3 +1566,80 @@ Inner markdown (strong + code) was correctly parsed before being handed to the h
 The design balances ergonomic shorthand (function-as-handler, string-as-result) with full control (descriptor form for type pinning, object result for llms.txt markdown fallback + dependency tracking). Built-ins are protected from accidental override. Errors carry source position + cause. Async + file I/O work naturally. Rubber-duck pass flagged five concrete improvements (innerMarkdown alongside innerHtml, dep tracking, markdown fallback, descriptor form, attribute typing) — all incorporated before commit.
 
 **Next:** None specific. Future considerations: text directives (`:name[label]`) for inline use cases; a `markbook-callout` user-facing skill that scaffolds the pattern. Both are opt-in additions; the v1 surface is complete.
+
+## 2026-06-04 — Directives: external-file pattern + remark-directive credit
+
+**What changed:** Two small follow-ups to the user-directives extension model. Both are about discoverability — making sure consumers know what's possible (external-file handlers, already supported but not documented) and what's under the hood (the `remark-directive` library that provides the syntax).
+
+### External-file handlers (no new API — just a documented + demoed pattern)
+
+Markbook's CLI loads `markbook.config.ts` through [jiti](https://github.com/unjs/jiti), which transparently handles TypeScript imports through the whole config tree. That means directive handlers can live in their own files and be imported into the config — TODAY, no code change needed:
+
+```ts
+// markbook.config.ts
+import { defineConfig } from '@markbook/core';
+import { callout } from './directives/callout.js';
+import { youtube } from './directives/youtube.js';
+
+export default defineConfig({
+  directives: { callout, youtube },
+});
+```
+
+```ts
+// directives/callout.ts
+import { escapeAttribute, type DirectiveHandler } from '@markbook/core';
+
+const VALID_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
+
+export const callout: DirectiveHandler = ({ attributes, innerHtml }) => {
+  const raw = attributes.type ?? 'info';
+  const type = VALID_TYPES.has(raw) ? raw : 'info';
+  return `<aside class="callout callout-${escapeAttribute(type)}" role="note">${innerHtml ?? ''}</aside>`;
+};
+```
+
+This is the right pattern once the registry grows past a couple of inline handlers — handlers become regular modules: testable, refactorable, version-controlled with their own history, and free of the config file's noise.
+
+Considered adding a `directivesDir` auto-discovery option (mirroring `layoutsDir` / `templatesDir`) but rejected: the import-and-pass pattern is the community norm (Astro, VitePress, Eleventy all do it the same way), it's one line of overhead per directive, and auto-discovery would couple file names to directive names in a way that's load-bearing-but-invisible.
+
+### Worked example: markbook-site's callout moved out
+
+`examples/markbook-site/`:
+
+- New `directives/callout.ts` — 5-line handler exported with a typed `DirectiveHandler`.
+- `markbook.config.ts` now imports it: `import { callout } from './directives/callout.js'` + `directives: { callout }`.
+
+The site still builds (`pnpm example:site:build` → `✓ Markbook build complete`); the rendered `:::callout` blocks in the guides are byte-identical to before. The refactor proves the pattern works end-to-end (jiti picks up the TS import; the handler runs at config-load time; the dispatcher invokes it per-page just like an inline handler).
+
+### `remark-directive` credit
+
+The user asked: "is this pattern relying on some external library that can already do it?" — yes. The `:::name{attr=value}` syntax itself comes from [`remark-directive`](https://github.com/remarkjs/remark-directive), a standard remark plugin. Markbook layers a registry + dispatcher + lifecycle (async, parallel, dep tracking, llms.txt fallback, error wrapping) on top, but the parser is reused.
+
+Credit added in three places:
+
+- `pages/guides/custom-directives.md` — prominent `:::callout{type=info}` at the top: "Built on remark-directive. Markbook layers a registry + dispatcher on top: name-keyed handler lookup, leaf/container form auto-detection, async-with-Promise.all execution, dev-mode dependency tracking, llms.txt markdown fallback, and clear file:line error wrapping. The directive syntax itself comes from remark-directive — you can use other remark-directive consumers in the same project and Markbook will leave their directive names alone."
+- `pages/reference/directives.md` — opening paragraph: "The syntax itself comes from remark-directive; Markbook layers a registry + dispatcher on top so handlers can be registered by name from `markbook.config.ts`."
+- `packages/core/README.md` — directives section opening: "The syntax itself is provided by remark-directive."
+
+Plus a bottom-of-page "References" link in the custom-directives guide pointing at the remark-directive repo.
+
+### New site content
+
+- `pages/guides/custom-directives.md` gained a "Handlers in external files" section (~60 lines) with file layout, handler example, config import, jiti note, and a unit-test example showing how to Vitest-test a handler in isolation.
+- The reference + core README mention remark-directive and link to it.
+
+### Verified
+
+- `pnpm example:site:build` → `✓ Markbook build complete`. The callout in `customization.html` is rendered correctly from the external-file handler.
+- All 248 tests still pass (no test changes — the new code is pure documentation + a refactor of an example).
+- Lint + typecheck clean. All 6 demos build.
+
+### What didn't change
+
+- Public API surface — unchanged. The pattern works today without any new code.
+- Tests — no new ones needed; the refactor exercises the same dispatcher code path.
+
+**Why:** Two small wins from one user observation. The "use external files" question hinted that the inline-only examples I'd shown were giving the wrong impression — users needed to know they could organize their handlers like any other code. The "external library" question is a credit-where-credit-is-due thing: remark-directive is real and people should know it's there. Both fixes are docs/example refactors with zero code change.
+
+**Next:** None specific. If the directives registry ever needs auto-discovery, it'd come as a `directivesDir` config option mirroring `layoutsDir` — the rationale for skipping it now is captured above.
