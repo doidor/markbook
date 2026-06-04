@@ -428,7 +428,7 @@ export async function dev(config: MarkbookConfig): Promise<void> {
     root: ctx.tmpDir,
     base: '/',
     appType: 'mpa',
-    plugins: ctx.adapterPlugins as never,
+    plugins: [...(ctx.adapterPlugins as never[]), utf8TxtPlugin()],
     css: {
       postcss: ctx.root,
     },
@@ -565,6 +565,44 @@ export async function runPagefind(outDir: string): Promise<void> {
   }
 }
 
+/**
+ * Tiny Vite plugin for `markbook dev` — stamps `Content-Type: text/plain;
+ * charset=utf-8` on every `.txt` response. Without it, Vite (like Python's
+ * `http.server`) sends bare `text/plain`, and browsers fall back to a
+ * legacy single-byte encoding — turning every emoji and em-dash in
+ * `/llms.txt` and `/llms/<page>.txt` into mojibake.
+ *
+ * The build-time output is also protected by a UTF-8 BOM (see UTF8_BOM
+ * usage in `emitLlms` / `emitPerPageLlmsTxt`); this plugin is the
+ * belt-and-braces dev-mode fix.
+ */
+function utf8TxtPlugin() {
+  return {
+    name: 'markbook:utf8-txt',
+    configureServer(server: {
+      middlewares: {
+        use: (
+          handler: (
+            req: { url?: string },
+            res: { setHeader: (k: string, v: string) => void },
+            next: () => void,
+          ) => void,
+        ) => void;
+      };
+    }) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        // Strip query string before extension check (Vite often appends ?import).
+        const pathOnly = url.split('?')[0] ?? '';
+        if (pathOnly.endsWith('.txt')) {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        }
+        next();
+      });
+    },
+  };
+}
+
 function buildNav(pages: PageRecord[]): NavGroup[] {
   const groupMap = new Map<string | null, NavItem[]>();
   for (const p of pages) {
@@ -647,13 +685,20 @@ export async function emitLlms(
     lines.push(`- [${linkText}](${url})${desc}`);
   }
 
-  await fs.writeFile(path.join(outDir, 'llms.txt'), `${lines.join('\n')}\n`);
+  await fs.writeFile(path.join(outDir, 'llms.txt'), `${UTF8_BOM}${lines.join('\n')}\n`);
 }
 
 /**
  * Write every page's plain-markdown mirror to `<base>/llms/<page>.txt`.
  * Used both by `emitLlms` (for the static dist output) and `writePages`
  * (for the dev/build tmpDir so the "View as Markdown" buttons resolve).
+ *
+ * Each file starts with a UTF-8 BOM so browsers (and naive readers that
+ * don't honour HTTP `charset=utf-8`) detect the encoding from the bytes
+ * themselves. Without it, hosts that serve `.txt` as `text/plain` with
+ * no charset (Vite's default, Python's `http.server`, some CDNs) cause
+ * browsers to fall back to Latin-1 — emojis and em-dashes display as
+ * mojibake.
  */
 async function emitPerPageLlmsTxt(pages: PageRecord[], baseDir: string): Promise<void> {
   const llmsDir = path.join(baseDir, 'llms');
@@ -664,9 +709,18 @@ async function emitPerPageLlmsTxt(pages: PageRecord[], baseDir: string): Promise
     const txtContent = startsWithH1
       ? page.parsed.plainMarkdown
       : `# ${page.parsed.title}\n\n${page.parsed.plainMarkdown}`;
-    await fs.writeFile(txtAbs, `${txtContent}\n`);
+    await fs.writeFile(txtAbs, `${UTF8_BOM}${txtContent}\n`);
   }
 }
+
+/**
+ * UTF-8 byte-order mark — `EF BB BF` when serialised. Prepended to every
+ * emitted `.txt` (per-page mirrors AND the top-level index) so browsers
+ * decode the file as UTF-8 regardless of the host's `Content-Type` header.
+ * Modern markdown parsers and LLM ingestion pipelines strip BOMs
+ * transparently; the cost is 3 bytes per file.
+ */
+const UTF8_BOM = '\uFEFF';
 
 function formatLinkText(page: PageRecord): string {
   const segments = page.relPath.replace(/\.md$/, '').split(/[\\/]/);

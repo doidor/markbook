@@ -400,7 +400,9 @@ describe('emitLlms — top-level llms.txt + per-page mirrors', () => {
     expect(await fx.exists('llms/about.txt')).toBe(true);
 
     const index = await fx.read('llms.txt');
-    expect(index).toMatch(/^# Home/);
+    // BOM + H1 — substring check accommodates the leading \uFEFF.
+    expect(index).toContain('# Home');
+    expect(index.startsWith('\uFEFF')).toBe(true);
     expect(index).toContain('llmstxt.org');
     expect(index).toContain('](./llms/index.txt)');
     expect(index).toContain(': The landing page');
@@ -417,7 +419,8 @@ describe('emitLlms — top-level llms.txt + per-page mirrors', () => {
     const { emitLlms } = await import('./build.js');
     await emitLlms(pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
     const index = await fx.read('llms.txt');
-    expect(index).toMatch(/^# My Site/);
+    expect(index).toContain('# My Site');
+    expect(index.startsWith('\uFEFF')).toBe(true);
   });
 
   it('emits per-page mirrors writePages-side too (so dev "View as Markdown" works)', async () => {
@@ -435,5 +438,32 @@ describe('emitLlms — top-level llms.txt + per-page mirrors', () => {
     expect(txt).toContain('Body.');
     // Top-level llms.txt is NOT written by writePages alone.
     expect(await fx.exists('llms.txt')).toBe(false);
+  });
+
+  it('emits a UTF-8 BOM at the start of every .txt file so browsers detect the encoding regardless of HTTP Content-Type', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n\n# Home\n\nEmoji: 🚀 — em-dash.',
+    });
+    const ctx = await createContext({ root: fx.root });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitLlms } = await import('./build.js');
+    await emitLlms(pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
+
+    // Per-page mirror written by writePages: BOM present.
+    const perPage = await fx.read('llms/index.txt');
+    expect(perPage.startsWith('\uFEFF')).toBe(true);
+    // Top-level index written by emitLlms: BOM present.
+    const top = await fx.read('llms.txt');
+    expect(top.startsWith('\uFEFF')).toBe(true);
+
+    // Read the raw bytes to confirm the BOM is the canonical EF BB BF.
+    const raw = await fs.readFile(path.join(fx.root, '.markbook/llms.txt'));
+    expect(raw[0]).toBe(0xef);
+    expect(raw[1]).toBe(0xbb);
+    expect(raw[2]).toBe(0xbf);
+
+    // Emoji + em-dash round-trip cleanly (UTF-8 bytes intact, no mojibake).
+    expect(perPage).toContain('🚀');
+    expect(perPage).toContain('—');
   });
 });

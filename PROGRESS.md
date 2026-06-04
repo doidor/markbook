@@ -955,3 +955,67 @@ Fixes in `cumulus.css`:
 **Why:** Search is the most-touched UI element on a docs/marketing site after the page content itself. Subtle misalignments (mismatched radii, weak hierarchy, polluted snippets) accumulate into "this site feels janky." Fixing them is high-leverage polish.
 
 **Next:** None — the user should re-screenshot to verify.
+
+## 2026-06-03 — UTF-8 hardening for `llms.txt` + per-page `.txt` mirrors (BOM + dev `charset` header)
+
+**What changed:** Browsers were displaying `⚙️` as `âš™ï¸`, `🧩` as `ðŸ§©`, and `—` as `â€"` in `/llms.txt` and `/llms/<page>.txt` — the classic UTF-8-decoded-as-Latin-1 mojibake. The file bytes were always correct UTF-8 (`hexdump` confirmed `e2 9a 99 ef b8 8f` for ⚙️). The bug was upstream:
+
+```
+$ curl -sI http://localhost:5173/llms/product.txt | grep -i content-type
+Content-Type: text/plain         # ← no charset!
+```
+
+Both Vite's dev server and Python's `http.server` send `text/plain` without a charset for `.txt`. Browsers default to a legacy single-byte encoding (Latin-1 / Windows-1252) and mangle every multi-byte sequence.
+
+Two complementary fixes, both shipped in core:
+
+### 1. UTF-8 BOM (`\uFEFF`) at the start of every emitted `.txt`
+
+`emitLlms` (top-level index) and `emitPerPageLlmsTxt` (per-page mirrors) now prepend `\uFEFF` to every file they write. Bytes on disk start with `EF BB BF` — the canonical UTF-8 byte-order mark. Browsers detect this prefix and force UTF-8 decoding regardless of any HTTP `Content-Type` header (or absence thereof). Works on every host, on misconfigured CDNs, and even via `file://` URLs.
+
+Cost: 3 bytes per file. Modern markdown parsers (CommonMark, marked, micromark) and LLM ingestion pipelines normalize BOMs transparently; the prefix doesn't affect content semantics. Documented inline in `build.ts` (the new `UTF8_BOM` constant carries the rationale).
+
+### 2. Vite dev middleware: `Content-Type: text/plain; charset=utf-8` for `.txt`
+
+New `utf8TxtPlugin()` registered in `dev()` next to the adapter plugins. Its single job: intercept every request whose path (after stripping the query string) ends in `.txt` and stamp `Content-Type: text/plain; charset=utf-8` on the response. Belt-and-braces with the BOM — even readers that ignore the BOM (rare) get the explicit charset hint.
+
+HTML routes are untouched (verified: `Content-Type: text/html` on `.html` responses).
+
+### Tests (+1 in build-integration.test.ts, total 163 core + 21 CLI = 184)
+
+New explicit BOM test:
+- Per-page mirror written by `writePages` starts with `\uFEFF`.
+- Top-level `llms.txt` written by `emitLlms` starts with `\uFEFF`.
+- Raw bytes on disk start with `EF BB BF` (canonical UTF-8 BOM).
+- Round-trip preserves `🚀` and `—` (emoji + em-dash UTF-8 bytes intact, no mojibake).
+
+Two existing tests were tightened: switched from `^# Home` regex (which fails on the leading `\uFEFF`) to `toContain('# Home')` + explicit `startsWith('\uFEFF')` assertion. Now both the content presence AND the BOM presence are tested.
+
+### Verified end-to-end
+
+```
+$ pnpm example:marketing:build
+$ head -c 3 dist/llms.txt | xxd
+00000000: efbb bf                                  ...
+$ head -c 3 dist/llms/product.txt | xxd
+00000000: efbb bf                                  ...
+
+$ pnpm example:marketing:dev
+$ curl -sI http://localhost:5173/llms/product.txt | grep -i content-type
+Content-Type: text/plain; charset=utf-8     # ← fixed
+$ curl -sI http://localhost:5173/product.html | grep -i content-type
+Content-Type: text/html                      # ← untouched
+$ curl -s http://localhost:5173/llms/product.txt | grep -aoE '"feature-icon">.{1,8}' | head -2
+"feature-icon">⚙️</div>
+"feature-icon">λ</div>
+```
+
+**Why:** Two reasons.
+
+1. **The fix needs to work everywhere, not just in `markbook dev`.** A user who builds locally and serves the `dist/` folder via `python -m http.server`, opens a `.txt` directly via `file://`, deploys to a misconfigured nginx, or hands the file to a colleague who opens it in their editor — all of those scenarios bypass any HTTP middleware. The BOM is the only universal fix.
+
+2. **The Vite middleware is the cleanest dev-mode fix.** Even with the BOM, sending the right `Content-Type` is the standards-compliant thing to do, and it future-proofs against any browser that decides to be more aggressive about charset auto-detection.
+
+This is a universal core fix — every Markbook site that emits `llms.txt` benefits, not just the marketing demo.
+
+**Next:** None. The user should re-load `/llms/product.txt` in their browser and confirm the emoji + em-dashes render correctly.
