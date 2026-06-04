@@ -698,3 +698,67 @@ describe('dev-mode emit parity (writePages → emitLlms → emitSitemapAndRobots
     expect(await fx.exists('robots.txt')).toBe(false);
   });
 });
+
+describe('inline asset minification', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('built-in shell inlines BASE_CSS with no CSS comments (minified)', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    const styleBlock = html.match(/<style>([\s\S]*?)<\/style>/);
+    expect(styleBlock, 'inline style block').toBeTruthy();
+    const css = styleBlock![1]!;
+    // After minification: no CSS block comments, no double whitespace gaps,
+    // no indented newlines.
+    expect(css).not.toMatch(/\/\*/);
+    expect(css).not.toMatch(/\n\s{2,}/);
+    // Still contains the brand-token namespace (proof we minified the right
+    // string, not an empty placeholder).
+    expect(css).toContain('--mb-');
+  });
+
+  it('user CSS inlined into the page is minified (comments stripped)', async () => {
+    const cssWith = `/* user comment */
+      .my-rule {
+        color: red;
+        /* nested */
+        background: blue;
+      }`;
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+      'site.css': cssWith,
+    });
+    const ctx = await createContext({ root: fx.root, css: ['./site.css'] });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    const userBlock = html.match(/<style data-markbook-user-css>([\s\S]*?)<\/style>/);
+    expect(userBlock, 'user-css block').toBeTruthy();
+    const css = userBlock![1]!;
+    expect(css).not.toContain('user comment');
+    expect(css).not.toContain('nested');
+    expect(css).not.toMatch(/\n\s{2,}/);
+    expect(css).toContain('.my-rule');
+    expect(css).toContain('color:red');
+  });
+
+  it('inline boot scripts are minified (no // comments, no indented newlines)', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Each <script> ... </script> block in the head should be a tight IIFE
+    // with no surrounding whitespace or comments.
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const s of scripts) {
+      // Boot scripts shouldn't carry author-comments or excessive whitespace.
+      expect(s).not.toMatch(/\/\/\s+\w/); // no // line comments
+      expect(s).not.toMatch(/\n\s{4,}/); // no deep indented newlines
+    }
+  });
+});

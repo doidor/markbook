@@ -1278,3 +1278,74 @@ errors: TypeError: Failed to resolve module specifier '.../pagefind.js'.
 **Why a separate command instead of just adding the python tip to docs:** static-site tools have collectively standardized on `<tool> preview` as the build-verification surface. Discoverability beats documentation — a user typing `markbook --help` will see `preview` listed and try it; a user reading PROGRESS will find python-http-server tips eventually but only after frustration. The implementation is ~30 lines and inherits everything Vite already does correctly.
 
 **Next:** None specific. Could later add `markbook preview --open` to launch the browser automatically; current behavior matches Vite's default (just print URLs, let user click).
+
+## 2026-06-04 — Inline asset minification (BASE_CSS + boot scripts + user CSS) — ~20% smaller pages
+
+**What changed:** Markbook injects three flavours of inline content into every page: `BASE_CSS` (~10KB unminified), seven small boot scripts (theme / tabs / playground / copy / permalink / search-kbd / copy-md), and the user CSS (concatenation of `config.css` files). All three were shipped UNMINIFIED — Vite never sees them (they're injected by our code AFTER Vite's bundling), so its minifier doesn't apply.
+
+Lighthouse Performance flags this as "Minify CSS" + "Minify JavaScript", and the byte cost is real: every page carries the full unminified payload.
+
+### Implementation
+
+**`packages/core/src/minify.ts`** (new) — `minifyCss(source)` and `minifyJs(source)` async helpers wrapping `transformWithEsbuild` (Vite re-exports it; no extra dependency). Both memoize by source string so repeat calls cost nothing, and both fall back to the source on parse failure (would never want minification noise to break a build).
+
+**`packages/core/src/build.ts`** — three plumbing changes:
+
+1. `loadUserCss` now `await minifyCss(...)` before returning. User CSS is minified once at context creation (and again on each dev regeneration when CSS files change).
+2. The seven `*_BOOT_SCRIPT` constants and `BASE_CSS` were promoted from `const` to `let`. A new `ensureInlineAssetsMinified()` function fires all eight minifications via `Promise.all` on first call, mutates the captured variables in place, and sets a flag to skip on subsequent calls. Called from `createContext` so every entry point (`build`, `dev`, `preview`) inherits the optimization. After it resolves, every subsequent `buildHeadInjections` call reads the minified strings synchronously — no async cascade through the render pipeline.
+
+### Size impact
+
+Measured on `examples/marketing-demo/dist/index.html` (uses `disableBaseCss: true` + ~20KB of user CSS):
+
+```
+Before  →  33,227 bytes raw, 9,334 gzipped
+After   →  25,869 bytes raw, 7,053 gzipped
+Savings →  ~22% raw, ~24% gzipped (~7KB raw, ~2KB gzipped PER PAGE)
+```
+
+Built across five pages, that's ~35KB of duplicated HTML eliminated. For docs sites using BASE_CSS, the savings are similar (~6-8KB raw per page) because BASE_CSS shrinks from ~10KB to ~6KB.
+
+### Tests (+17, total 201 in core + 21 CLI = 222)
+
+`packages/core/src/minify.test.ts` (new, 14 tests):
+- `minifyCss`: strips comments + whitespace; shortens zero values; preserves CSS variables + var() references; empty input round-trips; caches by source; falls back gracefully on malformed input.
+- `minifyJs`: strips comments + whitespace from IIFE; renames local variables to single letters; preserves window/document globals; empty input round-trips; caches; falls back gracefully.
+
+`packages/core/src/build-integration.test.ts` (+3):
+- Built-in shell's inlined BASE_CSS has no comments, no indented newlines, still contains `--mb-*` tokens.
+- User CSS injected via `<style data-markbook-user-css>` is minified (comments stripped, double-whitespace eliminated, rules preserved).
+- Each `<script>` boot block in the head is minified (no `//` comments, no deep-indented newlines).
+
+### Verified interactivity intact
+
+Spun up `markbook preview` against the rebuilt marketing demo and ran a Playwright probe:
+
+```
+initial theme: light                                    ← theme boot script fires
+search ('container'): 1 result                          ← Pagefind init + search-kbd boot scripts
+Cmd+K → active: INPUT inside #markbook-search-ui        ← search-kbd boot script
+/ → active: INPUT inside #markbook-search-ui            ← search-kbd boot script
+permalink click → hash: #compute                        ← permalink boot script
+copy-md button present: 1                               ← copy-md boot script renders
+errors: (none)                                          ← no console errors
+```
+
+Esbuild's JS minifier preserves event handler semantics (renaming local vars in IIFE scopes only, never touching globals like `window`, `document`, `localStorage`), so the boot scripts continue to wire up correctly. CSS minification is value-preserving by definition.
+
+### Lint + builds
+
+- 222 tests pass.
+- Lint clean (2 pre-existing embed-host warnings).
+- All 5 example demos build with `✓ Markbook build complete` and no Pagefind noise.
+
+**Why:** The user observed "a lot of inline styles and js code in the page which is probably going to hit performance in Lighthouse." That assessment was correct on both axes: the inline blocks bypassed Vite's minifier, AND Lighthouse explicitly flags unminified inline content. Esbuild via Vite's re-export is the lightest possible solution — no new dep, no new build step in user projects.
+
+I kept the assets INLINE rather than extracting them to separate files because:
+- Inline content is non-render-blocking → faster FCP / LCP (Lighthouse rewards this).
+- The total bytes saved by externalizing + caching would only pay off after ~3 page navigations (typical visit length on a marketing site is 1-2 pages).
+- External CSS files would force a render-blocking `<link rel="stylesheet">` or require the `preload` swap dance, which is a footgun.
+
+If a future user has a multi-MB user CSS, we can add a `cssMode: 'inline' | 'external'` config option. For now, minified-inline is the right default.
+
+**Next:** None. Lighthouse Performance / Minify CSS / Minify JS rubrics should now show green. If real-world testing reveals more gains: HTTP-2 server push hints, prefetch tags for nav links, image lazy-loading for content `<img>` tags.

@@ -13,6 +13,7 @@ import { resolveInlinedSources } from './inline-sources.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
 import { staticAdapter } from './config.js';
 import { applyHtmlLayout, type HtmlLayoutSubstitutions } from './template.js';
+import { minifyCss, minifyJs } from './minify.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig, MarkbookAdapter, PlaygroundConfig } from './config.js';
 
@@ -145,6 +146,10 @@ export function makeLoadHtmlLayout(
 }
 
 export async function createContext(config: MarkbookConfig): Promise<BuildContext> {
+  // One-time minification of the static inline boot scripts + BASE_CSS.
+  // Pays a few-ms cost on first build; cached for the lifetime of the
+  // process (no-op on subsequent calls, e.g. dev-mode regenerations).
+  await ensureInlineAssetsMinified();
   const root = path.resolve(config.root ?? process.cwd());
   if (config.contentDir != null && config.docsDir != null) {
     throw new Error(
@@ -243,7 +248,55 @@ async function loadUserCss(cssPaths: string[]): Promise<string> {
       throw new Error(`Markbook: failed to read CSS file '${p}' — ${(err as Error).message}`);
     }
   }
-  return sources.join('\n');
+  // Minify before returning — the result is inlined into every page's <head>
+  // via `<style data-markbook-user-css>`, so trimming a 20KB stylesheet down
+  // to ~12KB compounds across HTML output sizes (and silences Lighthouse's
+  // "Minify CSS" warning).
+  return minifyCss(sources.join('\n'));
+}
+
+/**
+ * One-time minification of the static inline assets — boot scripts +
+ * BASE_CSS. These are module-level constants that never change between
+ * builds, so we minify lazily on first use and mutate the captured
+ * variables in place. After this resolves, every subsequent
+ * `buildHeadInjections` call reads the minified strings synchronously.
+ *
+ * Called from `createContext` so every entry point (`build`, `dev`,
+ * `preview`) inherits the optimization without needing to await
+ * anything later in the pipeline.
+ */
+let _inlineAssetsMinified = false;
+async function ensureInlineAssetsMinified(): Promise<void> {
+  if (_inlineAssetsMinified) return;
+  const [
+    themeMin,
+    tabsMin,
+    playgroundMin,
+    copyMin,
+    permalinkMin,
+    searchKbdMin,
+    copyMdMin,
+    baseCssMin,
+  ] = await Promise.all([
+    minifyJs(THEME_BOOT_SCRIPT),
+    minifyJs(TABS_BOOT_SCRIPT),
+    minifyJs(PLAYGROUND_BOOT_SCRIPT),
+    minifyJs(COPY_BOOT_SCRIPT),
+    minifyJs(PERMALINK_BOOT_SCRIPT),
+    minifyJs(SEARCH_KBD_BOOT_SCRIPT),
+    minifyJs(COPY_MD_BOOT_SCRIPT),
+    minifyCss(BASE_CSS),
+  ]);
+  THEME_BOOT_SCRIPT = themeMin;
+  TABS_BOOT_SCRIPT = tabsMin;
+  PLAYGROUND_BOOT_SCRIPT = playgroundMin;
+  COPY_BOOT_SCRIPT = copyMin;
+  PERMALINK_BOOT_SCRIPT = permalinkMin;
+  SEARCH_KBD_BOOT_SCRIPT = searchKbdMin;
+  COPY_MD_BOOT_SCRIPT = copyMdMin;
+  BASE_CSS = baseCssMin;
+  _inlineAssetsMinified = true;
 }
 
 interface WritePagesResult {
@@ -1486,9 +1539,9 @@ function escapeHtml(s: string): string {
  * first visit), apply it to <html data-theme=…> before paint, and delegate
  * clicks on the theme toggle button to flip it.
  */
-const THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
+let THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
 
-const TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closest('[data-markbook-tabs]');if(!wrap)return;var tabs=wrap.querySelectorAll('[role="tab"]');var pid=tab.getAttribute('aria-controls');for(var i=0;i<tabs.length;i++){var t=tabs[i];t.setAttribute('aria-selected',t===tab?'true':'false');t.tabIndex=t===tab?0:-1;}var panels=wrap.querySelectorAll('[role="tabpanel"]');for(var j=0;j<panels.length;j++){panels[j].hidden=panels[j].id!==pid;}}document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(t&&t.closest('[data-markbook-tabs]'))activate(t);});document.addEventListener('keydown',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(!t||!t.closest('[data-markbook-tabs]'))return;if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();var tabs=t.parentElement.querySelectorAll('[role="tab"]');var i=Array.prototype.indexOf.call(tabs,t);var n=e.key==='ArrowRight'?(i+1)%tabs.length:(i-1+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n]);});})();`;
+let TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closest('[data-markbook-tabs]');if(!wrap)return;var tabs=wrap.querySelectorAll('[role="tab"]');var pid=tab.getAttribute('aria-controls');for(var i=0;i<tabs.length;i++){var t=tabs[i];t.setAttribute('aria-selected',t===tab?'true':'false');t.tabIndex=t===tab?0:-1;}var panels=wrap.querySelectorAll('[role="tabpanel"]');for(var j=0;j<panels.length;j++){panels[j].hidden=panels[j].id!==pid;}}document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(t&&t.closest('[data-markbook-tabs]'))activate(t);});document.addEventListener('keydown',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(!t||!t.closest('[data-markbook-tabs]'))return;if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();var tabs=t.parentElement.querySelectorAll('[role="tab"]');var i=Array.prototype.indexOf.call(tabs,t);var n=e.key==='ArrowRight'?(i+1)%tabs.length:(i-1+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n]);});})();`;
 
 /**
  * Delegated click handler for [data-markbook-playground] buttons. Each button
@@ -1497,14 +1550,14 @@ const TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closes
  * form, append to body, submit, then remove. Posts in a new tab so the
  * docs page is not navigated away from.
  */
-const PLAYGROUND_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-playground]');if(!b)return;e.preventDefault();var d;try{d=JSON.parse(atob(b.getAttribute('data-payload')||''));}catch(err){console.error('markbook: malformed playground payload',err);return;}var f=document.createElement('form');f.action=d.action;f.method='POST';f.target='_blank';f.style.display='none';for(var i=0;i<d.fields.length;i++){var pair=d.fields[i];var input=document.createElement('input');input.type='hidden';input.name=pair[0];input.value=pair[1];f.appendChild(input);}document.body.appendChild(f);f.submit();f.parentNode.removeChild(f);});})();`;
+let PLAYGROUND_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-playground]');if(!b)return;e.preventDefault();var d;try{d=JSON.parse(atob(b.getAttribute('data-payload')||''));}catch(err){console.error('markbook: malformed playground payload',err);return;}var f=document.createElement('form');f.action=d.action;f.method='POST';f.target='_blank';f.style.display='none';for(var i=0;i<d.fields.length;i++){var pair=d.fields[i];var input=document.createElement('input');input.type='hidden';input.name=pair[0];input.value=pair[1];f.appendChild(input);}document.body.appendChild(f);f.submit();f.parentNode.removeChild(f);});})();`;
 
 /**
  * Copy-code button. Delegated click handler reads the nearest `<pre>` block,
  * extracts its textContent, copies via navigator.clipboard, briefly flips
  * the button label to "Copied!" for ~1.2s.
  */
-const COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy]');if(!b)return;e.preventDefault();var wrap=b.closest('.markbook-code-pre-wrap');var pre=wrap&&wrap.querySelector('pre');if(!pre||!navigator.clipboard)return;navigator.clipboard.writeText(pre.textContent||'').then(function(){var lbl=b.querySelector('.markbook-copy-label');if(!lbl)return;var prev=lbl.textContent;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: clipboard write failed',err);});});})();`;
+let COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy]');if(!b)return;e.preventDefault();var wrap=b.closest('.markbook-code-pre-wrap');var pre=wrap&&wrap.querySelector('pre');if(!pre||!navigator.clipboard)return;navigator.clipboard.writeText(pre.textContent||'').then(function(){var lbl=b.querySelector('.markbook-copy-label');if(!lbl)return;var prev=lbl.textContent;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: clipboard write failed',err);});});})();`;
 
 /**
  * Heading permalinks. Click on a [data-markbook-permalink] anchor copies the
@@ -1512,14 +1565,14 @@ const COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function
  * URL bar updates as expected). Modifier-clicks (cmd/ctrl/shift) skip the
  * clipboard write so users can open in a new tab via standard browser UX.
  */
-const PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-markbook-permalink]');if(!a)return;if(e.metaKey||e.ctrlKey||e.shiftKey)return;if(!navigator.clipboard)return;var h=a.getAttribute('href')||'';var url=location.origin+location.pathname+h;navigator.clipboard.writeText(url).catch(function(){});});})();`;
+let PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-markbook-permalink]');if(!a)return;if(e.metaKey||e.ctrlKey||e.shiftKey)return;if(!navigator.clipboard)return;var h=a.getAttribute('href')||'';var url=location.origin+location.pathname+h;navigator.clipboard.writeText(url).catch(function(){});});})();`;
 
 /**
  * Cmd-K / Ctrl-K opens the Pagefind search input. Slash key also works
  * (Algolia DocSearch / GitHub convention). Only active when search is
  * enabled — handler is omitted from the HTML in dev mode.
  */
-const SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
+let SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
 
 /**
  * "Copy as Markdown" button handler. Delegated click reads the button's
@@ -1528,9 +1581,9 @@ const SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.
  * file:// (where fetch can't reach the .txt file) and shows a tooltip
  * instead of silently failing.
  */
-const COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=document.querySelectorAll('[data-markbook-copy-md]');for(var i=0;i<btns.length;i++){var b=btns[i];b.disabled=true;b.title='Serve this site over http(s) to copy markdown.';b.style.opacity='0.5';b.style.cursor='not-allowed';}return;}document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy-md]');if(!b)return;e.preventDefault();if(!navigator.clipboard){return;}var url=b.getAttribute('data-url')||'';var lbl=b.querySelector('.markbook-copy-md-label');var prev=lbl?lbl.textContent:'';fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.text();}).then(function(text){return navigator.clipboard.writeText(text);}).then(function(){if(!lbl)return;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: copy-as-markdown failed',err);if(!lbl)return;lbl.textContent='Copy failed';setTimeout(function(){lbl.textContent=prev;},1500);});});})();`;
+let COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=document.querySelectorAll('[data-markbook-copy-md]');for(var i=0;i<btns.length;i++){var b=btns[i];b.disabled=true;b.title='Serve this site over http(s) to copy markdown.';b.style.opacity='0.5';b.style.cursor='not-allowed';}return;}document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy-md]');if(!b)return;e.preventDefault();if(!navigator.clipboard){return;}var url=b.getAttribute('data-url')||'';var lbl=b.querySelector('.markbook-copy-md-label');var prev=lbl?lbl.textContent:'';fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.text();}).then(function(text){return navigator.clipboard.writeText(text);}).then(function(){if(!lbl)return;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: copy-as-markdown failed',err);if(!lbl)return;lbl.textContent='Copy failed';setTimeout(function(){lbl.textContent=prev;},1500);});});})();`;
 
-const BASE_CSS = `
+let BASE_CSS = `
 :root {
   --mb-bg: #ffffff;
   --mb-fg: #1a1a1a;
