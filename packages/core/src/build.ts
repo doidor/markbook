@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
-import { build as viteBuild, createLogger, createServer } from 'vite';
+import { build as viteBuild, createLogger, createServer, preview as vitePreview } from 'vite';
 import * as pagefind from 'pagefind';
 import chokidar from 'chokidar';
 import { parseMarkdown } from './parse.js';
@@ -491,6 +491,49 @@ function buildQuietLogger() {
     originalError(msg, opts);
   };
   return logger;
+}
+
+/**
+ * Serve a previously-built site (the `dist/` from `markbook build`) over
+ * HTTP, the same way a production deploy would. Use this to verify the
+ * built output locally — opening `dist/<page>.html` via `file://` breaks
+ * dynamic-import-based features (notably Pagefind UI's search, which
+ * needs a real HTTP origin) and isn't representative of how visitors
+ * will see the site.
+ *
+ * Mirrors Vite's `preview` API but accepts the same `MarkbookConfig` the
+ * other commands use — port comes from `config.dev.port` (or +1000 if
+ * dev is configured, to avoid clashing when both run at once).
+ */
+export async function preview(config: MarkbookConfig): Promise<void> {
+  const ctx = await createContext(config);
+  // Reuse the same UTF-8 charset middleware we install in dev so the
+  // preview server matches dev behaviour for .txt responses.
+  const server = await vitePreview({
+    root: ctx.tmpDir, // any valid root; Vite preview only reads outDir
+    base: './',
+    publicDir: ctx.publicDir,
+    plugins: [utf8TxtPlugin()] as never,
+    build: { outDir: ctx.outDir },
+    preview: {
+      port: config.dev?.port ? config.dev.port + 1000 : 4173,
+      host: config.dev?.host,
+    },
+    logLevel: 'warn',
+    configFile: false,
+  });
+
+  const localUrls = server.resolvedUrls?.local ?? [];
+  const networkUrls = server.resolvedUrls?.network ?? [];
+  console.log('');
+  console.log('  Markbook preview server ready (serving dist/ over HTTP):');
+  for (const url of localUrls) console.log(`    ➜  Local:   ${url}`);
+  for (const url of networkUrls) console.log(`    ➜  Network: ${url}`);
+  console.log('');
+  console.log('  Use this to test the built site as visitors will see it.');
+  console.log('  Opening dist/*.html via file:// breaks Pagefind search + other dynamic imports.');
+  console.log('  Ctrl-C to stop.');
+  console.log('');
 }
 
 export async function dev(config: MarkbookConfig): Promise<void> {

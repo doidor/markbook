@@ -2,7 +2,7 @@ import { cac } from 'cac';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createJiti } from 'jiti';
-import { build, bundleEmbed, dev, type MarkbookConfig } from '@markbook/core';
+import { build, bundleEmbed, dev, preview, type MarkbookConfig } from '@markbook/core';
 import { formatInstallResults, installAll, listInstalled } from './skills.js';
 
 const CONFIG_NAMES = [
@@ -75,6 +75,36 @@ cli
       });
     } catch (err) {
       console.error('✗ Markbook dev failed:');
+      console.error(err);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command(
+    'preview',
+    'Serve the built dist/ over HTTP (use after `markbook build` to verify the production output)',
+  )
+  .option('-c, --config <path>', 'Path to markbook.config.{ts,mts,js,mjs}')
+  .option('--root <path>', 'Project root (defaults to cwd)')
+  .option('--port <port>', 'Port to listen on (default: 4173)')
+  .option('--host <host>', 'Host to bind to')
+  .action(async (opts: { root?: string; config?: string; port?: string; host?: string }) => {
+    try {
+      const root = path.resolve(opts.root ?? process.cwd());
+      const config = await loadConfig(root, opts.config);
+      const port = opts.port ? parseInt(opts.port, 10) : undefined;
+      await preview({
+        ...config,
+        root: config.root ?? root,
+        dev: {
+          ...config.dev,
+          ...(port !== undefined ? { port } : {}),
+          ...(opts.host !== undefined ? { host: opts.host } : {}),
+        },
+      });
+    } catch (err) {
+      console.error('✗ Markbook preview failed:');
       console.error(err);
       process.exit(1);
     }

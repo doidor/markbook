@@ -32,6 +32,7 @@
     "example:static:dev": "pnpm --filter @markbook/example-static-demo dev",
     "example:marketing:build": "pnpm --filter @markbook/example-marketing-demo build",
     "example:marketing:dev": "pnpm --filter @markbook/example-marketing-demo dev",
+    "example:marketing:preview": "pnpm --filter @markbook/example-marketing-demo exec markbook preview",
     "examples:dev": "node scripts/examples-dev.mjs",
     "examples:build": "pnpm --filter './examples/*' --parallel build",
     "example:embed-host:build": "pnpm example:build && pnpm example:bundle && pnpm example:bundle:package",

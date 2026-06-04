@@ -20,6 +20,6 @@ export type {
   PlaygroundProvider,
 } from './config.js';
 
-export { build, dev } from './build.js';
+export { build, dev, preview } from './build.js';
 export { bundleEmbed } from './embed.js';
 export type { BundleEmbedOptions, BundleMode, BundleIsolation } from './embed.js';

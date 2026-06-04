@@ -1211,3 +1211,70 @@ $ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5173/robots.txt     
 **Why:** Both fixes are about closing inconsistencies — same emissions in dev as in build, and a first-class spot for static assets. The user asked the questions in a way that revealed both were gaps. The cost is small (Vite already supports `publicDir`; we just needed to thread it through); the user-facing benefit is large (favicons, OG images, `.well-known/`, etc. all "just work").
 
 **Next:** None specific. Auto-generation of OG images via Satori is still available as a future feature; for now users can drop a real `og.png` into `public/` and reference `https://<siteUrl>/og.png` via `config.ogImage`.
+
+## 2026-06-04 — `markbook preview` command — serve `dist/` over HTTP (fixes Pagefind via file://)
+
+**Symptom:** User built the marketing demo (`pnpm example:marketing:build`) and opened the result. Search rendered correctly, typing a query showed "Searching for container..." indefinitely, no results ever returned.
+
+**Root cause:** User was loading the built HTML via `file://` (double-clicked the file, or opened via the `OpenFile` macOS shortcut). Pagefind UI uses dynamic `import('./pagefind.js')` to load its runtime. Modern browsers BLOCK dynamic import from CORS-cross-origin scripts (which `file://`-loaded pages count as) and throw:
+
+```
+TypeError: Failed to resolve module specifier '.../pagefind.js'.
+The base URL is about:blank because import() is called from a
+CORS-cross-origin script.
+```
+
+Pagefind silently catches the error and the UI is stuck on "Searching for…". Reproduced via Playwright headless test: file:// fails; HTTP works.
+
+**Fix:** Added a first-class `markbook preview` command. Every comparable static-site tool ships one (Vite, Astro, Next, Eleventy, Hugo). Markbook didn't, and users were left to figure out `python -m http.server` or `npx serve` on their own — easy to skip, easy to misconfigure.
+
+### Implementation
+
+- **`packages/core/src/build.ts`** — new `preview(config)` export wrapping Vite's `vitePreview()`. Reuses our context resolution (so `outDir`, `publicDir`, `dev.port`/`host` all come from the same config the other commands use). Adds the `utf8TxtPlugin` middleware so `.txt` responses carry `Content-Type: text/plain; charset=utf-8` (matches dev). Default port: 4173 (or `config.dev.port + 1000` if dev is configured, to avoid clashes when both run simultaneously).
+
+- **`packages/cli/src/index.ts`** — new `markbook preview` subcommand with the standard `--port` / `--host` / `--root` / `--config` options. Same error-handling pattern as `dev`/`build`.
+
+- **`packages/core/src/index.ts`** — added `preview` to the public API barrel.
+
+- **`package.json`** — new root script `example:marketing:preview` for quick iteration on the marketing demo.
+
+### Console output
+
+```
+$ markbook preview
+
+  Markbook preview server ready (serving dist/ over HTTP):
+    ➜  Local:   http://localhost:4173/
+
+  Use this to test the built site as visitors will see it.
+  Opening dist/*.html via file:// breaks Pagefind search + other dynamic imports.
+  Ctrl-C to stop.
+```
+
+The inline reminder about `file://` is deliberate — it's the gotcha that motivated this command, and a 30-second-to-debug issue without context.
+
+### Verified end-to-end (headless browser)
+
+```
+$ markbook preview                           # serves dist/ on :4173
+$ node /tmp/probe.mjs                        # Playwright opens /product.html, types "container"
+result: {"message":"1 result for container","hasResult":true}
+errors: (none)
+```
+
+Same site loaded via `file://`:
+
+```
+errors: TypeError: Failed to resolve module specifier '.../pagefind.js'.
+        The base URL is about:blank because import() is called from a
+        CORS-cross-origin script.
+```
+
+### Other surfaces
+
+- `pnpm example:marketing:build && pnpm example:marketing:preview` — full build-then-serve flow in two commands.
+- Lint clean. Typecheck clean. All 5 example demos build with just `✓ Markbook build complete`.
+
+**Why a separate command instead of just adding the python tip to docs:** static-site tools have collectively standardized on `<tool> preview` as the build-verification surface. Discoverability beats documentation — a user typing `markbook --help` will see `preview` listed and try it; a user reading PROGRESS will find python-http-server tips eventually but only after frustration. The implementation is ~30 lines and inherits everything Vite already does correctly.
+
+**Next:** None specific. Could later add `markbook preview --open` to launch the browser automatically; current behavior matches Vite's default (just print URLs, let user click).
