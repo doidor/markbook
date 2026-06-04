@@ -38,3 +38,4 @@ The convention is:
 | [`core-no-framework`](core-no-framework.md) | `packages/core/**/*.ts` | Keep the engine framework-agnostic |
 | [`tests-co-located`](tests-co-located.md) | `packages/**/*.test.ts` | Vitest convention + import-from-sibling rule |
 | [`progress-on-package-edit`](progress-on-package-edit.md) | `packages/**/*` | Don't forget the PROGRESS update |
+| [`harness-on-architectural-change`](harness-on-architectural-change.md) | `packages/**/src/{index,internal,config}.ts` | Architectural / public-API changes also update AGENTS.md / package READMEs / ROADMAP.md / wiki |
