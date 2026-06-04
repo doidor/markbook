@@ -50,6 +50,8 @@ export {
   makeLoadHtmlLayout,
   resolvePageLayout,
   emitLlms,
+  emitSitemapAndRobots,
+  normalizeSiteUrl,
   runPagefind,
   sortIndexFirst,
   isIndexHref,

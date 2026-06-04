@@ -6,6 +6,7 @@ import {
   capitalize,
   isIndexHref,
   makeLoadHtmlLayout,
+  normalizeSiteUrl,
   resolvePageLayout,
   sortIndexFirst,
   type NavItem,
@@ -182,5 +183,47 @@ describe('resolvePageLayout', () => {
     expect(() => resolvePageLayout(makePage({ layout: true }), null)).toThrow(
       /invalid `layout:` frontmatter/,
     );
+  });
+});
+
+describe('normalizeSiteUrl', () => {
+  it('returns null for undefined, null, or empty input', () => {
+    expect(normalizeSiteUrl(undefined)).toBeNull();
+    expect(normalizeSiteUrl(null)).toBeNull();
+    expect(normalizeSiteUrl('')).toBeNull();
+  });
+
+  it('strips trailing slash', () => {
+    expect(normalizeSiteUrl('https://example.com/')).toBe('https://example.com');
+    expect(normalizeSiteUrl('https://example.com')).toBe('https://example.com');
+  });
+
+  it('preserves a base path (origin + path) and strips its trailing slash', () => {
+    expect(normalizeSiteUrl('https://example.com/docs/')).toBe('https://example.com/docs');
+    expect(normalizeSiteUrl('https://example.com/docs')).toBe('https://example.com/docs');
+  });
+
+  it('accepts http and https', () => {
+    expect(normalizeSiteUrl('http://localhost:3000')).toBe('http://localhost:3000');
+    expect(normalizeSiteUrl('https://example.com')).toBe('https://example.com');
+  });
+
+  it('rejects other protocols', () => {
+    expect(() => normalizeSiteUrl('ftp://example.com')).toThrow(/must use http or https/);
+    expect(() => normalizeSiteUrl('file:///etc/passwd')).toThrow(/must use http or https/);
+  });
+
+  it('rejects query strings and fragments', () => {
+    expect(() => normalizeSiteUrl('https://example.com?foo=1')).toThrow(
+      /must not contain a query string or fragment/,
+    );
+    expect(() => normalizeSiteUrl('https://example.com#bar')).toThrow(
+      /must not contain a query string or fragment/,
+    );
+  });
+
+  it('rejects malformed URLs with a clear error', () => {
+    expect(() => normalizeSiteUrl('not a url')).toThrow(/invalid siteUrl/);
+    expect(() => normalizeSiteUrl('//example.com')).toThrow(/invalid siteUrl/);
   });
 });

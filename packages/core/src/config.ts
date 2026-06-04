@@ -63,6 +63,34 @@ export interface MarkbookConfig {
   title?: string;
   description?: string;
   /**
+   * Canonical site origin for the deployed site, e.g. `'https://cumulus.example'`.
+   * When set, Markbook emits:
+   *
+   *   - `<link rel="canonical">` per page.
+   *   - `<meta property="og:url">` per page.
+   *   - `dist/sitemap.xml` listing every page.
+   *   - `dist/robots.txt` referencing the sitemap.
+   *
+   * Should NOT include a trailing slash; Markbook normalizes it. When unset,
+   * Markbook skips canonical / `og:url` / sitemap / robots — pages still get
+   * Open Graph + Twitter cards without URL fields.
+   */
+  siteUrl?: string;
+  /**
+   * Browser theme color (`<meta name="theme-color">`) — picked up by mobile
+   * browsers for window chrome and PWA app-icon backgrounds. Accepts any
+   * CSS color string. Defaults to `'#0a1228'` (matches the built-in shell's
+   * dark background); override for branded sites.
+   */
+  themeColor?: string;
+  /**
+   * Default Open Graph / Twitter card image URL, used when a page doesn't
+   * supply `ogImage` in frontmatter. Should be an absolute URL (Markbook
+   * does NOT prepend `siteUrl` — embed the full URL yourself so the same
+   * default works whether the site is deployed at the root or a sub-path).
+   */
+  ogImage?: string;
+  /**
    * One or more directories (relative to root, or absolute) to search for page
    * templates. Searched in order; the first `<dir>/<name>.md` that exists wins.
    * Default: `'templates'`.

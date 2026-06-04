@@ -25,6 +25,10 @@ export default defineConfig({
   layoutsDir: 'layouts',
   layout: 'default',
   description: 'Cumulus — cloud infrastructure that gets out of your way.',
+  // Illustrative siteUrl — turns on canonical, og:url, sitemap.xml, robots.txt.
+  // Replace with your real production origin when deploying.
+  siteUrl: 'https://cumulus.example',
+  themeColor: '#0a1228',
   disableBaseCss: true,
   css: ['./cumulus.css'],
 });

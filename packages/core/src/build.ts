@@ -67,6 +67,16 @@ export interface BuildContext {
    */
   siteTitle: string | null;
   siteDescription: string | undefined;
+  /**
+   * Normalized canonical site origin (no trailing slash). When set, Markbook
+   * emits `<link rel="canonical">`, `<meta property="og:url">`, and
+   * generates `sitemap.xml` + `robots.txt` in the build output.
+   */
+  siteUrl: string | null;
+  /** `<meta name="theme-color">` value (mobile browser chrome tint). */
+  themeColor: string;
+  /** Default OG / Twitter image URL when a page omits `ogImage` frontmatter. */
+  ogImage: string | null;
   adapter: MarkbookAdapter;
   adapterPackageName: string;
   adapterPlugins: unknown[];
@@ -141,6 +151,9 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   const tmpDir = path.resolve(root, '.markbook');
   const siteTitle = config.title ?? null;
   const siteDescription = config.description;
+  const siteUrl = normalizeSiteUrl(config.siteUrl);
+  const themeColor = config.themeColor ?? '#0a1228';
+  const ogImage = config.ogImage ?? null;
   const templateDirs = (() => {
     const raw = config.templatesDir ?? 'templates';
     const list = Array.isArray(raw) ? raw : [raw];
@@ -193,6 +206,9 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     decoratorPaths,
     siteTitle,
     siteDescription,
+    siteUrl,
+    themeColor,
+    ogImage,
     adapter,
     adapterPackageName: adapter.packageName,
     adapterPlugins,
@@ -328,12 +344,9 @@ export async function writePages(
     const prc = buildPageRenderContext(
       page,
       nav,
-      ctx.siteTitle,
+      ctx,
       hasStories ? path.basename(entryAbs) : null,
       opts.searchEnabled,
-      ctx.userCss,
-      ctx.disableBaseCss,
-      ctx.llmsButtons,
     );
     if (layoutName) {
       const layoutBody = await loadHtmlLayout(layoutName);
@@ -407,6 +420,7 @@ export async function build(config: MarkbookConfig): Promise<void> {
   });
 
   await emitLlms(pages, ctx.outDir, ctx.siteTitle, ctx.siteDescription);
+  await emitSitemapAndRobots(pages, ctx.outDir, ctx.siteUrl);
   await runPagefind(ctx.outDir);
 }
 
@@ -722,6 +736,74 @@ async function emitPerPageLlmsTxt(pages: PageRecord[], baseDir: string): Promise
  */
 const UTF8_BOM = '\uFEFF';
 
+/**
+ * Normalize a user-supplied `siteUrl` for canonical/OG/sitemap use:
+ *   - Returns `null` if unset.
+ *   - Strips any trailing slash so concatenation with page paths is clean.
+ *   - Throws on an obviously-malformed input (must parse as an `http(s)`
+ *     URL with no path, query, or fragment).
+ */
+export function normalizeSiteUrl(raw: string | undefined | null): string | null {
+  if (raw == null || raw === '') return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(
+      `Markbook: invalid siteUrl '${raw}' — expected an absolute http(s) URL like 'https://example.com'.`,
+    );
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Markbook: siteUrl '${raw}' must use http or https; got '${parsed.protocol}'.`);
+  }
+  if (parsed.search || parsed.hash) {
+    throw new Error(`Markbook: siteUrl '${raw}' must not contain a query string or fragment.`);
+  }
+  // Normalize: keep origin + any base path, strip trailing slash.
+  let normalized = `${parsed.origin}${parsed.pathname}`;
+  if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+  return normalized;
+}
+
+/**
+ * Emit `dist/sitemap.xml` listing every built page, plus a `dist/robots.txt`
+ * that references the sitemap. Skipped when `siteUrl` is not configured —
+ * the sitemap spec requires absolute URLs.
+ *
+ * Exported for tests / advanced consumers. `build()` calls this
+ * automatically after Vite finishes.
+ */
+export async function emitSitemapAndRobots(
+  pages: PageRecord[],
+  outDir: string,
+  siteUrl: string | null,
+): Promise<void> {
+  if (!siteUrl) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = pages
+    .map((p) => {
+      const url = `${siteUrl}/${p.htmlRelPath.replace(/\\/g, '/')}`;
+      // index.html → canonical URL ends at the directory (cleaner sitemap entry).
+      const canonical = url.endsWith('/index.html') ? url.slice(0, -'index.html'.length) : url;
+      return `  <url>\n    <loc>${escapeXml(canonical)}</loc>\n    <lastmod>${today}</lastmod>\n  </url>`;
+    })
+    .join('\n');
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  await fs.writeFile(path.join(outDir, 'sitemap.xml'), sitemap);
+
+  const robots = `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
+  await fs.writeFile(path.join(outDir, 'robots.txt'), robots);
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function formatLinkText(page: PageRecord): string {
   const segments = page.relPath.replace(/\.md$/, '').split(/[\\/]/);
   const last = segments[segments.length - 1];
@@ -921,6 +1003,14 @@ interface PageRenderContext {
   userCss: string;
   disableBaseCss: boolean;
   llmsButtons: boolean;
+  /** Site-wide description (frontmatter overrides per-page). */
+  siteDescription: string | undefined;
+  /** Canonical site origin (no trailing slash), or null if not configured. */
+  siteUrl: string | null;
+  /** `<meta name="theme-color">` value. */
+  themeColor: string;
+  /** Default Open Graph image URL, or null if not configured. */
+  defaultOgImage: string | null;
   /** Function that rewrites a `target` path (e.g. `index.html`) to a relative href from this page. */
   resolveHref: (target: string) => string;
   /** Relative path from this page to `pagefind/` (no trailing slash). */
@@ -929,17 +1019,20 @@ interface PageRenderContext {
   browserTitle: string;
   /** What goes in the header brand on the built-in shell. */
   brandText: string;
+  /** Effective page description (frontmatter > config.description > ''). */
+  effectiveDescription: string;
+  /** Effective Open Graph image URL (frontmatter `ogImage` > config.ogImage > null). */
+  effectiveOgImage: string | null;
+  /** Canonical absolute URL for this page if `siteUrl` is set, else null. */
+  canonicalUrl: string | null;
 }
 
 function buildPageRenderContext(
   page: PageRecord,
   nav: NavGroup[],
-  siteTitle: string | null,
+  ctx: BuildContext,
   entryBasename: string | null,
   searchEnabled: boolean,
-  userCss: string,
-  disableBaseCss: boolean,
-  llmsButtons: boolean,
 ): PageRenderContext {
   const fromDir = path.dirname(page.htmlRelPath);
 
@@ -958,22 +1051,47 @@ function buildPageRenderContext(
   })();
 
   const pageTitle = page.parsed.title;
-  const browserTitle = siteTitle ? `${pageTitle} — ${siteTitle}` : pageTitle;
-  const brandText = siteTitle ?? pageTitle;
+  const browserTitle = ctx.siteTitle ? `${pageTitle} — ${ctx.siteTitle}` : pageTitle;
+  const brandText = ctx.siteTitle ?? pageTitle;
+
+  // Description / OG image: per-page frontmatter wins, falls back to config.
+  const fmDescription =
+    typeof page.parsed.frontmatter.description === 'string'
+      ? page.parsed.frontmatter.description
+      : undefined;
+  const effectiveDescription = fmDescription ?? ctx.siteDescription ?? '';
+  const fmOgImage =
+    typeof page.parsed.frontmatter.ogImage === 'string'
+      ? page.parsed.frontmatter.ogImage
+      : undefined;
+  const effectiveOgImage = fmOgImage ?? ctx.ogImage;
+
+  // Canonical URL — only emit when siteUrl is set; build from absolute path
+  // so URL is portable regardless of resolveHref's relative output.
+  const canonicalUrl = ctx.siteUrl
+    ? `${ctx.siteUrl}/${page.htmlRelPath.replace(/\\/g, '/')}`
+    : null;
 
   return {
     page,
     nav,
-    siteTitle,
+    siteTitle: ctx.siteTitle,
     entryBasename,
     searchEnabled,
-    userCss,
-    disableBaseCss,
-    llmsButtons,
+    userCss: ctx.userCss,
+    disableBaseCss: ctx.disableBaseCss,
+    llmsButtons: ctx.llmsButtons,
+    siteDescription: ctx.siteDescription,
+    siteUrl: ctx.siteUrl,
+    themeColor: ctx.themeColor,
+    defaultOgImage: ctx.ogImage,
     resolveHref,
     pagefindBase,
     browserTitle,
     brandText,
+    effectiveDescription,
+    effectiveOgImage,
+    canonicalUrl,
   };
 }
 
@@ -1001,7 +1119,72 @@ function buildHeadInjections(prc: PageRenderContext): string {
   if (pagefindLink) parts.push(pagefindLink);
   if (!prc.disableBaseCss) parts.push(`<style>${BASE_CSS}</style>`);
   if (prc.userCss) parts.push(`<style data-markbook-user-css>${prc.userCss}</style>`);
+  // SEO + browser-chrome meta. Always emitted; per-page values come from
+  // the PageRenderContext (frontmatter > config defaults).
+  parts.push(buildSeoMeta(prc));
   return parts.join('\n');
+}
+
+/**
+ * Build the SEO / Open Graph / Twitter Card / theme-color meta block.
+ * Lives inside `{{ head }}` so layouts get it automatically, and the
+ * built-in shell gets it too (its `<head>` template embeds head
+ * injections directly).
+ *
+ * Per-page values cascade frontmatter > config defaults. Tags that
+ * require a canonical URL (canonical, og:url) are emitted only when
+ * `siteUrl` is set in the config.
+ */
+function buildSeoMeta(prc: PageRenderContext): string {
+  const lines: string[] = [];
+  // Per-page description — first-class SEO requirement. Skip if empty
+  // (don't emit `<meta content="">` — Lighthouse flags it as "no
+  // description").
+  if (prc.effectiveDescription) {
+    lines.push(`<meta name="description" content="${escapeAttr(prc.effectiveDescription)}">`);
+  }
+  // Browser chrome tinting + dark-mode hint. theme-color works on mobile
+  // browsers + PWAs; color-scheme tells the browser which native form
+  // controls / scrollbars to use.
+  lines.push(`<meta name="theme-color" content="${escapeAttr(prc.themeColor)}">`);
+  lines.push('<meta name="color-scheme" content="light dark">');
+  // Canonical + og:url only when siteUrl is set (otherwise we'd emit a
+  // relative-path canonical, which Lighthouse flags).
+  if (prc.canonicalUrl) {
+    lines.push(`<link rel="canonical" href="${escapeAttr(prc.canonicalUrl)}">`);
+  }
+  // Open Graph — required (or strongly recommended) properties.
+  lines.push('<meta property="og:type" content="website">');
+  lines.push(`<meta property="og:title" content="${escapeAttr(prc.browserTitle)}">`);
+  if (prc.effectiveDescription) {
+    lines.push(
+      `<meta property="og:description" content="${escapeAttr(prc.effectiveDescription)}">`,
+    );
+  }
+  if (prc.siteTitle) {
+    lines.push(`<meta property="og:site_name" content="${escapeAttr(prc.siteTitle)}">`);
+  }
+  if (prc.canonicalUrl) {
+    lines.push(`<meta property="og:url" content="${escapeAttr(prc.canonicalUrl)}">`);
+  }
+  if (prc.effectiveOgImage) {
+    lines.push(`<meta property="og:image" content="${escapeAttr(prc.effectiveOgImage)}">`);
+  }
+  // Twitter Card — picks up og:* fallback automatically, but explicit
+  // tags rank higher in Twitter's preview UI.
+  lines.push(
+    `<meta name="twitter:card" content="${prc.effectiveOgImage ? 'summary_large_image' : 'summary'}">`,
+  );
+  lines.push(`<meta name="twitter:title" content="${escapeAttr(prc.browserTitle)}">`);
+  if (prc.effectiveDescription) {
+    lines.push(
+      `<meta name="twitter:description" content="${escapeAttr(prc.effectiveDescription)}">`,
+    );
+  }
+  if (prc.effectiveOgImage) {
+    lines.push(`<meta name="twitter:image" content="${escapeAttr(prc.effectiveOgImage)}">`);
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -1267,6 +1450,13 @@ const BASE_CSS = `
   color-scheme: dark;
 }
 *,*::before,*::after { box-sizing: border-box; }
+/* The 'scrollbar-gutter: stable' rule reserves space for the vertical
+   scrollbar even on short pages, so navigation between long and short
+   pages doesn't cause the layout to jitter horizontally (the viewport
+   width stays constant whether or not the scrollbar is drawn). */
+html {
+  scrollbar-gutter: stable;
+}
 html, body {
   margin: 0;
   background: var(--mb-bg);

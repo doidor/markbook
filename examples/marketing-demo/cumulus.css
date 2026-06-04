@@ -39,6 +39,14 @@
   box-sizing: border-box;
 }
 
+/* Reserve the vertical scrollbar's space even on short pages, so
+   navigating between long and short pages doesn't shift the layout
+   horizontally (the viewport width stays constant whether or not the
+   scrollbar is drawn). */
+html {
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;

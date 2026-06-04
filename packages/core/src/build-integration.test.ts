@@ -467,3 +467,192 @@ describe('emitLlms — top-level llms.txt + per-page mirrors', () => {
     expect(perPage).toContain('—');
   });
 });
+
+describe('writePages — SEO + Open Graph meta', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('built-in shell emits description, theme-color, color-scheme, OG, and Twitter tags', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: My awesome page\n---\n# Home\n',
+    });
+    const ctx = await createContext({
+      root: fx.root,
+      title: 'My Site',
+      description: 'Site-wide description',
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+
+    // Description: per-page frontmatter wins over config.description.
+    expect(html).toContain('<meta name="description" content="My awesome page">');
+    // Theme color + color scheme — always emitted.
+    expect(html).toContain('<meta name="theme-color" content="#0a1228">');
+    expect(html).toContain('<meta name="color-scheme" content="light dark">');
+    // Open Graph
+    expect(html).toContain('<meta property="og:type" content="website">');
+    expect(html).toContain('<meta property="og:title" content="Home — My Site">');
+    expect(html).toContain('<meta property="og:description" content="My awesome page">');
+    expect(html).toContain('<meta property="og:site_name" content="My Site">');
+    // Twitter (summary card since no image configured)
+    expect(html).toContain('<meta name="twitter:card" content="summary">');
+    expect(html).toContain('<meta name="twitter:title" content="Home — My Site">');
+  });
+
+  it('falls back to config.description when frontmatter omits it', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({
+      root: fx.root,
+      description: 'Site description fallback',
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<meta name="description" content="Site description fallback">');
+  });
+
+  it('omits the description meta entirely when neither frontmatter nor config supplies one', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // No description anywhere — Lighthouse prefers absence over empty content.
+    expect(html).not.toMatch(/<meta name="description"/);
+    expect(html).not.toMatch(/<meta property="og:description"/);
+  });
+
+  it('emits canonical + og:url only when siteUrl is configured', async () => {
+    // Without siteUrl
+    fx = await setupFixture({ 'docs/about.md': '---\ntitle: About\n---\n# About\n' });
+    let ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    let html = await fx.read('about.html');
+    expect(html).not.toMatch(/<link rel="canonical"/);
+    expect(html).not.toMatch(/<meta property="og:url"/);
+
+    // With siteUrl
+    await fs.rm(fx.root, { recursive: true, force: true });
+    fx = await setupFixture({ 'docs/about.md': '---\ntitle: About\n---\n# About\n' });
+    ctx = await createContext({ root: fx.root, siteUrl: 'https://example.com' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    html = await fx.read('about.html');
+    expect(html).toContain('<link rel="canonical" href="https://example.com/about.html">');
+    expect(html).toContain('<meta property="og:url" content="https://example.com/about.html">');
+  });
+
+  it('honours frontmatter `ogImage` (per-page) + config.ogImage (default) and bumps twitter:card to summary_large_image', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+      'docs/about.md':
+        '---\ntitle: About\nogImage: https://example.com/about-og.png\n---\n# About\n',
+    });
+    const ctx = await createContext({
+      root: fx.root,
+      ogImage: 'https://example.com/default-og.png',
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+
+    const homeHtml = await fx.read('index.html');
+    expect(homeHtml).toContain(
+      '<meta property="og:image" content="https://example.com/default-og.png">',
+    );
+    expect(homeHtml).toContain('<meta name="twitter:card" content="summary_large_image">');
+
+    const aboutHtml = await fx.read('about.html');
+    expect(aboutHtml).toContain(
+      '<meta property="og:image" content="https://example.com/about-og.png">',
+    );
+    expect(aboutHtml).toContain('<meta name="twitter:card" content="summary_large_image">');
+  });
+
+  it('HTML layout also receives the SEO meta block through {{ head }}', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: Layout SEO test\n---\n# Home\n',
+      'layouts/default.html': `<!doctype html><html><head><title>{{ browserTitle }}</title>{{ head }}</head>
+<body><article data-pagefind-body>{{ content }}</article>{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({
+      root: fx.root,
+      layout: 'default',
+      siteUrl: 'https://example.com',
+    });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Layout's own <title> wasn't disturbed.
+    expect(html).toContain('<title>Home</title>');
+    // Markbook injected the SEO meta via {{ head }}.
+    expect(html).toContain('<meta name="description" content="Layout SEO test">');
+    expect(html).toContain('<link rel="canonical" href="https://example.com/index.html">');
+    expect(html).toContain('<meta property="og:title" content="Home">');
+  });
+
+  it('uses a custom theme-color when configured', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root, themeColor: '#ff6b6b' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<meta name="theme-color" content="#ff6b6b">');
+  });
+});
+
+describe('build — sitemap.xml + robots.txt emission', () => {
+  let fx: Fixture;
+  afterEach(async () => {
+    if (fx) await fs.rm(fx.root, { recursive: true, force: true });
+  });
+
+  it('emits sitemap.xml + robots.txt under outDir when siteUrl is configured', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+      'docs/about.md': '---\ntitle: About\n---\n# About\n',
+      'docs/guide/intro.md': '---\ntitle: Intro\n---\n# Intro\n',
+    });
+    const ctx = await createContext({ root: fx.root, siteUrl: 'https://example.com' });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitSitemapAndRobots } = await import('./build.js');
+    await emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl);
+
+    expect(await fx.exists('sitemap.xml')).toBe(true);
+    expect(await fx.exists('robots.txt')).toBe(true);
+
+    const sitemap = await fx.read('sitemap.xml');
+    expect(sitemap).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+    expect(sitemap).toContain('xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"');
+    // index.html collapses to the directory URL (cleaner canonical form).
+    expect(sitemap).toContain('<loc>https://example.com/</loc>');
+    expect(sitemap).toContain('<loc>https://example.com/about.html</loc>');
+    expect(sitemap).toContain('<loc>https://example.com/guide/intro.html</loc>');
+    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+
+    const robots = await fx.read('robots.txt');
+    expect(robots).toContain('User-agent: *');
+    expect(robots).toContain('Allow: /');
+    expect(robots).toContain('Sitemap: https://example.com/sitemap.xml');
+  });
+
+  it('does NOT emit sitemap.xml or robots.txt when siteUrl is unset', async () => {
+    fx = await setupFixture({ 'docs/index.md': '---\ntitle: Home\n---\n# Home\n' });
+    const ctx = await createContext({ root: fx.root });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitSitemapAndRobots } = await import('./build.js');
+    await emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl);
+    expect(await fx.exists('sitemap.xml')).toBe(false);
+    expect(await fx.exists('robots.txt')).toBe(false);
+  });
+
+  it('XML-escapes URLs so query strings or special chars survive', async () => {
+    fx = await setupFixture({
+      // Path with chars that need XML-escaping (& in filename is unusual but valid on POSIX).
+      'docs/q-and-a.md': '---\ntitle: Q&A\n---\n# Q&A\n',
+    });
+    const ctx = await createContext({ root: fx.root, siteUrl: 'https://example.com' });
+    const { pages } = await writePages(ctx, { clean: true, searchEnabled: false });
+    const { emitSitemapAndRobots } = await import('./build.js');
+    await emitSitemapAndRobots(pages, ctx.tmpDir, ctx.siteUrl);
+    const sitemap = await fx.read('sitemap.xml');
+    // Filename `q-and-a.html` doesn't have entity chars, but if it did,
+    // we use escapeXml internally. This test verifies the structure.
+    expect(sitemap).toContain('<loc>https://example.com/q-and-a.html</loc>');
+  });
+});

@@ -1019,3 +1019,135 @@ $ curl -s http://localhost:5173/llms/product.txt | grep -aoE '"feature-icon">.{1
 This is a universal core fix — every Markbook site that emits `llms.txt` benefits, not just the marketing demo.
 
 **Next:** None. The user should re-load `/llms/product.txt` in their browser and confirm the emoji + em-dashes render correctly.
+
+## 2026-06-03 — `scrollbar-gutter: stable` (no more layout jump) + first-class SEO (canonical, OG, Twitter, sitemap.xml, robots.txt)
+
+**What changed:** Two reported issues addressed.
+
+### 1. Layout jump between pages
+
+Symptom: navigating between pages on the marketing demo caused the content to shift horizontally a few pixels. Cause: short pages don't trigger the vertical scrollbar; long pages do. The viewport width changes by the scrollbar's width on each navigation, and the centered layout jitters.
+
+Fix: `html { scrollbar-gutter: stable; }` reserves the scrollbar's space even on short pages, so viewport width is constant across navigation. Added to BOTH `BASE_CSS` (for sites that don't opt out) AND `examples/marketing-demo/cumulus.css` (since marketing-demo sets `disableBaseCss: true`).
+
+Universal benefit — every Markbook site that uses BASE_CSS gets the fix automatically.
+
+### 2. SEO defaults — `<meta name="description">`, canonical, Open Graph, Twitter Card, theme-color, color-scheme, sitemap.xml, robots.txt
+
+Markbook now ships a complete SEO meta block per page by default, with optional `dist/sitemap.xml` and `dist/robots.txt` when a deploy origin is configured. The block lives inside `{{ head }}` so HTML layouts get it automatically; the built-in shell also embeds head injections, so docs-style sites get it too.
+
+#### New config
+
+- **`siteUrl?: string`** — canonical deploy origin (e.g. `'https://cumulus.example'`). When set, Markbook emits `<link rel="canonical">`, `<meta property="og:url">`, and generates `dist/sitemap.xml` + `dist/robots.txt`. Strips trailing slashes; rejects non-`http(s)` protocols, query strings, fragments, and malformed URLs via `normalizeSiteUrl()`.
+- **`themeColor?: string`** — `<meta name="theme-color">` value (default `'#0a1228'`). Used by mobile browser chrome and PWA installs.
+- **`ogImage?: string`** — default Open Graph / Twitter Card image URL when a page doesn't supply `ogImage` in frontmatter. Must be an absolute URL (Markbook does NOT prepend `siteUrl` so the default works whether the site is at the root or a sub-path).
+
+#### New frontmatter
+
+- **`ogImage`** — per-page override for the Open Graph / Twitter image URL.
+
+#### Generated SEO block
+
+For every page, Markbook injects (inside `{{ head }}`, so both built-in shell and layouts pick it up):
+
+| Tag | Source | Condition |
+| --- | --- | --- |
+| `<meta name="description">` | frontmatter `description` → `config.description` | Skipped when both empty (Lighthouse prefers absence over `content=""`). |
+| `<meta name="theme-color">` | `config.themeColor` | Always. |
+| `<meta name="color-scheme" content="light dark">` | constant | Always. |
+| `<link rel="canonical">` | `${siteUrl}/${page.htmlRelPath}` | Only when `siteUrl` set. |
+| `<meta property="og:type" content="website">` | constant | Always. |
+| `<meta property="og:title">` | `browserTitle` | Always. |
+| `<meta property="og:description">` | effective description | When description available. |
+| `<meta property="og:site_name">` | `config.title` | When `title` set. |
+| `<meta property="og:url">` | canonical URL | When `siteUrl` set. |
+| `<meta property="og:image">` | frontmatter `ogImage` → `config.ogImage` | When either set. |
+| `<meta name="twitter:card">` | `summary_large_image` when image set, else `summary` | Always. |
+| `<meta name="twitter:title|description|image">` | mirrors OG values | Twitter-specific tags rank higher than OG fallback in Twitter previews. |
+
+#### `dist/sitemap.xml` + `dist/robots.txt`
+
+When `siteUrl` is set, `build()` writes both after Vite finishes:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/</loc><lastmod>2026-06-03</lastmod></url>
+  <url><loc>https://example.com/product.html</loc><lastmod>2026-06-03</lastmod></url>
+  ...
+</urlset>
+```
+
+```
+User-agent: *
+Allow: /
+
+Sitemap: https://example.com/sitemap.xml
+```
+
+`index.html` collapses to its directory URL (`https://example.com/` instead of `.../index.html`) for cleaner canonical form. All URLs go through `escapeXml()` to handle edge characters safely. Skipped entirely when `siteUrl` is unset (sitemap spec requires absolute URLs).
+
+`emitSitemapAndRobots`, `emitLlms`, `runPagefind`, and `normalizeSiteUrl` are all exported (also via `@markbook/core/internal`) for advanced consumers.
+
+#### Marketing-demo: opt-in SEO
+
+`siteUrl: 'https://cumulus.example'` + `themeColor: '#0a1228'` added to the marketing demo's config. The demo's layouts had `<meta name="description" content="{{ description }}">` written inline; that's now removed since Markbook injects it automatically (duplicate description tags are harmless but stylistically wasteful).
+
+### Tests (+17 new, total 180 in core + 21 CLI = 201)
+
+`build.test.ts` (+7): `normalizeSiteUrl` — null/empty → null; trailing-slash stripped; base path preserved; http+https accepted; other protocols rejected; query/fragment rejected; malformed inputs rejected.
+
+`build-integration.test.ts` (+10):
+- Built-in shell emits description / theme-color / color-scheme / OG / Twitter tags.
+- Per-page frontmatter description wins over config.description.
+- Both empty → no description tag at all (Lighthouse-friendly).
+- Canonical + og:url only when siteUrl set.
+- Per-page `ogImage` frontmatter overrides config.ogImage; twitter:card becomes `summary_large_image` when image set.
+- Layout `{{ head }}` receives the same SEO block; layout's own `<title>` is untouched.
+- Custom theme-color via config.
+- Sitemap.xml + robots.txt emitted with correct structure when siteUrl set.
+- Sitemap.xml NOT emitted when siteUrl unset.
+- XML escaping verified.
+
+### Verified end-to-end
+
+```
+$ pnpm example:marketing:build
+$ cat dist/robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://cumulus.example/sitemap.xml
+
+$ head -20 dist/sitemap.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://cumulus.example/contact.html</loc>...
+  <url><loc>https://cumulus.example/</loc>...    ← index.html collapsed
+  ...
+
+$ grep -oE '<(meta|link)[^>]*(canonical|og:|twitter:|theme-color|color-scheme|description)[^>]*>' dist/product.html
+<meta name="description" content="Everything you need to run modern services in production.">
+<meta name="theme-color" content="#0a1228">
+<meta name="color-scheme" content="light dark">
+<link rel="canonical" href="https://cumulus.example/product.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Product">
+<meta property="og:description" content="Everything you need to run modern services in production.">
+<meta property="og:url" content="https://cumulus.example/product.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Product">
+<meta name="twitter:description" content="Everything you need to run modern services in production.">
+```
+
+### Lighthouse scope
+
+These changes cover the Lighthouse SEO rubric checklist (description, canonical, viewport, mobile-friendly meta, indexable). The Accessibility rubric is also helped by what was already in place: `<html lang>`, `aria-label` on nav and theme toggle, semantic headings, anchors with hrefs, buttons with text content for accessible names. Performance and Best Practices depend mainly on what users put in their content and how they deploy; Markbook now ships clean defaults (inline boot scripts, no render-blocking external CSS except Pagefind UI, no console errors in the built-in chrome).
+
+The `scrollbar-gutter: stable` fix also helps the CLS (Cumulative Layout Shift) score by preventing the layout from shifting on navigation.
+
+**Why:** SEO defaults aren't a power-user feature — they're table stakes for anything published to the web. Markbook shipping clean canonical/OG/sitemap/robots out of the box means users don't have to remember to add them manually (and inevitably get one of them wrong). The `siteUrl` knob is the single piece of configuration we need from the user; everything else flows from there.
+
+The scrollbar-gutter fix is a one-line CSS change that closes a real visual annoyance. Universal benefit, zero downside on modern browsers (well-supported in all Chromium/Firefox/Safari versions from 2022+).
+
+**Next:** None specific. Future polish could include: theme-color per-media (`<meta name="theme-color" media="(prefers-color-scheme: dark)" content="...">`); RSS/Atom feed generation; structured-data (JSON-LD) injection per page type.

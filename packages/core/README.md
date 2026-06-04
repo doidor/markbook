@@ -130,6 +130,12 @@ export default defineConfig({
   title: 'My Components',
   description: 'A short blurb',
 
+  // SEO + Open Graph (all optional, all auto-injected into <head>)
+  siteUrl: 'https://example.com',    // origin (no trailing slash); enables
+                                     //   canonical, og:url, sitemap.xml, robots.txt
+  themeColor: '#0a1228',             // <meta name="theme-color"> (mobile chrome)
+  ogImage: 'https://example.com/og.png', // default OG/Twitter image URL
+
   // Adapter (optional — defaults to staticAdapter() for markdown-only sites)
   adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
 
@@ -149,6 +155,41 @@ export default defineConfig({
                                      //    your own files (see "HTML layouts")
   transformHtml: async (html, page) => html, // 4. post-process per page (escape hatch)
 });
+```
+
+### SEO + Open Graph (automatic)
+
+Markbook always injects a complete SEO meta block into every page's `<head>`
+(both via the built-in shell AND via the `{{ head }}` placeholder in HTML
+layouts). The block contains:
+
+- `<meta name="description">` — per-page frontmatter `description` wins,
+  then `config.description`, then omitted entirely (Lighthouse prefers
+  absence over an empty value).
+- `<meta name="theme-color">` — from `config.themeColor` (default
+  `'#0a1228'`).
+- `<meta name="color-scheme" content="light dark">` — always.
+- `<link rel="canonical">` — emitted when `config.siteUrl` is set.
+- `<meta property="og:type|title|description|site_name|url|image">` —
+  always emitted; `og:url` and `og:site_name` are conditional on
+  `siteUrl` / `title`. `og:image` cascades per-page frontmatter
+  `ogImage` → `config.ogImage` → omitted.
+- `<meta name="twitter:card|title|description|image">` — always emitted;
+  the card type bumps to `summary_large_image` when an image is set.
+
+When `siteUrl` is set, `markbook build` also generates `dist/sitemap.xml`
+(listing every page with `<lastmod>`) and `dist/robots.txt` (referencing
+the sitemap). `index.html` collapses to its directory URL in the sitemap
+for a cleaner canonical form.
+
+Per-page frontmatter:
+
+```yaml
+---
+title: My page
+description: Page-specific description
+ogImage: https://example.com/custom-og.png
+---
 ```
 
 ### HTML layouts
