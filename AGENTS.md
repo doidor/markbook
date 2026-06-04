@@ -32,6 +32,8 @@ constitution for the repo.
 | "What's the package's public API?" | `packages/<name>/README.md` |
 | "How is the repo structured?" | `README.md` (directory map at the bottom) |
 | "How do I customize a Markbook site's chrome?" | Four layers in `packages/core/README.md`: `css` → `disableBaseCss` → `layoutsDir` → `transformHtml`. Worked example in `examples/marketing-demo/`. |
+| "How do I register a custom directive?" | `config.directives` from `markbook.config.ts`. See `examples/markbook-site/pages/guides/custom-directives.md` for the public guide, ADR-0025 for the design rationale, and `examples/markbook-site/directives/callout.{ts,html}` for the canonical pattern (handler in `.ts`, output markup in a `.html` template loaded by `htmlTemplate(new URL('./x.html', import.meta.url))`). |
+| "How do I emit HTML markup from a directive handler without inline template literals?" | `htmlTemplate(source)` in `@markbook/core`. Sync-load-once-cached `{{ key }}` + `{{ key.dot.path }}` substitution from a vars map; raw insertion (no auto-escape — matches the layout-placeholder contract); HTML comments preserved. Demoed in `examples/markbook-site/directives/callout.{ts,html}`. |
 
 ## Directory map
 
@@ -53,6 +55,9 @@ examples/
   vue-demo/  wc-demo/               ← framework-agnostic proofs
   static-demo/                      ← markdown-only docs site (no adapter)
   marketing-demo/                   ← marketing site via disableBaseCss + layouts/
+  markbook-site/                    ← the official Markbook website (markdown-only,
+                                       hybrid layout, custom :::callout directive
+                                       under directives/callout.{ts,html})
   embed-host/                       ← external consumer of embed/package bundles
 .copilot/                           ← canonical agent surface (skills/rules/wiki)
 .claude/.codex/.opencode/.agents/   ← vendor mirrors (symlinks into .copilot)

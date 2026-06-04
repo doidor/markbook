@@ -7,8 +7,12 @@ Starlight-style HTML site, a [Pagefind][pagefind] full-text search index, and
 a [`llms.txt`][llmstxt] mirror — plus portable, drop-in embeds for any of
 your stories.
 
-> **Status:** v0.9 — chrome customization, `:::stories` directive, story
-> portability, three framework adapters (React, Vue, web components). v1.0
+> **Status:** v0.10+ — chrome customization, `:::stories` directive, story
+> portability, three framework adapters (React, Vue, web components),
+> `config.directives` extension model for user-defined directives plus an
+> `htmlTemplate(source)` helper for handlers whose output lives in `.html`
+> files, SEO defaults (canonical + OG + Twitter + sitemap.xml + robots.txt),
+> a `public/` folder for static assets, and a `preview` command. v1.0
 > freezes the public API; until then minor releases may break things.
 
 ## Why
@@ -26,6 +30,12 @@ your stories.
   `[data-theme]` token flipping, and four layers of customization
   (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) so the same
   engine can render docs sites, marketing sites, or anything in between.
+- **Extensible directives.** Beyond the three built-ins (`:::story`,
+  `:::stories`, `:::props`), register your own with `config.directives` —
+  `:::callout`, `::youtube`, `:::csv-table`, anything. Handlers are plain
+  TS functions; the `htmlTemplate(source)` helper lets directive markup
+  live in real `.html` files (with `{{ key }}` substitution) instead of
+  inline JS template literals.
 
 ## Install
 
@@ -131,8 +141,8 @@ pnpm lint                    # biome check
 # Run every example dev server in parallel — color-coded, one Ctrl-C
 # stops them all. URLs printed at startup. Add new examples in
 # scripts/examples-dev.mjs.
-pnpm examples:dev            # all 5 dev servers on ports 5173-5177
-pnpm examples:build          # build all 5 examples in parallel
+pnpm examples:dev            # all 6 dev servers on ports 5173-5178
+pnpm examples:build          # build all 6 examples in parallel
 
 # Per-example scripts (each runs on the default port 5173 when invoked alone)
 pnpm example:dev             # React demo dev server (HMR)
