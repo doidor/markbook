@@ -1643,3 +1643,13 @@ Plus a bottom-of-page "References" link in the custom-directives guide pointing 
 **Why:** Two small wins from one user observation. The "use external files" question hinted that the inline-only examples I'd shown were giving the wrong impression — users needed to know they could organize their handlers like any other code. The "external library" question is a credit-where-credit-is-due thing: remark-directive is real and people should know it's there. Both fixes are docs/example refactors with zero code change.
 
 **Next:** None specific. If the directives registry ever needs auto-discovery, it'd come as a `directivesDir` config option mirroring `layoutsDir` — the rationale for skipping it now is captured above.
+
+---
+
+## 2026-05-09 — htmlTemplate helper: directive output from HTML files
+
+**What changed:** Added `htmlTemplate(source)` to `@markbook/core`. Returns a `(vars) => string` renderer that loads an `.html` file once (cached, lazy-sync), then does `{{ key }}` / `{{ key.dot.path }}` substitution from a vars map. Missing keys render empty; values insert raw (no auto-escape — call `escapeHtml`/`escapeAttribute` yourself, matching Markbook's layout-placeholder contract); HTML comments are preserved so `{{ }}` inside them stays literal. 12 tests cover substitution, dot-path drilldown, missing-key handling, comment protection, file-not-found error, cache sharing, URL + absolute-string source forms, and whitespace tolerance. Demoed in `examples/markbook-site/directives/callout.{ts,html}` — the callout handler now `htmlTemplate(new URL('./callout.html', import.meta.url))` and just calls `render({ type, content })`. Custom-directives guide gets a "Templates in HTML files" section; reference doc + core README reference it.
+
+**Why:** Closes a real pain point with `config.directives`: even moderately structured output (multi-line markup with classes/aria attributes) is awkward inside JS template literals — no syntax highlighting, no formatter, mixed JSX-vs-HTML mental model. With `htmlTemplate`, the markup goes in a `.html` file (editor highlights it; designers can edit without touching handler logic) and the handler just maps validated values to placeholders. Sync-load-once-cached is cheaper than async-per-call given handlers fire many times per build, and the cache is module-keyed-by-absolute-path so two `htmlTemplate(samePath)` calls share one read.
+
+**Next:** None specific. The helper is intentionally tiny — no conditionals/loops/partials in templates. If someone hits a case where they want `{{#each}}` they should reach for a real templating library (Handlebars, ETA) and call it from inside the handler.

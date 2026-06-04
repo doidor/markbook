@@ -13,6 +13,7 @@
       "!**/.markbook",
       "!**/_layouts",
       "!**/layouts/**/*.html",
+      "!**/directives/**/*.html",
       "!**/*.tsbuildinfo",
       "!pnpm-lock.yaml",
       "!**/llms.txt",

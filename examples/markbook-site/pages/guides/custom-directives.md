@@ -116,6 +116,51 @@ describe('callout', () => {
 
 The official Markbook site uses this pattern — see [`examples/markbook-site/directives/callout.ts`](https://github.com/microsoft/markbook/blob/main/examples/markbook-site/directives/callout.ts).
 
+## Templates in HTML files
+
+Hand-written HTML inside JS template literals gets ugly fast. Markbook ships an `htmlTemplate(source)` helper so the markup can live in a real `.html` file next to the handler:
+
+```
+my-site/
+└── directives/
+    ├── callout.ts
+    └── callout.html
+```
+
+```html
+<!-- directives/callout.html -->
+<aside class="callout callout-{{ type }}" role="note">
+  {{ content }}
+</aside>
+```
+
+```ts
+// directives/callout.ts
+import { escapeAttribute, htmlTemplate, type DirectiveHandler } from '@markbook/core';
+
+const VALID_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
+const render = htmlTemplate(new URL('./callout.html', import.meta.url));
+
+export const callout: DirectiveHandler = ({ attributes, innerHtml }) => {
+  const raw = attributes.type ?? 'info';
+  const type = VALID_TYPES.has(raw) ? raw : 'info';
+  return render({
+    type: escapeAttribute(type),
+    content: innerHtml ?? '',
+  });
+};
+```
+
+The helper:
+
+- **Reads the file once and caches it.** The first `render()` call loads from disk synchronously; subsequent calls are pure string substitution. Same path → same cached body, even across multiple `htmlTemplate()` instances.
+- **`{{ key }}` and `{{ key.dot.path }}` substitution.** Missing keys render as an empty string (no throw — keeps optional placeholders ergonomic).
+- **All values insert raw — no auto-escaping.** Call `escapeAttribute` / `escapeHtml` yourself on untrusted strings before passing them in. This matches Markbook's layout-placeholder contract: what you pass is what lands. It's also what you want for `innerHtml`, which IS already HTML.
+- **HTML comments are preserved verbatim.** `{{ }}` mentions inside `<!-- ... -->` are left alone, so you can document expected variables in the template itself.
+- **`new URL('./file.html', import.meta.url)` is the recommended source form** — it resolves relative to the calling module rather than `process.cwd()`. Absolute string paths also work.
+
+If the file is missing, the helper throws a clear `Markbook: htmlTemplate could not read '<path>'` error at first render.
+
 ## Two directive forms
 
 | Form | Syntax | Body? | Typical use |

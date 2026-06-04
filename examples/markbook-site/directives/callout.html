@@ -1,0 +1,8 @@
+<!-- Markbook custom directive: :::callout{type=info|tip|warning|danger}
+     Variables substituted by directives/callout.ts via htmlTemplate():
+       {{ type }}    — validated callout variant (already attribute-escaped)
+       {{ content }} — inner markdown parsed to HTML by Markbook
+-->
+<aside class="callout callout-{{ type }}" role="note">
+  {{ content }}
+</aside>

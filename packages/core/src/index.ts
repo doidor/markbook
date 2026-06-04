@@ -27,6 +27,7 @@ export type {
 } from './config.js';
 
 export { escapeHtml, escapeAttribute } from './directive-utils.js';
+export { htmlTemplate } from './html-template.js';
 
 export { build, dev, preview } from './build.js';
 export { bundleEmbed } from './embed.js';

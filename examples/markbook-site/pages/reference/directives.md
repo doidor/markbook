@@ -93,7 +93,7 @@ export default defineConfig({
 
 Both leaf (`::name{...}`) and container (`:::name{...}\n...\n:::`) forms are supported. Handlers receive the directive's attributes, inner content (parsed HTML + raw markdown), and page context.
 
-See [custom directives guide →](../guides/custom-directives.html) for the full extension model — async handlers, dependency tracking, error handling, the descriptor form for stricter validation, and example handlers.
+See [custom directives guide →](../guides/custom-directives.html) for the full extension model — async handlers, dependency tracking, error handling, the descriptor form for stricter validation, handlers in their own files, and the `htmlTemplate(source)` helper for moving directive output markup into `.html` template files.
 
 ## Attribute syntax
 
