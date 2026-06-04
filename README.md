@@ -114,6 +114,8 @@ examples/
   static-demo/      — Skyline: a markdown-only docs site, no adapter
   marketing-demo/   — Cumulus: a marketing site with a fully custom layout
                       (disableBaseCss + layouts/*.html + contentDir: 'pages')
+  markbook-site/    — the official Markbook website (hybrid: custom landing
+                      + default chrome for guides/reference). Markdown-only.
   embed-host/       — external consumer of the React demo's embed bundles
 ```
 
@@ -141,6 +143,7 @@ pnpm example:vue:dev|build|bundle
 pnpm example:wc:dev|build|bundle
 pnpm example:static:dev|build      # markdown-only docs site (no adapter)
 pnpm example:marketing:dev|build   # fully custom layout via HTML layouts + disableBaseCss
+pnpm example:site:dev|build|preview  # the official Markbook site (hybrid layout)
 ```
 
 ## License

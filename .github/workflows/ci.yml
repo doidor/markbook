@@ -57,3 +57,6 @@ jobs:
 
       - name: Build marketing demo (custom layout via disableBaseCss + transformHtml)
         run: pnpm example:marketing:build
+
+      - name: Build the Markbook site (hybrid layout — landing + default chrome)
+        run: pnpm example:site:build

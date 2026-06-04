@@ -1,0 +1,325 @@
+/*
+ * Markbook site styles.
+ *
+ * Two sections:
+ *   1. --mb-* token overrides — applied to BASE_CSS so the default
+ *      Markbook chrome (sidebar / header / TOC) on every non-landing
+ *      page renders in the Markbook palette.
+ *   2. Landing-only classes — used by layouts/landing.html for the
+ *      hero, feature grid, install snippet, etc.
+ *
+ * Palette: violet on slate. Reads as a developer-tools site without
+ * tipping into "yet another purple gradient SaaS" territory.
+ */
+
+/* === Section 1 — --mb-* token overrides ================================== */
+
+:root {
+  --mb-bg: #ffffff;
+  --mb-bg-elev: #f6f7fb;
+  --mb-bg-soft: #ecedf3;
+  --mb-fg: #1e2236;
+  --mb-fg-muted: #525978;
+  --mb-border: #e2e4ec;
+  --mb-accent: #7c3aed;
+  --mb-accent-fg: #ffffff;
+  --mb-link: #6d28d9;
+  --mb-code-bg: #f6f7fb;
+  --mb-radius: 8px;
+  --mb-content-width: 740px;
+  --mb-sidebar-width: 240px;
+  --mb-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mb-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root[data-theme="dark"] {
+  --mb-bg: #0e1421;
+  --mb-bg-elev: #14192a;
+  --mb-bg-soft: #1b2034;
+  --mb-fg: #e8ecf6;
+  --mb-fg-muted: #9aa3c0;
+  --mb-border: rgba(255, 255, 255, 0.08);
+  --mb-accent: #a78bfa;
+  --mb-accent-fg: #1a0a3e;
+  --mb-link: #c4b5fd;
+  --mb-code-bg: #0a0f1c;
+}
+
+/* === Section 2 — Landing-page classes ===================================== */
+/*
+ * The landing layout (layouts/landing.html) drops the default chrome and
+ * stacks: hero → feature grid → install → footer. These classes only
+ * appear on the home page; every other page uses the default chrome
+ * with the token overrides above.
+ */
+
+.site-landing {
+  background: var(--mb-bg);
+  color: var(--mb-fg);
+  font-family: var(--mb-font-sans);
+}
+
+.site-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 2rem;
+  background: color-mix(in srgb, var(--mb-bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--mb-border);
+}
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--mb-fg);
+  text-decoration: none;
+}
+.site-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--mb-accent);
+  border-radius: 6px;
+  color: var(--mb-accent-fg);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.site-topnav-links {
+  display: flex;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+.site-topnav-links a {
+  color: var(--mb-fg-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.site-topnav-links a:hover {
+  color: var(--mb-fg);
+}
+
+/* The {{ search }} slot inside the topnav. */
+.site-topnav-search {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+.site-topnav-search:empty {
+  display: none;
+}
+
+.site-hero {
+  padding: 6rem 2rem 5rem;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(167, 139, 250, 0.12), transparent 55%),
+    radial-gradient(ellipse at 80% 50%, rgba(124, 58, 237, 0.08), transparent 60%);
+  border-bottom: 1px solid var(--mb-border);
+}
+.site-hero-inner {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.site-hero h1 {
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 0 0 1.25rem;
+}
+.site-hero .site-hero-tagline {
+  font-size: 1.2rem;
+  line-height: 1.55;
+  color: var(--mb-fg-muted);
+  margin: 0 auto 2.5rem;
+  max-width: 600px;
+}
+.site-hero-ctas {
+  display: inline-flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.site-cta-primary,
+.site-cta-secondary {
+  display: inline-block;
+  padding: 0.85rem 1.5rem;
+  border-radius: var(--mb-radius);
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-decoration: none;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.site-cta-primary {
+  background: var(--mb-accent);
+  color: var(--mb-accent-fg);
+}
+.site-cta-primary:hover {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.site-cta-secondary {
+  border: 1px solid var(--mb-border);
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
+}
+.site-cta-secondary:hover {
+  border-color: var(--mb-accent);
+  color: var(--mb-fg);
+  text-decoration: none;
+}
+
+.site-install {
+  max-width: 540px;
+  margin: 2.25rem auto 0;
+  padding: 0.85rem 1.1rem;
+  background: var(--mb-code-bg);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  font-family: var(--mb-font-mono);
+  font-size: 0.88rem;
+  color: var(--mb-fg);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.site-install::before {
+  content: "$";
+  color: var(--mb-accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.site-section {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 5rem 2rem;
+}
+.site-section + .site-section {
+  border-top: 1px solid var(--mb-border);
+}
+.site-section h2 {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.5rem;
+}
+.site-section .site-section-lede {
+  font-size: 1.05rem;
+  color: var(--mb-fg-muted);
+  max-width: 640px;
+  margin: 0 0 2.5rem;
+}
+
+.site-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+.site-feature {
+  padding: 1.5rem;
+  background: var(--mb-bg-elev);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+}
+.site-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mb-accent) 15%, transparent);
+  color: var(--mb-accent);
+  font-size: 1.1rem;
+  margin-bottom: 0.85rem;
+}
+.site-feature h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.005em;
+}
+.site-feature p {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--mb-fg-muted);
+  margin: 0;
+}
+
+.site-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.site-guide-card {
+  display: block;
+  padding: 1.25rem 1.4rem;
+  background: var(--mb-bg-elev);
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  color: var(--mb-fg);
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+.site-guide-card:hover {
+  border-color: var(--mb-accent);
+  text-decoration: none;
+}
+.site-guide-card strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  color: var(--mb-fg);
+}
+.site-guide-card span {
+  font-size: 0.88rem;
+  color: var(--mb-fg-muted);
+}
+
+.site-footer {
+  border-top: 1px solid var(--mb-border);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--mb-fg-muted);
+}
+.site-footer a {
+  color: var(--mb-fg-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--mb-border);
+}
+.site-footer a:hover {
+  color: var(--mb-accent);
+  text-decoration-color: currentColor;
+}
+
+@media (max-width: 720px) {
+  .site-topnav {
+    padding: 0.85rem 1rem;
+    flex-wrap: wrap;
+  }
+  .site-topnav-links {
+    margin-left: 0;
+    width: 100%;
+    order: 3;
+  }
+  .site-hero {
+    padding: 4rem 1.25rem 3rem;
+  }
+  .site-section {
+    padding: 3.5rem 1.25rem;
+  }
+}

@@ -21,6 +21,15 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  examples/markbook-site:
+    devDependencies:
+      '@markbook/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      markbook:
+        specifier: workspace:*
+        version: link:../../packages/cli
+
   examples/marketing-demo:
     devDependencies:
       '@markbook/core':

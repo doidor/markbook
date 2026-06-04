@@ -1,0 +1,58 @@
+<!doctype html>
+<!--
+  Markbook home — custom landing layout.
+
+  Drops the default Markbook chrome (header / sidebar / TOC) and stacks:
+    sticky top nav → hero (title from frontmatter) → content → footer.
+
+  Every other page uses the default Markbook shell (no layout: in
+  frontmatter, no layout in config). This file is opted into via
+  `layout: landing` on index.md only.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ browserTitle }}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  {{ head }}
+</head>
+<body class="site-landing">
+  <nav class="site-topnav" aria-label="Site">
+    <a class="site-brand" href="/index.html">
+      <span class="site-brand-logo" aria-hidden>M</span>
+      Markbook
+    </a>
+    <div class="site-topnav-search">{{ search }}</div>
+    <div class="site-topnav-links">
+      <a href="/guides/getting-started.html">Guides</a>
+      <a href="/reference/config.html">Reference</a>
+      <a href="https://github.com/microsoft/markbook">GitHub</a>
+    </div>
+  </nav>
+
+  <section class="site-hero">
+    <div class="site-hero-inner">
+      <h1>{{ title }}</h1>
+      <p class="site-hero-tagline">{{ description }}</p>
+      <div class="site-hero-ctas">
+        <a class="site-cta-primary" href="/guides/getting-started.html">Get started →</a>
+        <a class="site-cta-secondary" href="https://github.com/microsoft/markbook">Star on GitHub</a>
+      </div>
+      <div class="site-install" role="text" aria-label="Install command">pnpm add -D markbook @markbook/core</div>
+    </div>
+  </section>
+
+  <main>
+    {{ content }}
+  </main>
+
+  <footer class="site-footer">
+    Markbook is open source under the MIT licence ·
+    <a href="https://github.com/microsoft/markbook">microsoft/markbook</a> ·
+    <a href="/llms.txt">All pages as markdown ↓</a>
+  </footer>
+
+  {{ bodyEnd }}
+</body>
+</html>

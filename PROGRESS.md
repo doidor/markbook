@@ -1349,3 +1349,100 @@ I kept the assets INLINE rather than extracting them to separate files because:
 If a future user has a multi-MB user CSS, we can add a `cssMode: 'inline' | 'external'` config option. For now, minified-inline is the right default.
 
 **Next:** None. Lighthouse Performance / Minify CSS / Minify JS rubrics should now show green. If real-world testing reveals more gains: HTTP-2 server push hints, prefetch tags for nav links, image lazy-loading for content `<img>` tags.
+
+## 2026-06-04 — Official Markbook site (`examples/markbook-site/`) — Markbook documenting Markbook
+
+**What changed:** Added a real Markbook-built website for Markbook itself. Single landing page + 4 guides + 5 reference pages, deployable as-is to any static host (GitHub Pages, Netlify, Cloudflare Pages, etc.).
+
+### Architecture
+
+Hybrid layout strategy — best of both worlds for a docs site that wants a marketing front door:
+
+- **Home page** (`pages/index.md`) opts into `layouts/landing.html` via frontmatter `layout: landing`. Sticky top nav (with search slot), big hero pulling `{{ title }}` + `{{ description }}` from frontmatter, install snippet, three-section feature grid, footer.
+- **Guides + reference** use the default Markbook chrome (header + left nav + content + right TOC). No `config.layout` set, no per-page `layout:` frontmatter — Markbook's built-in shell renders as designed.
+- **Brand tokens** in `markbook.css` override the `--mb-*` palette to violet-on-slate (#7c3aed accent, light + dark themes). Layer 1 customization — no `disableBaseCss`, no `transformHtml`. Demonstrates that you can heavily brand Markbook without writing any custom HTML.
+
+The hybrid pattern is documented in `examples/markbook-site/README.md` as "a common pattern for docs sites that want a marketing front door but standard docs chrome on every other page."
+
+### Content (9 pages, ~30KB of markdown)
+
+**Home** — the user-supplied description ("a library that renders markdown into HTML, with adapters for React, Vue, and web components — so it can also do component-library showcases like Storybook") flows verbatim into the hero. Three "feature highlight" sections: what it is, pick a starting point, what you don't need.
+
+**Guides** (`pages/guides/`):
+- `getting-started.md` — install, scaffold, first page, dev server, build, preview. Five minutes from zero.
+- `adding-stories.md` — adapters, `:::story` / `:::stories` directives, CSF v3 metadata, decorators, bundle output.
+- `customization.md` — the four-layer model with examples. Quick decision table at the top.
+- `search-and-seo.md` — Pagefind wiring, `data-pagefind-body` / `data-pagefind-ignore`, SEO meta, sitemap.xml, robots.txt, llms.txt.
+
+**Reference** (`pages/reference/`):
+- `config.md` — every `MarkbookConfig` field with defaults and a full example at the bottom.
+- `cli.md` — `build`, `dev`, `preview`, `bundle`, `skills install`, `skills list`. Flags and exit codes.
+- `frontmatter.md` — per-page YAML fields Markbook recognizes.
+- `placeholders.md` — every HTML layout `{{ }}` token with raw-vs-text classification.
+- `directives.md` — `:::story`, `:::stories`, `:::props`.
+
+### Wiring
+
+- Workspace: `examples/markbook-site/{package.json,markbook.config.ts,markbook.css,layouts/,pages/,public/}`.
+- Root scripts: `example:site:{build,dev,preview}`.
+- CI: new "Build the Markbook site" step in `.github/workflows/ci.yml` so the site stays buildable forever.
+- `public/favicon.svg` — branded violet "M" badge, copied to dist root by Vite's `publicDir`.
+- `siteUrl: 'https://microsoft.github.io/markbook'` — placeholder origin; flips on canonical + OG URL + sitemap + robots.
+
+### Build output
+
+```
+examples/markbook-site/dist/
+├── index.html                  ← landing layout
+├── favicon.svg                 ← from public/
+├── llms.txt                    ← auto-generated index
+├── robots.txt + sitemap.xml    ← auto-generated (siteUrl is set)
+├── pagefind/                   ← search index
+├── llms/                       ← per-page markdown mirrors
+├── guides/
+│   ├── getting-started.html
+│   ├── adding-stories.html
+│   ├── customization.html
+│   └── search-and-seo.html
+└── reference/
+    ├── config.html
+    ├── cli.html
+    ├── frontmatter.html
+    ├── placeholders.html
+    └── directives.html
+```
+
+Sizes after minification: ~33KB raw / ~9KB gzipped per page.
+
+### Verified end-to-end
+
+Playwright headless probe against `markbook preview`:
+
+```
+landing h1: Markbook
+landing tagline: A library that renders markdown into HTML, with adapters for React, Vue, and web...
+search 'pagefind': 6 results
+guide h1: Getting started
+built-in chrome on guide: { header: 1, sidebar: 1 }
+errors: (none)
+```
+
+- Custom landing layout renders correctly.
+- Search returns results across all 9 pages.
+- Guide pages get the built-in chrome (header + sidebar).
+- Zero console errors.
+- All routes return 200 (HTML, sitemap.xml, robots.txt, favicon.svg, llms.txt, pagefind assets).
+
+### Why
+
+The user asked for a presentation website for Markbook. Markbook documenting Markbook is also the highest-quality possible end-to-end test: every customization layer is exercised by real content, every error path is encountered by the writer, and any UX rough edge surfaces immediately. The site doubles as the most-realistic-possible example of a Markbook deployment — closer to what a real consumer would build than the synthetic demos (Pixie/Skyline/Cumulus).
+
+Six worked examples now (react, vue, wc, static, marketing, markbook-site) covering: framework adapters (react/vue/wc), markdown-only sites (static, markbook-site), full custom chrome (marketing), and hybrid layouts (markbook-site).
+
+### Lint/test/build
+
+- 222 tests still pass (no new tests — the site is content, not code).
+- Lint clean (2 pre-existing embed-host `!important` warnings).
+- All 6 example demos build with `✓ Markbook build complete`.
+
+**Next:** Wire up GitHub Pages deploy when v1.0 ships so the site is reachable at the configured `siteUrl`. The build step is already in CI.
