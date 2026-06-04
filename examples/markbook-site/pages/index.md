@@ -67,6 +67,10 @@ layout: landing
       <strong>Customization →</strong>
       <span>The four-layer model — tokens, disabling base CSS, custom HTML layouts, post-processing. Pick the smallest one that solves your problem.</span>
     </a>
+    <a class="site-guide-card" href="/guides/custom-directives.html">
+      <strong>Custom directives →</strong>
+      <span>Register your own <code>:::name</code> directives. Build admonitions, video embeds, diagram renderers — any reusable markdown vocabulary your team needs.</span>
+    </a>
     <a class="site-guide-card" href="/guides/search-and-seo.html">
       <strong>Search & SEO →</strong>
       <span>How Pagefind is hooked in, how sitemap/OG/Twitter tags are emitted, where to put your <code>siteUrl</code>.</span>

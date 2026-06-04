@@ -57,6 +57,12 @@ export interface ParsedPage {
   stories: StoryRef[];
   headings: HeadingRef[];
   title: string;
+  /**
+   * Absolute paths of files user-directive handlers reported reading.
+   * Used by `markbook dev` to re-render the page when any of those files
+   * change. Empty for pages without user directives.
+   */
+  directiveDependencies: string[];
 }
 
 export interface ParseOptions {
@@ -79,6 +85,15 @@ export interface ParseOptions {
    * async — file I/O is fine here.
    */
   renderStoryExtras?: (story: StoryRef) => string | Promise<string>;
+  /**
+   * User-defined directive handlers, keyed by directive name. Pre-validated
+   * (built-in name collisions rejected) by `createContext`. Pass the raw
+   * `config.directives` value through — the dispatcher handles both the
+   * function shorthand and the `{ type, handler }` descriptor form.
+   */
+  userDirectives?: Record<string, import('./config.js').DirectiveHandler>;
+  /** Project root — passed into the handler context. */
+  root?: string;
 }
 
 interface BaseSlot {
@@ -104,7 +119,20 @@ interface PropsSlot extends BaseSlot {
   kind: 'props';
 }
 
-type DirectiveSlot = StorySlot | StoriesSlot | PropsSlot;
+interface UserDirectiveSlot extends BaseSlot {
+  kind: 'user';
+  /** Resolved replacement HTML, populated in the async phase before splicing. */
+  html: string;
+  /**
+   * Markdown to substitute in the per-page `llms/<page>.txt` mirror.
+   * `undefined` means "keep the original directive source unchanged."
+   */
+  markdownReplacement: string | undefined;
+  /** Files this handler reported reading; rolled into the page's dependency set. */
+  dependencies: string[];
+}
+
+type DirectiveSlot = StorySlot | StoriesSlot | PropsSlot | UserDirectiveSlot;
 
 export async function parseMarkdown(
   source: string,
@@ -153,6 +181,25 @@ export async function parseMarkdown(
   }
   const pendingStoriesTasks: PendingStoriesTask[] = [];
 
+  // Pending user-directive tasks — same async-after-visit pattern. We
+  // capture a snapshot of the node + its source position so we can render
+  // children to HTML (for container directives) and call the user handler.
+  interface PendingUserDirectiveTask {
+    slot: UserDirectiveSlot;
+    name: string;
+    handler: import('./config.js').DirectiveHandler;
+    formInSource: 'leaf' | 'container';
+    attributes: Record<string, string | undefined>;
+    childrenSnapshot: unknown[];
+    /** Raw markdown source between the opening `:::` and closing `:::`. */
+    innerMarkdownSource: string | null;
+    line?: number;
+    column?: number;
+  }
+  const pendingUserDirectiveTasks: PendingUserDirectiveTask[] = [];
+
+  const userDirectives = options.userDirectives ?? {};
+
   const file = await unified()
     .use(remarkParse)
     .use(remarkGfm)
@@ -160,57 +207,111 @@ export async function parseMarkdown(
     .use(() => async (tree: unknown) => {
       visit(tree as never, (node: any, index, parent: any) => {
         if (!parent || typeof index !== 'number') return;
-        if (node.type !== 'containerDirective') return;
+        // Markbook recognizes both leaf (`::name{...}`) and container
+        // (`:::name{...}\n...\n:::`) directives. Built-ins are container-only.
+        if (node.type !== 'containerDirective' && node.type !== 'leafDirective') return;
+        const isContainer = node.type === 'containerDirective';
 
         const start = node.position?.start?.offset ?? 0;
         const end = node.position?.end?.offset ?? 0;
 
-        if (node.name === 'story') {
-          const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
-          const src = attrs.src;
-          const exportName = attrs.export ?? 'default';
-          const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
-          if (!src) return;
-          const id = `${fileId}--${storyCounter++}`;
-          const story: StoryRef = { id, src, exportName, slug: userSlug };
-          stories.push(story);
-          slots.push({ kind: 'story', parent, index, start, end, story });
-        } else if (node.name === 'stories') {
-          const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
-          const src = attrs.src;
-          if (!src) return;
-          const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
-          const only = parseNameList(attrs.only);
-          const exclude = parseNameList(attrs.exclude);
-          const groupId = `${fileId}--g${groupCounter++}`;
-          const slot: StoriesSlot = {
-            kind: 'stories',
-            parent,
-            index,
-            start,
-            end,
-            groupId,
-            stories: [],
-          };
-          slots.push(slot);
-          const absStoryFile = resolveSpec(src, pageDir);
-          if (absStoryFile === null) {
-            throw new Error(
-              `Markbook: \`:::stories{src=${src}}\` could not be resolved from ${pageDir}. ` +
-                `Use a relative path (\`./\` or \`../\`) or install the bare-specifier package.`,
-            );
+        // Built-ins first — they take precedence over user directives.
+        if (
+          isContainer &&
+          (node.name === 'story' || node.name === 'stories' || node.name === 'props')
+        ) {
+          if (node.name === 'story') {
+            const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
+            const src = attrs.src;
+            const exportName = attrs.export ?? 'default';
+            const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
+            if (!src) return;
+            const id = `${fileId}--${storyCounter++}`;
+            const story: StoryRef = { id, src, exportName, slug: userSlug };
+            stories.push(story);
+            slots.push({ kind: 'story', parent, index, start, end, story });
+          } else if (node.name === 'stories') {
+            const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
+            const src = attrs.src;
+            if (!src) return;
+            const userSlug = typeof attrs.id === 'string' ? attrs.id : undefined;
+            const only = parseNameList(attrs.only);
+            const exclude = parseNameList(attrs.exclude);
+            const groupId = `${fileId}--g${groupCounter++}`;
+            const slot: StoriesSlot = {
+              kind: 'stories',
+              parent,
+              index,
+              start,
+              end,
+              groupId,
+              stories: [],
+            };
+            slots.push(slot);
+            const absStoryFile = resolveSpec(src, pageDir);
+            if (absStoryFile === null) {
+              throw new Error(
+                `Markbook: \`:::stories{src=${src}}\` could not be resolved from ${pageDir}. ` +
+                  `Use a relative path (\`./\` or \`../\`) or install the bare-specifier package.`,
+              );
+            }
+            pendingStoriesTasks.push({
+              slot,
+              src,
+              absStoryFile,
+              userSlug,
+              only,
+              exclude,
+            });
+          } else {
+            slots.push({ kind: 'props', parent, index, start, end });
           }
-          pendingStoriesTasks.push({
-            slot,
-            src,
-            absStoryFile,
-            userSlug,
-            only,
-            exclude,
-          });
-        } else if (node.name === 'props') {
-          slots.push({ kind: 'props', parent, index, start, end });
+          return;
         }
+
+        // User directives — registered via config.directives.
+        const handler = userDirectives[node.name as string];
+        if (!handler) return;
+
+        const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
+        // Validate pinned `type` against actual source form (clearer error
+        // than silently letting the handler see an unexpected innerHtml).
+        const descriptor = isDirectiveDescriptor(handler) ? handler : { handler };
+        const pinned = descriptor.type;
+        const actualForm: 'leaf' | 'container' = isContainer ? 'container' : 'leaf';
+        if (pinned && pinned !== actualForm) {
+          const pos = node.position?.start;
+          throw new Error(
+            `Markbook: directive '${node.name}' in ${pageFile}` +
+              (pos ? `:${pos.line}:${pos.column}` : '') +
+              ` was written as ${actualForm} (${actualForm === 'leaf' ? '::' : ':::'}${node.name}…) but the handler is pinned to ${pinned}.`,
+          );
+        }
+
+        // Pre-allocate the slot — `html` / `markdownReplacement` are filled
+        // after the user handler resolves in the async pass below.
+        const slot: UserDirectiveSlot = {
+          kind: 'user',
+          parent,
+          index,
+          start,
+          end,
+          html: '',
+          markdownReplacement: undefined,
+          dependencies: [],
+        };
+        slots.push(slot);
+        pendingUserDirectiveTasks.push({
+          slot,
+          name: node.name as string,
+          handler,
+          formInSource: actualForm,
+          attributes: attrs,
+          childrenSnapshot: isContainer ? (node.children ?? []) : [],
+          innerMarkdownSource: isContainer ? source.slice(start, end) : null,
+          line: node.position?.start?.line,
+          column: node.position?.start?.column,
+        });
       });
 
       // Fan out `:::stories` slots first — they create StoryRefs that the
@@ -305,6 +406,63 @@ export async function parseMarkdown(
 
       await Promise.all(tasks);
 
+      // Resolve user directives in parallel. Each handler may render
+      // children to HTML, may do file I/O, may be async — all good.
+      // Errors get a clear file:line prefix and chain the original via
+      // `Error.cause`.
+      if (pendingUserDirectiveTasks.length > 0) {
+        await Promise.all(
+          pendingUserDirectiveTasks.map(async (task) => {
+            const innerHtml =
+              task.formInSource === 'container'
+                ? await renderChildrenToHtml(task.childrenSnapshot)
+                : null;
+            const innerMarkdown =
+              task.formInSource === 'container' ? extractInnerMarkdown(source, task.slot) : null;
+            const descriptor = isDirectiveDescriptor(task.handler)
+              ? task.handler
+              : { handler: task.handler };
+            let result: import('./config.js').DirectiveResult;
+            try {
+              result = await Promise.resolve(
+                descriptor.handler({
+                  name: task.name,
+                  attributes: task.attributes,
+                  type: task.formInSource,
+                  innerHtml,
+                  innerMarkdown,
+                  pageFile,
+                  root: options.root ?? path.dirname(pageFile),
+                  frontmatter,
+                }),
+              );
+            } catch (err) {
+              const where = `${pageFile}${task.line ? `:${task.line}:${task.column ?? 0}` : ''}`;
+              throw new Error(
+                `Markbook: directive '${task.name}' in ${where} threw: ${(err as Error).message}`,
+                { cause: err as Error },
+              );
+            }
+            if (result == null) {
+              task.slot.html = '';
+              task.slot.markdownReplacement = '';
+            } else if (typeof result === 'string') {
+              task.slot.html = result;
+            } else {
+              task.slot.html = result.html;
+              if (typeof result.markdown === 'string') {
+                task.slot.markdownReplacement = result.markdown;
+              }
+              if (Array.isArray(result.dependencies)) {
+                task.slot.dependencies = result.dependencies.filter(
+                  (d): d is string => typeof d === 'string',
+                );
+              }
+            }
+          }),
+        );
+      }
+
       // Resolve story extras (e.g. "Open in playground" buttons) AFTER
       // codeFiles is populated — the renderer typically needs the source.
       // We store the result on each story so slot rendering stays sync.
@@ -377,6 +535,11 @@ export async function parseMarkdown(
   const h1Text = headings.find((h) => h.level === 1)?.text;
   const title = fmTitle ?? h1Text ?? fileId;
 
+  // Roll user-directive dependencies up into a deduped list for the watcher.
+  const directiveDependencies = [
+    ...new Set(slots.flatMap((s) => (s.kind === 'user' ? s.dependencies : []))),
+  ];
+
   return {
     frontmatter,
     html,
@@ -385,7 +548,48 @@ export async function parseMarkdown(
     stories,
     headings,
     title,
+    directiveDependencies,
   };
+}
+
+/** Type-guard distinguishing the `{ type, handler }` descriptor form from the function shorthand. */
+function isDirectiveDescriptor(
+  h: import('./config.js').DirectiveHandler,
+): h is import('./config.js').DirectiveHandlerDescriptor {
+  return typeof h !== 'function' && typeof (h as { handler?: unknown }).handler === 'function';
+}
+
+/**
+ * Render a snapshot of mdast container-directive children into HTML using
+ * the same plugin stack the top-level pipeline uses. Built-in directives
+ * inside the children DON'T run (we'd hit recursion semantics that aren't
+ * defined yet); plain markdown and any nested user directives in the
+ * original tree DO render because they're already part of the snapshot's
+ * AST. For v1, scope is "render rich markdown inside callouts," not
+ * "nest custom directives inside callouts."
+ */
+async function renderChildrenToHtml(children: unknown[]): Promise<string> {
+  const processor = unified()
+    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeStringify, { allowDangerousHtml: true });
+  const wrapper = { type: 'root', children };
+  const hast = await processor.run(wrapper as never);
+  return String(processor.stringify(hast)).trim();
+}
+
+/**
+ * Return the raw markdown source between the opening `:::` and closing
+ * `:::` of a container directive — without the directive's own header
+ * line. Used so user handlers can ALSO see the original markdown text
+ * (some need it: e.g. `mermaid` wants the source verbatim, not parsed).
+ */
+function extractInnerMarkdown(source: string, slot: BaseSlot): string {
+  const raw = source.slice(slot.start, slot.end);
+  // Strip the leading `:::name{...}` line + trailing `:::` line. Be lenient
+  // about line endings.
+  const lines = raw.split('\n');
+  if (lines.length <= 2) return '';
+  return lines.slice(1, -1).join('\n').trim();
 }
 
 function buildPlainMarkdown(
@@ -417,6 +621,15 @@ function buildPlainMarkdown(
       out += sections.join('\n\n');
     } else if (slot.kind === 'props' && propsTableMarkdown) {
       out += propsTableMarkdown;
+    } else if (slot.kind === 'user') {
+      // User directives can provide a markdown replacement; otherwise
+      // leave the original directive source unchanged (so the per-page
+      // .txt mirror still reads naturally).
+      if (slot.markdownReplacement !== undefined) {
+        out += slot.markdownReplacement;
+      } else {
+        out += content.slice(slot.start, slot.end);
+      }
     }
     cursor = slot.end;
   }
@@ -463,6 +676,12 @@ function buildSlotReplacement(
           propsTableHtml ?? '<!-- markbook props table: no `component:` set in frontmatter -->',
       },
     ];
+  }
+  if (slot.kind === 'user') {
+    // User-handler output is injected as raw HTML. If the handler returned
+    // an empty string (or null/undefined), we still emit an empty html
+    // node so the original directive source is removed cleanly.
+    return [{ type: 'html', value: slot.html }];
   }
   // `:::stories` — fan out
   const nodes: unknown[] = [];

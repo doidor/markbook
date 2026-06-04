@@ -205,6 +205,110 @@ export interface MarkbookConfig {
    * tries to mount stories without one.
    */
   adapter?: MarkbookAdapter;
+  /**
+   * User-defined markdown directives. Each entry registers a `:::name`
+   * (container) or `::name` (leaf) handler that produces HTML to
+   * substitute for the directive in the rendered page.
+   *
+   * ```ts
+   * directives: {
+   *   youtube: ({ attributes }) =>
+   *     `<iframe src="https://youtube.com/embed/${attributes.id}" allowfullscreen></iframe>`,
+   *   callout: ({ attributes, innerHtml }) =>
+   *     `<div class="callout callout-${attributes.type ?? 'info'}">${innerHtml ?? ''}</div>`,
+   * }
+   * ```
+   *
+   * Names that collide with built-in directives (`story`, `stories`,
+   * `props`) throw at context creation — built-ins have side effects
+   * (story tracking, props-table generation) that a user handler can't
+   * replicate.
+   *
+   * Handlers may be async, may read files, and may declare dependencies
+   * for dev-mode re-rendering. See the `DirectiveHandler` type.
+   */
+  directives?: Record<string, DirectiveHandler>;
+}
+
+/** Built-in directive names users cannot redefine. */
+export const BUILTIN_DIRECTIVES = ['story', 'stories', 'props'] as const;
+
+/**
+ * Either a plain handler function (treated as accepting both leaf and
+ * container forms) or a descriptor that pins one form for stricter
+ * validation. When pinned, Markbook throws a clear error if the directive
+ * is written with the wrong form (leaf vs container).
+ */
+export type DirectiveHandler = DirectiveHandlerFn | DirectiveHandlerDescriptor;
+
+export type DirectiveHandlerFn = (
+  ctx: DirectiveContext,
+) => DirectiveResult | Promise<DirectiveResult>;
+
+export interface DirectiveHandlerDescriptor {
+  /**
+   * Pin this handler to one directive form. When the user writes the
+   * directive with the other form, Markbook throws with the source
+   * position. Default: handler accepts both.
+   */
+  type?: 'leaf' | 'container';
+  handler: DirectiveHandlerFn;
+}
+
+/**
+ * Per-directive context the handler receives. `innerHtml` /
+ * `innerMarkdown` are populated for container directives; null for leaf
+ * ones. `pageFile` is the absolute path; `root` is the project root.
+ */
+export interface DirectiveContext {
+  /** Directive name as written (e.g. 'youtube', 'callout'). */
+  name: string;
+  /**
+   * Attribute map from `{key=value other=value}`. Values are typed as
+   * possibly-undefined because remark-directive emits `attr` (no value)
+   * as `attr: ''` and validates nothing — better to surface that in
+   * types than to lie.
+   */
+  attributes: Record<string, string | undefined>;
+  /** Whether the directive was written as `::name` (leaf) or `:::name` (container). */
+  type: 'leaf' | 'container';
+  /** Container directive children rendered to HTML through Markbook's pipeline. `null` for leaf. */
+  innerHtml: string | null;
+  /** Container directive body as the raw markdown source. `null` for leaf. */
+  innerMarkdown: string | null;
+  /** Absolute path to the markdown file containing this directive. */
+  pageFile: string;
+  /** Project root (`MarkbookConfig.root`, resolved to absolute). */
+  root: string;
+  /** Parsed frontmatter of the page. */
+  frontmatter: Record<string, unknown>;
+}
+
+/**
+ * Handler return value. The string shortcut is for simple cases —
+ * return just the HTML. The object form lets handlers provide a
+ * plain-markdown fallback for `llms/<page>.txt`, declare file
+ * dependencies for dev-mode re-rendering, or both.
+ *
+ * `null` / `undefined` drops the directive entirely (renders nothing).
+ */
+export type DirectiveResult = string | DirectiveResultObject | null | undefined;
+
+export interface DirectiveResultObject {
+  /** HTML to substitute for the directive in the rendered page. */
+  html: string;
+  /**
+   * Plain markdown to substitute in the per-page `llms/<page>.txt`
+   * mirror. When omitted, Markbook keeps the original directive source
+   * unchanged in the markdown output. Set to `''` to drop entirely.
+   */
+  markdown?: string;
+  /**
+   * Absolute paths the handler read while producing the result. In dev
+   * mode, Markbook re-renders the page whenever any of these files
+   * change. Use for handlers that read files outside the markdown.
+   */
+  dependencies?: string[];
 }
 
 export type PlaygroundProvider = 'codesandbox' | 'stackblitz';

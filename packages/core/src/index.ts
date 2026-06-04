@@ -12,13 +12,21 @@
  * against, but their signatures may change at any minor release.
  */
 
-export { defineConfig, staticAdapter } from './config.js';
+export { defineConfig, staticAdapter, BUILTIN_DIRECTIVES } from './config.js';
 export type {
   MarkbookConfig,
   MarkbookAdapter,
   PlaygroundConfig,
   PlaygroundProvider,
+  DirectiveHandler,
+  DirectiveHandlerFn,
+  DirectiveHandlerDescriptor,
+  DirectiveContext,
+  DirectiveResult,
+  DirectiveResultObject,
 } from './config.js';
+
+export { escapeHtml, escapeAttribute } from './directive-utils.js';
 
 export { build, dev, preview } from './build.js';
 export { bundleEmbed } from './embed.js';

@@ -11,7 +11,7 @@ import { extractComponentProps } from './props.js';
 import { buildPlaygroundDescriptors } from './playground.js';
 import { resolveInlinedSources } from './inline-sources.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
-import { staticAdapter } from './config.js';
+import { BUILTIN_DIRECTIVES, staticAdapter } from './config.js';
 import { applyHtmlLayout, type HtmlLayoutSubstitutions } from './template.js';
 import { minifyCss, minifyJs } from './minify.js';
 import type { ParsedPage, StoryRef } from './parse.js';
@@ -95,6 +95,11 @@ export interface BuildContext {
   playground: PlaygroundConfig | undefined;
   /** Whether to render "View as Markdown" / "Copy as Markdown" buttons on every page. */
   llmsButtons: boolean;
+  /**
+   * Resolved user-directive registry, validated for built-in conflicts.
+   * Keyed by directive name. Empty record means no user directives.
+   */
+  userDirectives: Record<string, import('./config.js').DirectiveHandler>;
 }
 
 export function makeLoadTemplate(
@@ -210,6 +215,26 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   })();
   const userCss = await loadUserCss(cssPaths);
 
+  const userDirectives = (() => {
+    const raw = config.directives ?? {};
+    const builtin = new Set<string>(BUILTIN_DIRECTIVES);
+    for (const name of Object.keys(raw)) {
+      if (builtin.has(name)) {
+        throw new Error(
+          `Markbook: cannot register a user directive named '${name}' — it's a built-in ` +
+            `(see BUILTIN_DIRECTIVES: ${BUILTIN_DIRECTIVES.join(', ')}). Choose a different name.`,
+        );
+      }
+      if (!/^[a-z][a-z0-9-]*$/i.test(name)) {
+        throw new Error(
+          `Markbook: invalid directive name '${name}'. ` +
+            `Names must be alphanumeric (with optional dashes) and start with a letter — remark-directive's parser will not match anything else.`,
+        );
+      }
+    }
+    return raw;
+  })();
+
   return {
     config,
     root,
@@ -235,6 +260,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     disableBaseCss: !!config.disableBaseCss,
     playground: config.playground === false || !config.playground ? undefined : config.playground,
     llmsButtons: config.llmsButtons !== false,
+    userDirectives,
   };
 }
 
@@ -304,6 +330,12 @@ interface WritePagesResult {
   htmlInputs: Record<string, string>;
   /** Absolute paths of every story file referenced by any directive. Used by `dev` for HMR watching. */
   storyFiles: string[];
+  /**
+   * Absolute paths user-directive handlers reported reading. Same shape as
+   * `storyFiles` — both fold into `chokidar.watch` in dev so any change
+   * triggers a re-render.
+   */
+  directiveDependencies: string[];
 }
 
 /**
@@ -347,6 +379,8 @@ export async function writePages(
       renderStoryExtras: ctx.playground
         ? (story) => renderPlaygroundButtons(story, ctx.playground!, file, ctx.root)
         : undefined,
+      userDirectives: ctx.userDirectives,
+      root: ctx.root,
     });
     pages.push({
       file,
@@ -441,7 +475,8 @@ export async function writePages(
   await emitPerPageLlmsTxt(pages, ctx.tmpDir);
 
   const storyFiles = collectStoryFiles(pages);
-  return { pages, htmlInputs, storyFiles };
+  const directiveDependencies = [...new Set(pages.flatMap((p) => p.parsed.directiveDependencies))];
+  return { pages, htmlInputs, storyFiles, directiveDependencies };
 }
 
 function collectStoryFiles(pages: PageRecord[]): string[] {
@@ -637,13 +672,21 @@ export async function dev(config: MarkbookConfig): Promise<void> {
   console.log('');
 
   const watcher = chokidar.watch(
-    [ctx.docsDir, ...ctx.templateDirs, ...ctx.layoutDirs, ...ctx.cssPaths, ...initial.storyFiles],
+    [
+      ctx.docsDir,
+      ...ctx.templateDirs,
+      ...ctx.layoutDirs,
+      ...ctx.cssPaths,
+      ...initial.storyFiles,
+      ...initial.directiveDependencies,
+    ],
     {
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 },
     },
   );
   let watchedStoryFiles = new Set(initial.storyFiles);
+  let watchedDirectiveDeps = new Set(initial.directiveDependencies);
 
   let regenerating = false;
   const onChange = async (event: 'change' | 'add' | 'unlink', file: string) => {
@@ -651,11 +694,12 @@ export async function dev(config: MarkbookConfig): Promise<void> {
     const isMd = file.endsWith('.md');
     const isCss = ctx.cssPaths.includes(abs);
     const isStory = watchedStoryFiles.has(abs);
+    const isDirectiveDep = watchedDirectiveDeps.has(abs);
     const isHtmlLayout =
       file.endsWith('.html') && ctx.layoutDirs.some((d) => abs.startsWith(d + path.sep));
     // Story files inside docsDir are picked up by the docsDir watcher; only
     // bypass this guard for files we care about.
-    if (!isMd && !isCss && !isStory && !isHtmlLayout) return;
+    if (!isMd && !isCss && !isStory && !isHtmlLayout && !isDirectiveDep) return;
     if (regenerating) return;
     regenerating = true;
     try {
@@ -672,16 +716,20 @@ export async function dev(config: MarkbookConfig): Promise<void> {
       await emitSitemapAndRobots(result.pages, ctx.tmpDir, ctx.siteUrl);
       await runPagefind(ctx.tmpDir);
 
-      // Add newly-referenced story files to the watcher (e.g. a markdown
-      // page now points at a new `:::stories` source). Removing stale
-      // watches is rare and not worth the bookkeeping; chokidar tolerates
-      // missing files silently.
-      const fresh = result.storyFiles.filter((p) => !watchedStoryFiles.has(p));
-      if (fresh.length > 0) {
-        watcher.add(fresh);
-        for (const p of fresh) watchedStoryFiles.add(p);
+      // Add newly-referenced story files + directive dependencies to the
+      // watcher (e.g. a markdown page now points at a new `:::stories`
+      // source, or a directive handler started reading a new file).
+      // Removing stale watches is rare and not worth the bookkeeping;
+      // chokidar tolerates missing files silently.
+      const freshStories = result.storyFiles.filter((p) => !watchedStoryFiles.has(p));
+      const freshDeps = result.directiveDependencies.filter((p) => !watchedDirectiveDeps.has(p));
+      if (freshStories.length > 0 || freshDeps.length > 0) {
+        watcher.add([...freshStories, ...freshDeps]);
+        for (const p of freshStories) watchedStoryFiles.add(p);
+        for (const p of freshDeps) watchedDirectiveDeps.add(p);
       }
       watchedStoryFiles = new Set(result.storyFiles);
+      watchedDirectiveDeps = new Set(result.directiveDependencies);
 
       const dt = Date.now() - t0;
       console.log(`[markbook] ${event} ${path.relative(ctx.root, file)} — regenerated in ${dt}ms`);

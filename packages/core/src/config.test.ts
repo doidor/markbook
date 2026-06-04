@@ -142,4 +142,43 @@ describe('createContext — content + layouts wiring', () => {
     const ctx = await createContext({ root: tmp, publicDir: false });
     expect(ctx.publicDir).toBe(false);
   });
+
+  it('userDirectives defaults to an empty record', async () => {
+    const ctx = await createContext({ root: tmp });
+    expect(ctx.userDirectives).toEqual({});
+  });
+
+  it('throws when a user directive name collides with a built-in', async () => {
+    for (const builtin of ['story', 'stories', 'props']) {
+      await expect(
+        createContext({
+          root: tmp,
+          directives: { [builtin]: () => '' },
+        }),
+      ).rejects.toThrow(new RegExp(`cannot register a user directive named '${builtin}'`));
+    }
+  });
+
+  it('throws on invalid directive names (non-alphanumeric, leading digit, etc.)', async () => {
+    for (const bad of ['1abc', '_underscore', 'with space', 'foo!bar', '']) {
+      await expect(
+        createContext({
+          root: tmp,
+          directives: { [bad]: () => '' },
+        }),
+      ).rejects.toThrow(/invalid directive name/);
+    }
+  });
+
+  it('accepts well-formed directive names + descriptor form', async () => {
+    const ctx = await createContext({
+      root: tmp,
+      directives: {
+        youtube: () => '',
+        'my-widget': () => '',
+        callout: { type: 'container', handler: () => '' },
+      },
+    });
+    expect(Object.keys(ctx.userDirectives).sort()).toEqual(['callout', 'my-widget', 'youtube']);
+  });
 });

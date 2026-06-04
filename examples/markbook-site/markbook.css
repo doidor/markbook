@@ -323,3 +323,42 @@
     padding: 3.5rem 1.25rem;
   }
 }
+
+/* === Callouts ============================================================
+   Registered as a user directive in markbook.config.ts. Example:
+
+     :::callout{type=tip}
+     Use --mb-* token overrides for 80% of cases.
+     :::
+
+   Four types — info | tip | warning | danger — each with a tinted
+   left border + soft background-color wash. */
+.callout {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  background: var(--mb-bg-elev);
+}
+.callout > p:first-child {
+  margin-top: 0;
+}
+.callout > p:last-child {
+  margin-bottom: 0;
+}
+.callout-info {
+  border-left-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 6%, var(--mb-bg-elev));
+}
+.callout-tip {
+  border-left-color: #10b981;
+  background: color-mix(in srgb, #10b981 6%, var(--mb-bg-elev));
+}
+.callout-warning {
+  border-left-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 7%, var(--mb-bg-elev));
+}
+.callout-danger {
+  border-left-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 7%, var(--mb-bg-elev));
+}

@@ -1446,3 +1446,123 @@ Six worked examples now (react, vue, wc, static, marketing, markbook-site) cover
 - All 6 example demos build with `✓ Markbook build complete`.
 
 **Next:** Wire up GitHub Pages deploy when v1.0 ships so the site is reachable at the configured `siteUrl`. The build step is already in CI.
+
+## 2026-06-04 — User-defined markdown directives via `config.directives`
+
+**What changed:** New extension model — users can register their own `:::name` (container) or `::name` (leaf) directives from `markbook.config.ts`. The same point of extension that powers `:::story`, but exposed for any custom markdown vocabulary. See ADR-0025 for the design rationale + alternatives.
+
+### Public API
+
+```ts
+import { defineConfig, escapeAttribute } from '@markbook/core';
+
+export default defineConfig({
+  directives: {
+    youtube: ({ attributes }) =>
+      `<iframe src="https://youtube.com/embed/${escapeAttribute(attributes.id ?? '')}" allowfullscreen></iframe>`,
+
+    callout: ({ attributes, innerHtml }) =>
+      `<aside class="callout callout-${attributes.type ?? 'info'}">${innerHtml ?? ''}</aside>`,
+
+    'csv-table': async ({ attributes, pageFile }) => {
+      const abs = path.resolve(path.dirname(pageFile), attributes.src ?? '');
+      const text = await fs.readFile(abs, 'utf8');
+      return { html: csvToTableHtml(text), dependencies: [abs] };
+    },
+  },
+});
+```
+
+Eight new public exports:
+
+- **`BUILTIN_DIRECTIVES`** — `['story', 'stories', 'props']` (reserved names).
+- **`DirectiveHandler`** — `DirectiveHandlerFn | DirectiveHandlerDescriptor` union.
+- **`DirectiveHandlerFn`** — the function shorthand (accepts both leaf and container).
+- **`DirectiveHandlerDescriptor`** — `{ type: 'leaf' | 'container', handler }` for stricter validation.
+- **`DirectiveContext`** — `{ name, attributes, type, innerHtml, innerMarkdown, pageFile, root, frontmatter }`.
+- **`DirectiveResult`** — `string | { html, markdown?, dependencies? } | null | undefined`.
+- **`escapeHtml`, `escapeAttribute`** — safe-interpolation helpers re-exported for handlers.
+
+Attributes are typed `Record<string, string | undefined>` (remark-directive emits valueless attrs as `''`; the type tells the truth).
+
+### Implementation
+
+- **`packages/core/src/parse.ts`** — the existing slot collector now recognizes both `containerDirective` and `leafDirective` nodes. Built-ins take precedence (`story`/`stories`/`props`); any other name is looked up in `userDirectives`. A new `UserDirectiveSlot` slot kind stores the resolved HTML + markdown replacement + reported dependencies. Container directive children are rendered to HTML via a separate unified pass (`renderChildrenToHtml`) — handlers get parsed `innerHtml` and raw `innerMarkdown` both, and pick whichever they need.
+- **Async dispatch.** All user-directive handlers per page run in parallel via `Promise.all` after the visitor finishes. Handlers can throw — Markbook wraps with `Markbook: directive 'X' in <file>:<line>:<col> threw: <message>` and preserves the original via `Error.cause` (standard Node `new Error(msg, { cause })`).
+- **Pinned-type validation.** Descriptor-form handlers declaring `type: 'leaf' | 'container'` throw with source position when the user writes the directive with the other form. Function-shorthand handlers accept both.
+- **`packages/core/src/build.ts`** — `createContext` validates the directive registry (built-in conflict + invalid-name guard), stores it on the context. `writePages` threads it into the `parseMarkdown` options. `WritePagesResult` now exposes `directiveDependencies` for the dev watcher.
+- **Dev watcher** picks up `directiveDependencies` initially AND on regeneration. New deps discovered on a re-render get `watcher.add`ed alongside new story files. Editing any reported dep triggers a re-render within the usual ~80ms window.
+- **`packages/core/src/directive-utils.ts`** (new) — `escapeHtml` + `escapeAttribute`. Tiny, intentionally separate names so handler authors reach for the right tool.
+
+### Tests (+26, total 227 in core + 21 CLI = 248)
+
+- **`packages/core/src/directives.test.ts`** (new, 22 tests):
+  - Leaf form: attribute typing (incl. valueless attrs as `''`), `type === 'leaf'`, null inner.
+  - Container form: `innerHtml` is parsed markdown, `innerMarkdown` is raw source, `type === 'container'`, wrapped output.
+  - Descriptor form: leaf-pinned throws on container use; container-pinned throws on leaf use; function shorthand accepts both.
+  - Async: awaited correctly; handlers per page run in parallel (3 × 50ms handlers finish in <130ms).
+  - Result object: `markdown` replaces directive in `llms.txt` mirror; `dependencies` reported on `parsed.directiveDependencies`; deps deduped across multiple directives; `null` return drops the directive.
+  - Context fields: pageFile, root, frontmatter, name all passed correctly.
+  - Error handling: thrown errors get `file:line:col` prefix + preserve `cause`.
+  - `escapeHtml` / `escapeAttribute` correctness.
+
+- **`packages/core/src/config.test.ts`** (+4):
+  - `userDirectives` defaults to `{}` on the context.
+  - Throws on built-in name collision (`story`, `stories`, `props`).
+  - Throws on invalid directive names (leading digit, underscore, space, special chars, empty).
+  - Accepts well-formed names + descriptor form.
+
+### Worked example in the markbook-site
+
+The site now registers a `:::callout{type=info|tip|warning|danger}` directive demonstrating the full surface:
+
+```ts
+// examples/markbook-site/markbook.config.ts
+const CALLOUT_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
+export default defineConfig({
+  // ...
+  directives: {
+    callout: ({ attributes, innerHtml }) => {
+      const raw = attributes.type ?? 'info';
+      const type = CALLOUT_TYPES.has(raw) ? raw : 'info';
+      return `<aside class="callout callout-${escapeAttribute(type)}" role="note">${innerHtml ?? ''}</aside>`;
+    },
+  },
+});
+```
+
+CSS in `markbook.css` styles the four types (info/tip/warning/danger) with tinted left borders + soft background washes. Used in `pages/guides/customization.md` to highlight the "pick the smallest layer" tip.
+
+### New site content
+
+- **`pages/guides/custom-directives.md`** (new) — full extension guide: register, leaf vs container, descriptor form, context fields, result variants, async + file I/O, built-in conflict, safety helpers, error handling, real-world examples.
+- **`pages/reference/directives.md`** — restructured to split built-in directives (story/stories/props) from user directives, with a pointer to the new guide.
+- **`pages/index.md`** — added a "Custom directives →" guide card on the home page.
+
+### Verified end-to-end
+
+```
+$ pnpm example:site:build
+✓ Markbook build complete
+
+$ grep -oE '<aside class="callout[^>]*>' dist/guides/customization.html
+<aside class="callout callout-tip" role="note">
+
+$ awk '/<aside class="callout/,/<\/aside>/' dist/guides/customization.html
+<aside class="callout callout-tip" role="note">
+  <p>
+    <strong>Pick the smallest layer that solves your problem.</strong>
+    Token overrides via <code>css</code> cover ~80% of branding needs.
+    Reach for <code>disableBaseCss</code> + <code>layoutsDir</code> only
+    when the docs chrome itself is wrong for your site.
+  </p>
+</aside>
+```
+
+Inner markdown (strong + code) was correctly parsed before being handed to the handler as `innerHtml`. All 6 example demos build. 248 tests pass. Lint clean.
+
+**Why:** The user's observation was exactly right — `:::story` is the most distinctive piece of Markbook syntax, and there's no reason it should be the only one. The extension surface is small (one config key, one handler signature, a few helper exports) but unlocks a long tail of authoring vocabulary: admonitions, video embeds, diagram renderers, API doc cards, GitHub file embeds, CSV → table renderers, tab containers, collection lists. Each one becomes a piece of vocabulary your team gets to use without leaving markdown.
+
+The design balances ergonomic shorthand (function-as-handler, string-as-result) with full control (descriptor form for type pinning, object result for llms.txt markdown fallback + dependency tracking). Built-ins are protected from accidental override. Errors carry source position + cause. Async + file I/O work naturally. Rubber-duck pass flagged five concrete improvements (innerMarkdown alongside innerHtml, dep tracking, markdown fallback, descriptor form, attribute typing) — all incorporated before commit.
+
+**Next:** None specific. Future considerations: text directives (`:name[label]`) for inline use cases; a `markbook-callout` user-facing skill that scaffolds the pattern. Both are opt-in additions; the v1 surface is complete.

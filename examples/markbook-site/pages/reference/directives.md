@@ -1,6 +1,6 @@
 ---
 title: Markdown directives
-description: The custom :::directives Markbook recognizes for stories, props tables, and more.
+description: The custom :::directives Markbook recognizes — built-in (story, stories, props) and user-registered.
 ---
 
 # Markdown directives
@@ -9,10 +9,17 @@ Markbook understands a few [`remark-directive`](https://github.com/remarkjs/rema
 
 ```markdown
 :::name{key=value other=value}
+body content
 :::
 ```
 
-## `:::story` — one story per file
+(or, without a body: `::name{key=value}`)
+
+## Built-in directives
+
+Markbook ships three. They're tightly integrated with internal pipelines (story-file resolution, TypeScript AST analysis) and cannot be overridden.
+
+### `:::story` — one story per file
 
 Mount a single component story.
 
@@ -29,7 +36,7 @@ Mount a single component story.
 
 The story file's default export is the story (a component, or a CSF v3 object with `render`/`args`/`argTypes`/`parameters`). See [adding stories →](../guides/adding-stories.html) for the workflow.
 
-## `:::stories` — multiple exports from one file
+### `:::stories` — multiple exports from one file
 
 Mount every named export from a CSF v3 story file as a grid of cards.
 
@@ -40,7 +47,7 @@ Mount every named export from a CSF v3 story file as a grid of cards.
 
 Markbook walks the file's TypeScript AST to find runtime exports, skips type-only exports + reserved names (`default`, `args`, `argTypes`, `parameters`), and renders one card per remaining export with its humanized name.
 
-## `:::props` — generated props table
+### `:::props` — generated props table
 
 Render a table of every prop in a React component, generated from its TypeScript types via `react-docgen-typescript`. React-only.
 
@@ -66,6 +73,26 @@ componentExport: Button
 
 The directive renders a table of `{ Name, Type, Default, Description }` for every prop. The same table is mirrored into the page's `llms/<page>.txt` so LLMs see the props too.
 
+## User directives (`config.directives`)
+
+Register your own from `markbook.config.ts`:
+
+```ts
+export default defineConfig({
+  directives: {
+    youtube: ({ attributes }) =>
+      `<iframe src="https://youtube.com/embed/${attributes.id}" allowfullscreen></iframe>`,
+
+    callout: ({ attributes, innerHtml }) =>
+      `<aside class="callout callout-${attributes.type}">${innerHtml ?? ''}</aside>`,
+  },
+});
+```
+
+Both leaf (`::name{...}`) and container (`:::name{...}\n...\n:::`) forms are supported. Handlers receive the directive's attributes, inner content (parsed HTML + raw markdown), and page context.
+
+See [custom directives guide →](../guides/custom-directives.html) for the full extension model — async handlers, dependency tracking, error handling, the descriptor form for stricter validation, and example handlers.
+
 ## Attribute syntax
 
 Directive attributes use the standard remark-directive format:
@@ -77,8 +104,11 @@ Directive attributes use the standard remark-directive format:
 
 - Unquoted values are allowed for values without spaces.
 - Quoted values for spaces: `attr="value with space"`.
-- Boolean attributes (key with no value) are not currently used by any directive.
+- Valueless attributes are passed to the handler as the empty string (`""`).
 
-## Skipping directives
+## Skipping behaviour
 
-A directive with a missing required attribute is rendered as an empty placeholder (no error). A directive Markbook doesn't recognize is rendered as-is (HTML for the directive's content). This is deliberate — Markbook doesn't claim to own the entire directive vocabulary; you can use other remark-directive consumers alongside it.
+- A built-in directive with a missing required attribute is rendered as an empty placeholder (no error).
+- A user directive whose handler returns `null` / `undefined` drops the directive entirely.
+- An UNKNOWN directive name (neither built-in nor user-registered) is rendered as-is — Markbook doesn't claim to own the entire directive vocabulary, so other remark-directive consumers can coexist.
+

@@ -467,3 +467,51 @@ was `docsDir` (kept as a legacy alias). If both are set, Markbook throws
   soft-deprecation warning on `docsDir` in a future minor.
 - **Dev watcher includes `layoutDirs`.** Editing a layout file
   triggers a full reload, same as editing markdown or CSS.
+
+## ADR-0025 — User-defined markdown directives via `config.directives`
+
+**Status:** Accepted (2026-06-04).
+
+**Context.** Markbook ships three built-in directives (`:::story`, `:::stories`, `:::props`). The user observed: "the `:::story` markdown tag is pretty great and I'm thinking if we could create an extension model with which people could add more custom tags." Real-world demand surfaces immediately — callouts/admonitions, video embeds, Mermaid diagrams, API endpoint cards, GitHub file embeds, CSV→table renderers. Without an extension model, every site that wants any of these has to fork the parser or fall back to raw HTML in markdown.
+
+**Decision.** Add `MarkbookConfig.directives` — a `Record<string, DirectiveHandler>` registry the user populates from `markbook.config.ts`. Handlers receive the directive's attributes + page context and return HTML to substitute.
+
+```ts
+defineConfig({
+  directives: {
+    youtube: ({ attributes }) =>
+      `<iframe src="https://youtube.com/embed/${attributes.id}" allowfullscreen></iframe>`,
+    callout: ({ attributes, innerHtml }) =>
+      `<aside class="callout callout-${attributes.type ?? 'info'}">${innerHtml ?? ''}</aside>`,
+  },
+});
+```
+
+### Public API
+
+- **`DirectiveHandler = DirectiveHandlerFn | DirectiveHandlerDescriptor`** — the function shorthand accepts both leaf and container forms; the descriptor form `{ type: 'leaf' | 'container', handler }` pins one form and throws on the other (clearer error than silently letting the handler see an unexpected `innerHtml`).
+- **`DirectiveContext`** carries `{ name, attributes, type, innerHtml, innerMarkdown, pageFile, root, frontmatter }`. Attributes are typed `Record<string, string | undefined>` (remark-directive emits valueless attrs as `''`; we don't lie about that).
+- **`DirectiveResult = string | DirectiveResultObject | null | undefined`** — string shorthand for the simple case; object form carries `{ html, markdown?, dependencies? }`; null/undefined drops the directive.
+- **`BUILTIN_DIRECTIVES`** exported constant for users who want to introspect the reserved-name list.
+- **`escapeHtml`, `escapeAttribute`** — tiny helpers re-exported so handlers don't import their own.
+
+### Alternatives considered
+
+- **Plain function-as-config (`directives: () => …`).** Rejected — couldn't carry per-directive metadata (the `type` pin), and conflicts with the natural mental model of "a map of name → handler."
+- **Lazy `renderInnerHtml()` method on context.** Rejected — adds API surface for marginal benefit (rendering happens at the same cost either way; users would call it 100% of the time in practice).
+- **Plugin system / remark plugin pass-through.** Rejected — remark plugins are powerful but exposing them as Markbook's extension surface couples consumers to remark internals. The directive API is narrow on purpose; reach for `transformHtml` for power-user cases.
+- **Built-in conflict policy: silently override built-ins.** Rejected (rubber-duck flag). Built-ins have side effects (`:::story` populates `parsed.stories`, story-file resolution kicks in) a user handler can't replicate. Throwing at config load is the safer default.
+- **Sync handlers only.** Rejected. The most useful directives (Mermaid, CSV table, GitHub file embed) need file I/O or network access. Async-by-default; sync handlers just return strings.
+- **No dependency tracking.** Rejected (rubber-duck flag). Handlers that read files would silently break in dev mode without re-render hooks. Surfacing `dependencies` in the result object is cheap (~10 lines in the watcher) and the right default.
+
+### Consequences
+
+- **Built-in handler dispatch loop in `parse.ts` extended cleanly.** The visitor was already collecting `slots` and resolving them in an async pass; user directives slot into the same pattern as a new `UserDirectiveSlot` kind. Built-in directives still take precedence (story/stories/props names can't be overridden), but every other name is up for grabs.
+- **Container directive `innerHtml` semantics: children are pre-rendered through Markbook's standard pipeline.** This means callout-like wrappers "just work" with markdown inside. The trade-off: nested user directives inside a container don't currently re-dispatch — the v1 scope is "render rich markdown inside callouts," not "deeply compose directive trees." Documented in the dispatcher source.
+- **`innerMarkdown` alongside `innerHtml`.** Cheap, future-proofs handlers that need the raw source (Mermaid passes the text to mermaid.js verbatim; a syntax-highlight directive might want the unparsed code).
+- **Dev-mode dep tracking.** Handler-reported `dependencies` flow through `ParsedPage.directiveDependencies` → `WritePagesResult.directiveDependencies` → the chokidar watch list in `dev()`. New deps discovered on regeneration get `watcher.add`ed in the same loop that handles new story files.
+- **Errors get file:line context + `{ cause }`.** When a handler throws, we wrap with `Markbook: directive 'X' in /path/to/page.md:L:C threw: <message>` and preserve the original via `Error.cause`. Standard Node error patterns; debuggable.
+- **Pinned-type validation.** Descriptor-form handlers can declare `type: 'leaf' | 'container'`. When the user writes the directive with the wrong form, Markbook throws with the source position — much better than silently passing `innerHtml: null` to a handler that expected content. Function-shorthand handlers accept both forms; the handler can branch on `ctx.type` if it cares.
+- **Reserved name validation.** Built-in conflict throws at `createContext`; invalid characters throw too (remark-directive's parser only matches `/[a-z][a-z0-9-]*/i`, so anything else would silently never fire — better to throw than to ship a no-op).
+- **`escapeHtml` / `escapeAttribute` re-exported.** Same implementation today, separately named so handler authors reach for the right tool — and so a future minor can diverge (e.g. percent-encoding for URLs) without breaking callers.
+- **Public API gains 8 new exports**: `BUILTIN_DIRECTIVES`, `DirectiveHandler`, `DirectiveHandlerFn`, `DirectiveHandlerDescriptor`, `DirectiveContext`, `DirectiveResult`, `DirectiveResultObject`, `escapeHtml`, `escapeAttribute`. Every one has a TSDoc explaining intent. The surface is small but each piece is locked in for v1.0.

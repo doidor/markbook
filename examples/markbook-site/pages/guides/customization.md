@@ -16,6 +16,10 @@ Markbook layers customization from "smallest change you might want" to "I want t
 
 Each layer is opt-in; you can use one, two, all four, or none.
 
+:::callout{type=tip}
+**Pick the smallest layer that solves your problem.** Token overrides via `css` cover ~80% of branding needs. Reach for `disableBaseCss` + `layoutsDir` only when the docs chrome itself is wrong for your site.
+:::
+
 ## Layer 1 — Token overrides (`css`)
 
 The cheapest fix. Markbook's chrome is driven by CSS variables (`--mb-bg`, `--mb-fg`, `--mb-accent`, `--mb-link`, `--mb-content-width`, ...). Override them in a CSS file:

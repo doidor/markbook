@@ -1,4 +1,4 @@
-import { defineConfig } from '@markbook/core';
+import { defineConfig, escapeAttribute } from '@markbook/core';
 
 /**
  * The official Markbook site, built with Markbook.
@@ -13,7 +13,14 @@ import { defineConfig } from '@markbook/core';
  *
  * BASE_CSS is ON; `markbook.css` overrides the `--mb-*` tokens to a
  * violet-on-slate palette and adds the landing-page-specific classes.
+ *
+ * `directives.callout` registers a `:::callout{type=info|tip|warning|danger}`
+ * user directive — used by the guides to render admonitions. Demonstrates
+ * the extension model from `reference/directives.html`.
  */
+
+const CALLOUT_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
+
 export default defineConfig({
   contentDir: 'pages',
   title: 'Markbook',
@@ -24,4 +31,11 @@ export default defineConfig({
   siteUrl: 'https://microsoft.github.io/markbook',
   themeColor: '#a78bfa',
   playground: false,
+  directives: {
+    callout: ({ attributes, innerHtml }) => {
+      const raw = attributes.type ?? 'info';
+      const type = CALLOUT_TYPES.has(raw) ? raw : 'info';
+      return `<aside class="callout callout-${escapeAttribute(type)}" role="note">${innerHtml ?? ''}</aside>`;
+    },
+  },
 });
