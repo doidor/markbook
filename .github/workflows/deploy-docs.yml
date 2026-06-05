@@ -50,6 +50,14 @@ jobs:
       - name: Build the Markbook docs site
         run: pnpm example:site:build
 
+      - name: Build React demo site
+        run: pnpm example:build
+
+      - name: Copy React demo into docs site
+        run: |
+          mkdir -p examples/markbook-site/dist/demos/react-demo
+          cp -R examples/react-demo/dist/* examples/markbook-site/dist/demos/react-demo/
+
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5

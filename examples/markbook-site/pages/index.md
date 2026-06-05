@@ -75,6 +75,10 @@ layout: landing
       <strong>Search & SEO →</strong>
       <span>How Pagefind is hooked in, how sitemap/OG/Twitter tags are emitted, where to put your <code>siteUrl</code>.</span>
     </a>
+    <a class="site-guide-card" href="./demos/react-demo/">
+      <strong>React demo →</strong>
+      <span>Live demo of the React component library built with Markbook. Available at <code>/demos/react-demo/</code> on the published docs site.</span>
+    </a>
     <a class="site-guide-card" href="./reference/config.html">
       <strong>Config reference →</strong>
       <span>Every field of <code>MarkbookConfig</code>, with defaults and examples.</span>
