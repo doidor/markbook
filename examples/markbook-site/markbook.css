@@ -289,6 +289,26 @@
   color: var(--mb-fg-muted);
 }
 
+.site-hero-spotlight {
+  margin: 0 0 1.5rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--mb-bg-elev);
+  border: 1px solid var(--mb-border);
+  border-left: 3px solid var(--mb-accent);
+  border-radius: var(--mb-radius);
+}
+.site-hero-spotlight h3 {
+  font-size: 1rem;
+  margin: 0 0 0.25rem;
+  color: var(--mb-fg);
+}
+.site-hero-spotlight p {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--mb-fg-muted);
+  margin: 0;
+}
+
 .site-footer {
   border-top: 1px solid var(--mb-border);
   padding: 2.5rem 2rem;

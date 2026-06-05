@@ -54,7 +54,16 @@ layout: landing
     Two reading paths, depending on what you're building.
   </p>
 
+  <div class="site-hero-spotlight">
+    <h3>Try the interactive demo</h3>
+    <p>Explore a live React component demo built with Markbook — stories, variants, and interactive examples. <a href="./demos/react-demo/">Open the React demo →</a></p>
+  </div>
+
   <div class="site-guide-grid">
+    <a class="site-guide-card" href="./demos/react-demo/">
+      <strong>React demo →</strong>
+      <span>Live demo of the React component library built with Markbook. Available at <code>/demos/react-demo/</code> on the published docs site.</span>
+    </a>
     <a class="site-guide-card" href="./guides/getting-started.html">
       <strong>Getting started →</strong>
       <span>Install, scaffold a project, run the dev server. Five minutes from zero to your first page.</span>
