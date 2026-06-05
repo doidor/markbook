@@ -1,83 +1,151 @@
 # Markbook
 
-A lightweight Storybook alternative. Author component documentation as plain
-**Markdown**; story components live in adjacent `.tsx` / `.ts` / `.js` files
-that the markdown imports via directives. The build emits a static
-Starlight-style HTML site, a [Pagefind][pagefind] full-text search index, and
-a [`llms.txt`][llmstxt] mirror — plus portable, drop-in embeds for any of
-your stories.
+**A lightweight, markdown-first Storybook alternative.** Author your
+documentation as plain **Markdown**; reference component stories that live in
+adjacent `.tsx` / `.ts` / `.vue` / `.js` files via directives. The build emits
+a static, Starlight-style HTML site with full-text search, dark mode, an
+[`llms.txt`][llmstxt] mirror, SEO tags, and a sitemap — plus portable, drop-in
+embeds of any of your stories.
 
-> **Status:** v0.10+ — chrome customization, `:::stories` directive, story
-> portability, three framework adapters (React, Vue, web components),
-> `config.directives` extension model for user-defined directives plus an
-> `htmlTemplate(source)` helper for handlers whose output lives in `.html`
-> files, SEO defaults (canonical + OG + Twitter + sitemap.xml + robots.txt),
-> a `public/` folder for static assets, and a `preview` command. v1.0
-> freezes the public API; until then minor releases may break things.
+📖 **[Read the docs →](https://doidor.github.io/markbook)** &nbsp;·&nbsp;
+🧩 React / Vue / Web Components &nbsp;·&nbsp;
+🔍 Pagefind search &nbsp;·&nbsp;
+📦 Portable story embeds
 
-## Why
+> **Status:** pre-1.0. The public API (`defineConfig`, `build`/`dev`/`bundle`,
+> the adapter contract, directives, frontmatter, theme tokens) is documented
+> and largely stable, but minor releases may still break things until v1.0
+> freezes it.
 
-- **Markdown-first.** Stories are referenced from CommonMark — no MDX, no JSX
-  in your prose. The `llms.txt` falls out for free.
-- **One story per file (or many).** Use `:::story{src=…}` for one renderer
-  per file, or `:::stories{src=…}` to fan out to every named export.
-- **Framework-agnostic core.** Adapters mount React, Vue, or web components
-  into placeholder elements; the core knows nothing about any of them.
-- **Stories that escape the docs site.** `markbook bundle` produces either
-  self-contained ESM embeds (drop-in `<script type="module">` on any page) or
-  publishable npm packages with the framework as a peer dep.
-- **Search, dark mode, themes, custom CSS, HTML layouts.** Pagefind,
-  `[data-theme]` token flipping, and four layers of customization
-  (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) so the same
-  engine can render docs sites, marketing sites, or anything in between.
-- **Extensible directives.** Beyond the three built-ins (`:::story`,
-  `:::stories`, `:::props`), register your own with `config.directives` —
-  `:::callout`, `::youtube`, `:::csv-table`, anything. Handlers are plain
-  TS functions; the `htmlTemplate(source)` helper lets directive markup
-  live in real `.html` files (with `{{ key }}` substitution) instead of
-  inline JS template literals.
+---
+
+## Contents
+
+- [Why Markbook](#why-markbook)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Core concepts](#core-concepts)
+  - [Pages & frontmatter](#pages--frontmatter)
+  - [Directives](#directives)
+  - [Component stories](#component-stories)
+  - [Bundling stories](#bundling-stories)
+  - [Customization](#customization)
+  - [Search, SEO & llms.txt](#search-seo--llmstxt)
+- [CLI](#cli)
+- [Configuration](#configuration)
+- [What Markbook deliberately doesn't ship](#what-markbook-deliberately-doesnt-ship)
+- [Packages](#packages)
+- [Repository layout](#repository-layout)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Why Markbook
+
+- **📄 Markdown is the source of truth.** Every page is a `.md` file; the HTML
+  site and the `llms.txt` mirror are two views of one AST. No MDX, no JSX in
+  your prose, no JSON sidecars, no JS templates to learn.
+- **🧩 Component stories, optional.** Drop a `:::story` directive into any page
+  to mount a React, Vue, or web-component example. Skip the directive — and the
+  adapter — for a pure docs/marketing site.
+- **🔍 Search + SEO by default.** [Pagefind][pagefind] builds a full-text index
+  at build time. Canonical, Open Graph, Twitter Card, `sitemap.xml`, and
+  `robots.txt` are emitted automatically.
+- **🎨 Four layers of customization.** Token overrides → opt out of base CSS →
+  swap the HTML shell with your own layouts → post-process the final HTML. Each
+  layer is opt-in; reach for the smallest one that solves your problem.
+- **📦 Portable stories.** `markbook bundle` produces self-contained ESM embeds
+  (drop a `<script type="module">` on any page) or publishable npm packages
+  with the framework as a peer dependency — stories that work anywhere.
+- **⚡ Fast dev loop.** Vite under the hood. ~80 ms regeneration on a small site,
+  including a full Pagefind re-index, with hot reload across markdown, CSS,
+  layouts, and story files.
+- **🛠️ Extensible directives.** Beyond the three built-ins, register your own
+  `:::name` handlers from `markbook.config.ts` — admonitions, video embeds,
+  diagram renderers, any reusable markdown vocabulary your team needs.
 
 ## Install
 
 ```bash
-pnpm add -D markbook @markbook/core @markbook/adapter-react
-pnpm add react react-dom  # or vue, or nothing for web components
+# Core + CLI (markdown-only sites need nothing else)
+pnpm add -D markbook @markbook/core
 ```
 
-After installing, run `markbook skills install` to drop agent-CLI skills (`markbook-init`, `markbook-add-component-page`, `markbook-bulk-generate`, `markbook-style`, `markbook-bundle-story`) into your project's `.claude/skills/` (or `.codex/`, `.opencode/`, `.agents/`). Then your agent can scaffold pages, bulk-generate from an existing component library, apply visual presets, etc. — see [`packages/cli/README.md`](packages/cli/README.md#markbook-skills-action) for the full skill catalogue.
+For live **component stories**, add the matching adapter and its runtime:
 
-## Hello world
+```bash
+# React
+pnpm add -D @markbook/adapter-react && pnpm add react react-dom
 
-```
-docs/
-  index.md
-  Button/
-    Button.stories.tsx
-markbook.config.ts
-```
+# Vue
+pnpm add -D @markbook/adapter-vue && pnpm add vue
 
-`docs/index.md`:
-
-```md
----
-title: Button
----
-
-# Button
-
-:::story{src=./Button/Button.stories.tsx}
-:::
+# Web components — no adapter dependency, no runtime
+pnpm add -D @markbook/adapter-wc
 ```
 
-`docs/Button/Button.stories.tsx`:
+Works with any package manager (`npm install --save-dev` / `yarn add -D` too).
 
-```tsx
-export default () => <button type="button">Hello</button>;
+> **Using an AI coding agent?** Run `markbook skills install` to drop
+> Markbook-specific skills (`markbook-init`, `markbook-add-component-page`,
+> `markbook-bulk-generate`, `markbook-style`, `markbook-bundle-story`) into
+> `.claude/` / `.codex/` / `.opencode/` / `.agents/` so your agent can scaffold
+> pages and generate stories. See the [CLI README](packages/cli/README.md).
+
+## Quick start
+
+A minimal markdown-only site:
+
+```
+my-site/
+├─ pages/
+│  └─ index.md
+└─ markbook.config.ts
 ```
 
 `markbook.config.ts`:
 
 ```ts
+import { defineConfig } from '@markbook/core';
+
+export default defineConfig({
+  title: 'My Project',
+  description: 'A short blurb about the site.',
+});
+```
+
+`pages/index.md`:
+
+```markdown
+---
+title: Welcome
+description: The home page of my site.
+---
+
+# Hello, world
+
+This is **markdown**. It becomes HTML — with search, dark mode, and a TOC.
+```
+
+Then:
+
+```bash
+npx markbook dev      # live dev server with HMR  → http://localhost:5173
+npx markbook build    # static site in dist/
+npx markbook preview  # serve dist/ over HTTP      → http://localhost:4173
+```
+
+> Markbook reads from `pages/` or `docs/` (configurable via `contentDir`).
+> Don't open `dist/*.html` via `file://` — Pagefind loads its runtime through
+> dynamic `import()`, which browsers block on `file://`. Use `markbook preview`.
+
+### …with a component story
+
+Add an adapter to the config and reference a story file from markdown:
+
+```ts
+// markbook.config.ts
 import { defineConfig } from '@markbook/core';
 import { reactAdapter } from '@markbook/adapter-react/config';
 
@@ -87,74 +155,290 @@ export default defineConfig({
 });
 ```
 
-Then:
-
-```bash
-pnpm markbook dev      # live HMR
-pnpm markbook build    # static site in dist/
-pnpm markbook bundle   # portable embeds in dist/embed/
+```tsx
+// pages/Button/Button.stories.tsx
+import { Button } from '../../../src/Button';
+export default () => <Button variant="primary">Click me</Button>;
 ```
 
-## Documentation
+````markdown
+<!-- pages/index.md -->
+# Button
+
+:::story{src=./Button/Button.stories.tsx}
+:::
+````
+
+Markbook mounts the live component where the directive was, with a
+Shiki-highlighted "Show code" disclosure underneath.
+
+## Core concepts
+
+### Pages & frontmatter
+
+Each `.md` file under `contentDir` becomes a page. Subdirectories become
+sidebar nav groups; H2/H3 headings become the on-this-page TOC. Frontmatter
+controls per-page behavior:
+
+| Field | Type | Purpose |
+| --- | --- | --- |
+| `title` | `string` | Page title (falls back to the first H1, then the file id). |
+| `description` | `string` | Muted lede under the H1; used for `<meta name="description">`. |
+| `order` | `number` | Sidebar position within the nav group (lower = earlier). |
+| `template` | `string` | Wrap the page in a markdown template from `templatesDir`. |
+| `layout` | `string \| false` | Pick an HTML layout from `layoutsDir`, or `false` to force the built-in shell. |
+| `component` / `componentExport` | `string` | Target component for `:::props`. |
+| `ogImage` | `string` | Per-page Open Graph image (overrides `config.ogImage`). |
+
+### Directives
+
+Markbook recognizes `:::name{attr=value}` (container) and `::name{attr=value}`
+(leaf) blocks on top of standard markdown — the syntax comes from
+[`remark-directive`](https://github.com/remarkjs/remark-directive); Markbook
+layers a registry + dispatcher on top.
+
+**Three built-ins** (tightly integrated with internal pipelines; cannot be
+overridden):
+
+- **`:::story{src=… [export=…] [id=…]}`** — mount a single story (the file's
+  default export, or a named `export`).
+- **`:::stories{src=… [only=A,B] [exclude=C]}`** — mount every named runtime
+  export of a CSF-v3 story file, discovered via TypeScript AST analysis, one
+  card per export.
+- **`:::props`** — render a props table for a React component (frontmatter
+  `component:`), generated from its TypeScript types via
+  `react-docgen-typescript`. The table is mirrored into `llms.txt` too.
+
+**User directives** — register your own from `markbook.config.ts`:
+
+```ts
+import { defineConfig, escapeAttribute } from '@markbook/core';
+
+export default defineConfig({
+  directives: {
+    youtube: ({ attributes }) =>
+      `<iframe src="https://youtube.com/embed/${escapeAttribute(attributes.id ?? '')}" allowfullscreen></iframe>`,
+
+    callout: ({ attributes, innerHtml }) =>
+      `<aside class="callout callout-${attributes.type ?? 'info'}">${innerHtml ?? ''}</aside>`,
+  },
+});
+```
+
+Handlers can be async, read files (with dev-mode dependency tracking), return a
+plain-markdown fallback for `llms.txt`, and live in their own modules. The
+`htmlTemplate(new URL('./callout.html', import.meta.url))` helper lets directive
+markup live in a real `.html` file with `{{ key }}` substitution instead of
+inline template literals. See the
+[custom directives guide](https://doidor.github.io/markbook/guides/custom-directives.html).
+
+### Component stories
+
+Three thin adapters mount stories into placeholder elements; the core engine
+knows nothing about any framework.
+
+| Adapter | Mounts | Runtime |
+| --- | --- | --- |
+| `@markbook/adapter-react` | React components | `react`, `react-dom` (peer) |
+| `@markbook/adapter-vue` | Vue 3 components | `vue` (peer) |
+| `@markbook/adapter-wc` | Custom elements | none — vanilla DOM |
+
+A story file is a regular component file. **One story per file** is the
+convention (default export); multiple named exports fan out via `:::stories`.
+Storybook **CSF v3** object exports are supported:
+
+```tsx
+export const Primary = {
+  render: (args) => <Button {...args}>Click me</Button>,
+  args: { variant: 'primary', disabled: false },
+  argTypes: {
+    variant: { control: 'select', options: ['primary', 'secondary'] },
+    disabled: { control: 'boolean' },
+  },
+  parameters: { layout: 'centered' }, // centered | padded | fullscreen
+};
+```
+
+- **`args`** — initial prop values. The React adapter renders an interactive
+  **controls panel** under the story so readers can tweak props live.
+- **`argTypes`** — control hints (`text` / `number` / `boolean` / `select`);
+  inferred from `args` when omitted.
+- **Decorators** — wrap every story in shared providers (theme, i18n, router)
+  via `reactAdapter({ decorators: ['./preview.tsx', './theme.tsx'] })`. Applied
+  outer-to-inner: `['A', 'B']` → `<A><B><Story/></B></A>`.
+
+See the [adding-stories guide](https://doidor.github.io/markbook/guides/adding-stories.html).
+
+### Bundling stories
+
+`markbook bundle` packages stories as portable artifacts that work outside the
+docs site:
+
+```bash
+markbook bundle                      # all stories → self-mounting ESM embeds
+markbook bundle my-button            # one story by id
+markbook bundle --mode package       # publishable npm package directories
+markbook bundle --isolation shadow   # wrap each mount in an open shadow root
+```
+
+- **`embed` mode** → `dist/embed/<slug>.js`. Drop a placeholder anywhere:
+  ```html
+  <div data-markbook-embed="my-button"></div>
+  <script type="module" src="https://cdn.example.com/embed/my-button.js"></script>
+  ```
+  The bundled CSS is baked in and injected at mount time (into `document.head`,
+  or the shadow root with `--isolation shadow` so host-page CSS can't leak in).
+- **`package` mode** → `dist/packages/<slug>/`, a publishable npm package with
+  the framework declared as a peer dependency.
+
+### Customization
+
+Four escalating layers — use the smallest that solves your problem:
+
+1. **`css`** — inline CSS files after the built-in chrome. Override the `--mb-*`
+   theme tokens (`--mb-bg`, `--mb-fg`, `--mb-accent`, `--mb-content-width`, …) to
+   rebrand without touching templates. A `[data-theme="dark"]` block re-declares
+   the color tokens; the toggle is wired by an inline boot script.
+2. **`disableBaseCss`** — drop the built-in stylesheet entirely. The
+   `.markbook-*` class names and `data-*` hooks stay stable so you can restyle
+   from scratch.
+3. **`layoutsDir` + `layout`** — replace the whole HTML shell with your own
+   `.html` layouts, using `{{ content }}`, `{{ head }}`, `{{ bodyEnd }}`,
+   `{{ search }}`, `{{ themeToggle }}`, `{{ pageActions }}`, `{{ title }}`,
+   `{{ frontmatter.x }}`, … placeholders (validated — unknown placeholders and a
+   missing/duplicate `{{ content }}` throw).
+4. **`transformHtml(html, page)`** — an async escape hatch that post-processes
+   each page's final HTML.
+
+### Search, SEO & llms.txt
+
+- **Search** — Pagefind indexes the built output (and the dev server). `Cmd/Ctrl+K`
+  or `/` focuses the search box.
+- **SEO** — set `siteUrl` to emit `<link rel="canonical">`, `og:url`,
+  `sitemap.xml`, and `robots.txt`. Open Graph + Twitter Card + `theme-color` +
+  `color-scheme` meta are always injected.
+- **llms.txt** — every build emits a top-level `/llms.txt` index plus per-page
+  plain-markdown mirrors at `/llms/<page>.txt`, surfaced via "View / Copy as
+  Markdown" buttons on each page.
+
+## CLI
+
+```bash
+npx markbook <command> [options]
+```
+
+| Command | Purpose |
+| --- | --- |
+| `build` | Build the static site to `outDir` (parse → layout → Vite bundle → llms.txt → sitemap → Pagefind). |
+| `dev` | Vite dev server with HMR across markdown, CSS, layouts, and story files. `--port`, `--host`. |
+| `preview` | Serve the built `dist/` over HTTP (verify production output). |
+| `bundle [storyId]` | Bundle one/all stories. `--mode embed\|package`, `--isolation shadow`. |
+| `skills install` / `skills list` | Manage the agent skills shipped in the npm package. |
+
+Common flags: `-c, --config <path>` and `--root <path>`. Full details in the
+[CLI reference](https://doidor.github.io/markbook/reference/cli.html).
+
+## Configuration
+
+`markbook.config.{ts,mts,js,mjs}` exports a `MarkbookConfig` via `defineConfig`:
+
+```ts
+import { defineConfig } from '@markbook/core';
+import { reactAdapter } from '@markbook/adapter-react/config';
+
+export default defineConfig({
+  // Layout
+  contentDir: 'pages',          // default 'docs'
+  outDir: 'dist',
+  publicDir: 'public',          // static assets copied to the output root
+
+  // Identity + SEO
+  title: 'My Component Library',
+  description: 'A small set of accessible primitives.',
+  siteUrl: 'https://my-components.example',  // enables canonical/OG/sitemap
+  themeColor: '#7c3aed',
+  ogImage: 'https://my-components.example/og.png',
+
+  // Customization
+  css: ['./brand.css'],
+  // disableBaseCss: true,
+  // layoutsDir: 'layouts', layout: 'default',
+  // transformHtml: async (html, page) => html,
+
+  // Component stories (omit for markdown-only sites)
+  adapter: reactAdapter({ decorators: ['./preview.tsx'] }),
+
+  // User directives
+  directives: { /* youtube, callout, … */ },
+
+  // Optional: "Open in playground" buttons (CodeSandbox / StackBlitz)
+  // playground: { providers: ['codesandbox', 'stackblitz'] },
+
+  dev: { port: 5173 },
+});
+```
+
+Every field, with defaults, lives in the
+[config reference](https://doidor.github.io/markbook/reference/config.html) and
+in [`packages/core/README.md`](packages/core/README.md).
+
+## What Markbook deliberately doesn't ship
+
+- **No MDX.** Markdown is markdown. To embed a component, use a story directive —
+  your component file stays a regular `.tsx` your tooling already understands.
+- **No theme engine.** Customize via CSS tokens or replace the shell. No
+  theme-prop API, no provider hierarchy, no plugin framework to learn.
+- **No bundled UI framework.** Markbook itself is plain HTML + minified IIFE
+  boot scripts. Bring React/Vue for stories if you want them; the engine
+  doesn't care.
+
+## Packages
 
 | Package | Purpose |
 | --- | --- |
-| [`markbook`](packages/cli) | The `markbook` CLI (`build`, `dev`, `bundle`) |
-| [`@markbook/core`](packages/core) | Markdown parser, builder, dev server, embed bundler |
-| [`@markbook/adapter-react`](packages/adapter-react) | Mount React stories |
-| [`@markbook/adapter-vue`](packages/adapter-vue) | Mount Vue stories |
-| [`@markbook/adapter-wc`](packages/adapter-wc) | Mount vanilla web components |
-
-For architectural decisions see [`DECISIONS.md`](DECISIONS.md). For the
-running development journal see [`PROGRESS.md`](PROGRESS.md).
+| [`markbook`](packages/cli) | The `markbook` CLI (`build`, `dev`, `preview`, `bundle`, `skills`). |
+| [`@markbook/core`](packages/core) | Markdown parser, builder, dev server, embed bundler, directive registry. |
+| [`@markbook/adapter-react`](packages/adapter-react) | Mount React stories (+ controls + decorators). |
+| [`@markbook/adapter-vue`](packages/adapter-vue) | Mount Vue 3 stories (+ decorators). |
+| [`@markbook/adapter-wc`](packages/adapter-wc) | Mount vanilla web components (no runtime). |
+| [`@markbook/adapter-shared`](packages/adapter-shared) | Shared browser runtime for the adapters (internal; see [ADR-0026](DECISIONS.md)). |
 
 ## Repository layout
 
 ```
 packages/
-  core/             — markdown + builder + dev server + embed bundler
+  core/             — markdown + builder + dev server + embed bundler + directives
   cli/              — `markbook` binary (cac + jiti)
   adapter-react/    — React mount + controls + decorators
   adapter-vue/      — Vue 3 mount + decorators
-  adapter-wc/       — Web-components mount (no framework runtime)
+  adapter-wc/       — web-components mount (no framework runtime)
+  adapter-shared/   — shared pure-DOM runtime for the adapters
 examples/
   react-demo/       — Pixie component library — the canonical dogfood
   vue-demo/         — Counter component in Vue
   wc-demo/          — <click-counter> custom element
   static-demo/      — Skyline: a markdown-only docs site, no adapter
   marketing-demo/   — Cumulus: a marketing site with a fully custom layout
-                      (disableBaseCss + layouts/*.html + contentDir: 'pages')
-  markbook-site/    — the official Markbook website (hybrid: custom landing
-                      + default chrome for guides/reference). Markdown-only.
+  markbook-site/    — the official Markbook website (hybrid layout, custom :::callout)
   embed-host/       — external consumer of the React demo's embed bundles
 ```
 
-## Workspace scripts
+## Contributing
 
 ```bash
-pnpm install                 # bootstrap the workspace
-pnpm build                   # compile every @markbook/* package
-pnpm test                    # run @markbook/core's Vitest suite
-pnpm typecheck               # tsc --noEmit across the workspace
-pnpm lint                    # biome check
+pnpm install      # bootstrap the workspace
+pnpm build        # compile every @markbook/* package (tsc -b, topological)
+pnpm test         # @markbook/core + CLI Vitest suites
+pnpm typecheck    # tsc --noEmit across packages (resolves from source — no prior build needed)
+pnpm lint         # biome check
 
-# Run every example dev server in parallel — color-coded, one Ctrl-C
-# stops them all. URLs printed at startup. Add new examples in
-# scripts/examples-dev.mjs.
-pnpm examples:dev            # all 6 dev servers on ports 5173-5178
-pnpm examples:build          # build all 6 examples in parallel
-
-# Per-example scripts (each runs on the default port 5173 when invoked alone)
-pnpm example:dev             # React demo dev server (HMR)
-pnpm example:build           # build the React demo to dist/
-pnpm example:bundle          # bundle React demo stories as ESM embeds
-pnpm example:embed-host:serve  # serve the embed-host pages
-pnpm example:vue:dev|build|bundle
-pnpm example:wc:dev|build|bundle
-pnpm example:static:dev|build      # markdown-only docs site (no adapter)
-pnpm example:marketing:dev|build   # fully custom layout via HTML layouts + disableBaseCss
-pnpm example:site:dev|build|preview  # the official Markbook site (hybrid layout)
+pnpm examples:dev     # every example dev server in parallel (ports 5173+)
+pnpm examples:build   # build every example
 ```
+
+Conventions live in [`AGENTS.md`](AGENTS.md); architectural decisions in
+[`DECISIONS.md`](DECISIONS.md); the running development journal in
+[`PROGRESS.md`](PROGRESS.md); planned work in [`ROADMAP.md`](ROADMAP.md).
 
 ## License
 
