@@ -131,6 +131,7 @@ TypeScript types via `react-docgen-typescript` (React-only).
 | --- | --- | --- |
 | `title` | `string` | Page title; falls back to first H1, then the file ID |
 | `description` | `string` | Used as muted lede after the H1; appears in nav descriptions |
+| `order` | `number` | Sidebar position within the page's nav group (lower = earlier). Ordered pages appear before unordered ones; same-`order` pages preserve file-discovery order. The index page is always first. |
 | `template` | `string` | Wrap content in `<templatesDir>/<name>.md` |
 | `layout` | `string \| false` | Pick an HTML layout `<layoutsDir>/<name>.html`; `false` to opt out when `config.layout` sets a default |
 | `component` | `string` | Path to the component for `:::props` (relative to page) |
@@ -347,11 +348,36 @@ These classes / data-attributes stay stable even when you drop `BASE_CSS`:
 - `.markbook-story-block`, `.markbook-story`, `.markbook-controls`,
   `.markbook-code`, `.markbook-code-tabs`, `.markbook-code-tablist`,
   `.markbook-code-file`, `.markbook-code-file-label`
+- `.markbook-code-pre-wrap`, `.markbook-fenced-code`, `.markbook-code-copy`,
+  `.markbook-copy-label` (fenced markdown code blocks get the wrap +
+  Shiki + copy button — see "Code blocks" below)
 - `.markbook-props`, `.markbook-required`
 - `[data-markbook-story="<id>"]`, `[data-markbook-controls="<id>"]`,
   `[data-markbook-group="<id>"]`, `[data-markbook-embed="<slug>"]`,
   `[data-markbook-theme-toggle]`, `[data-markbook-tabs]`,
-  `[data-pagefind-body]`
+  `[data-markbook-copy]`, `[data-pagefind-body]`
+
+## Code blocks
+
+Every fenced markdown code block (triple-backtick) is automatically:
+
+- **Wrapped** in `<div class="markbook-code-pre-wrap markbook-fenced-code">`
+- **Syntax-highlighted** via [Shiki](https://shiki.style/) using the
+  `github-light` + `github-dark` themes (`defaultColor: false`) so the
+  `<html data-theme>` swap re-paints colors with zero rebuild. Blocks
+  without a language tag, or with a language Shiki doesn't recognize,
+  render as plain `<pre><code>` inside the same wrapper.
+- **Decorated** with a hover-revealed `<button data-markbook-copy>`. The
+  copy boot script in `BASE_CSS` finds the closest wrap, reads the
+  `<pre>`'s `textContent`, and writes it to the clipboard.
+
+Story code disclosures (`:::story` expansions) use the same Shiki + copy
+machinery but live inside a `<details class="markbook-code">` outer
+container so they can be collapsed/expanded.
+
+The fenced-code background pulls from `--mb-code-bg` so a single token
+override re-skins every code block in light + dark mode without touching
+Shiki's syntax colors.
 
 ## See also
 

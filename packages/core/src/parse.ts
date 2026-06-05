@@ -11,6 +11,7 @@ import { visit } from 'unist-util-visit';
 import { applyTemplate } from './template.js';
 import { humanizeExportName } from './exports.js';
 import { resolveSpec } from './resolve.js';
+import { highlightFencedCodeBlocks } from './fenced-code.js';
 
 export interface StoryCodeFile {
   label: string;
@@ -487,6 +488,9 @@ export async function parseMarkdown(
     })
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSlug)
+    .use(() => async (tree: unknown) => {
+      await highlightFencedCodeBlocks(tree);
+    })
     .use(() => (tree: unknown) => {
       visit(tree as never, 'element', (node: any) => {
         if (typeof node.tagName !== 'string') return;
@@ -571,6 +575,9 @@ function isDirectiveDescriptor(
 async function renderChildrenToHtml(children: unknown[]): Promise<string> {
   const processor = unified()
     .use(remarkRehype, { allowDangerousHtml: true })
+    .use(() => async (tree: unknown) => {
+      await highlightFencedCodeBlocks(tree);
+    })
     .use(rehypeStringify, { allowDangerousHtml: true });
   const wrapper = { type: 'root', children };
   const hast = await processor.run(wrapper as never);

@@ -22,6 +22,7 @@ Markbook recognizes the following fields. Any field not listed here is passed th
 | --- | --- | --- | --- |
 | `title` | `string` | First H1, then file ID | Page title. Used for `<title>`, sidebar label, OG/Twitter titles. |
 | `description` | `string` | `config.description` | Used as `<meta name="description">`, `og:description`, `twitter:description`, AND in the `llms.txt` index entry. |
+| `order` | `number` | (none) | Sidebar position within the page's nav group (lower = earlier). Pages with `order` appear before pages without it; same-`order` pages preserve their file-discovery order. The index page is always first regardless of `order`. |
 
 ## Layout selection
 

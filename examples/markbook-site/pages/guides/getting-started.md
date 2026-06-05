@@ -1,6 +1,7 @@
 ---
 title: Getting started
 description: Install Markbook, scaffold a project, write your first page, run the dev server.
+order: 1
 ---
 
 # Getting started

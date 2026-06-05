@@ -9,14 +9,16 @@ import {
   normalizeSiteUrl,
   resolvePageLayout,
   sortIndexFirst,
+  sortNavItems,
   type NavItem,
 } from './build.js';
 import type { ParsedPage } from './parse.js';
 
-const item = (id: string, htmlRelPath: string): NavItem => ({
+const item = (id: string, htmlRelPath: string, order?: number): NavItem => ({
   id,
   title: id,
   htmlRelPath,
+  ...(order !== undefined ? { order } : {}),
 });
 
 describe('capitalize', () => {
@@ -68,6 +70,67 @@ describe('sortIndexFirst', () => {
     const original = [...items];
     sortIndexFirst(items);
     expect(items).toEqual(original);
+  });
+});
+
+describe('sortNavItems', () => {
+  it('places frontmatter-ordered items before unordered ones', () => {
+    const items = [item('a', 'a.html'), item('b', 'b.html'), item('c', 'c.html', 1)];
+    const sorted = sortNavItems(items);
+    expect(sorted.map((i) => i.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('sorts ordered items ascending by order', () => {
+    const items = [item('a', 'a.html', 5), item('b', 'b.html', 1), item('c', 'c.html', 3)];
+    expect(sortNavItems(items).map((i) => i.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('preserves original file-discovery order for unordered items (stable)', () => {
+    // The "Getting started" scenario: getting-started.md was discovered
+    // 4th alphabetically by file path; without `order`, the other guides
+    // keep their existing position; with `order: 1`, getting-started
+    // jumps to the front but the rest stay in their original order.
+    const items = [
+      item('adding-stories', 'adding-stories.html'),
+      item('custom-directives', 'custom-directives.html'),
+      item('customization', 'customization.html'),
+      item('getting-started', 'getting-started.html', 1),
+      item('search-and-seo', 'search-and-seo.html'),
+    ];
+    expect(sortNavItems(items).map((i) => i.id)).toEqual([
+      'getting-started',
+      'adding-stories',
+      'custom-directives',
+      'customization',
+      'search-and-seo',
+    ]);
+  });
+
+  it('breaks order-ties by original file-discovery order', () => {
+    const items = [item('a', 'a.html', 2), item('b', 'b.html', 2), item('c', 'c.html', 2)];
+    expect(sortNavItems(items).map((i) => i.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('places the index page before everything, even before ordered items', () => {
+    const items = [item('a', 'a.html', 1), item('idx', 'index.html'), item('b', 'b.html', 2)];
+    expect(sortNavItems(items).map((i) => i.id)).toEqual(['idx', 'a', 'b']);
+  });
+
+  it('handles negative and zero order values', () => {
+    const items = [item('a', 'a.html', 0), item('b', 'b.html', -1), item('c', 'c.html', 5)];
+    expect(sortNavItems(items).map((i) => i.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('does not mutate the input array', () => {
+    const items = [item('a', 'a.html', 2), item('b', 'b.html', 1)];
+    const original = [...items];
+    sortNavItems(items);
+    expect(items).toEqual(original);
+  });
+
+  it('sortIndexFirst is a backwards-compatible alias of sortNavItems', () => {
+    const items = [item('b', 'b.html'), item('idx', 'index.html')];
+    expect(sortIndexFirst(items).map((i) => i.id)).toEqual(['idx', 'b']);
   });
 });
 

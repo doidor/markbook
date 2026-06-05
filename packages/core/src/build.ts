@@ -32,6 +32,14 @@ export interface NavItem {
   id: string;
   title: string;
   htmlRelPath: string;
+  /**
+   * Explicit sort key from frontmatter `order:`. When set on at least one
+   * sibling, ordered pages appear before unordered ones, sorted ascending
+   * by `order`. Unordered pages preserve their existing file-discovery
+   * order (alphabetical by file path) — adding `order:` to one page does
+   * not silently reshuffle the others.
+   */
+  order?: number;
 }
 
 export interface NavGroup {
@@ -837,33 +845,58 @@ function buildNav(pages: PageRecord[]): NavGroup[] {
   const groupMap = new Map<string | null, NavItem[]>();
   for (const p of pages) {
     if (!groupMap.has(p.groupKey)) groupMap.set(p.groupKey, []);
+    const rawOrder = p.parsed.frontmatter.order;
+    const order = typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : undefined;
     groupMap.get(p.groupKey)!.push({
       id: p.fileId,
       title: p.parsed.title,
       htmlRelPath: p.htmlRelPath,
+      order,
     });
   }
   const groups: NavGroup[] = [];
   if (groupMap.has(null)) {
-    groups.push({ label: null, items: sortIndexFirst(groupMap.get(null)!) });
+    groups.push({ label: null, items: sortNavItems(groupMap.get(null)!) });
   }
   const named = [...groupMap.entries()]
     .filter(([k]) => k !== null)
     .sort(([a], [b]) => (a as string).localeCompare(b as string));
   for (const [k, v] of named) {
-    groups.push({ label: k as string, items: sortIndexFirst(v) });
+    groups.push({ label: k as string, items: sortNavItems(v) });
   }
   return groups;
 }
 
-export function sortIndexFirst(items: NavItem[]): NavItem[] {
-  return items.slice().sort((a, b) => {
-    const aIdx = isIndexHref(a.htmlRelPath);
-    const bIdx = isIndexHref(b.htmlRelPath);
-    if (aIdx && !bIdx) return -1;
-    if (!aIdx && bIdx) return 1;
-    return 0;
+/**
+ * Sort sidebar items: index page first, then frontmatter-ordered pages
+ * ascending, then any pages without `order:` in their original
+ * file-discovery order (stable). Ties on `order` also fall back to
+ * file-discovery order. The stability matters: users who rely on
+ * filename prefixes for sort order (`01-intro.md`, `02-setup.md`)
+ * don't get silently reshuffled by adding `order:` to one sibling.
+ */
+export function sortNavItems(items: NavItem[]): NavItem[] {
+  const indexed = items.map((item, originalIndex) => ({ item, originalIndex }));
+  indexed.sort((a, b) => {
+    const aIdx = isIndexHref(a.item.htmlRelPath);
+    const bIdx = isIndexHref(b.item.htmlRelPath);
+    if (aIdx !== bIdx) return aIdx ? -1 : 1;
+
+    const aOrdered = a.item.order !== undefined;
+    const bOrdered = b.item.order !== undefined;
+    if (aOrdered !== bOrdered) return aOrdered ? -1 : 1;
+    if (aOrdered && bOrdered && a.item.order !== b.item.order) {
+      return (a.item.order as number) - (b.item.order as number);
+    }
+
+    return a.originalIndex - b.originalIndex;
   });
+  return indexed.map(({ item }) => item);
+}
+
+/** @deprecated Use `sortNavItems`. Kept as a thin alias for backward compatibility with any consumer reaching into the internals. */
+export function sortIndexFirst(items: NavItem[]): NavItem[] {
+  return sortNavItems(items);
 }
 
 export function isIndexHref(href: string): boolean {
@@ -2123,6 +2156,32 @@ a:hover { text-decoration: underline; }
 .markbook-code-copy:hover { color: var(--mb-fg); border-color: var(--mb-accent); }
 .markbook-code-copy.is-copied { opacity: 1; color: var(--mb-accent); border-color: var(--mb-accent); }
 .markbook-code-copy:focus-visible { outline: 2px solid var(--mb-accent); outline-offset: 2px; }
+
+/* Fenced markdown code blocks (triple-backtick blocks in any page).
+   Layered AFTER the global .markbook-content .shiki rules so the bg
+   override wins. */
+.markbook-content .markbook-code-pre-wrap.markbook-fenced-code {
+  margin: 1rem 0;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  overflow: hidden;
+  background: var(--mb-code-bg);
+}
+.markbook-content .markbook-fenced-code pre {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  background: transparent;
+}
+.markbook-content .markbook-fenced-code pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85em;
+}
+.markbook-content .markbook-fenced-code .shiki,
+.markbook-content .markbook-fenced-code .shiki span {
+  background-color: transparent;
+}
 .markbook-heading-anchor {
   display: inline-block;
   margin-left: 0.35rem;
