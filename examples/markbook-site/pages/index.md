@@ -55,31 +55,31 @@ layout: landing
   </p>
 
   <div class="site-guide-grid">
-    <a class="site-guide-card" href="/guides/getting-started.html">
+    <a class="site-guide-card" href="./guides/getting-started.html">
       <strong>Getting started →</strong>
       <span>Install, scaffold a project, run the dev server. Five minutes from zero to your first page.</span>
     </a>
-    <a class="site-guide-card" href="/guides/adding-stories.html">
+    <a class="site-guide-card" href="./guides/adding-stories.html">
       <strong>Adding component stories →</strong>
       <span>Wire up an adapter (React / Vue / web components), drop your first <code>:::story</code> directive, view it in the docs.</span>
     </a>
-    <a class="site-guide-card" href="/guides/customization.html">
+    <a class="site-guide-card" href="./guides/customization.html">
       <strong>Customization →</strong>
       <span>The four-layer model — tokens, disabling base CSS, custom HTML layouts, post-processing. Pick the smallest one that solves your problem.</span>
     </a>
-    <a class="site-guide-card" href="/guides/custom-directives.html">
+    <a class="site-guide-card" href="./guides/custom-directives.html">
       <strong>Custom directives →</strong>
       <span>Register your own <code>:::name</code> directives. Build admonitions, video embeds, diagram renderers — any reusable markdown vocabulary your team needs.</span>
     </a>
-    <a class="site-guide-card" href="/guides/search-and-seo.html">
+    <a class="site-guide-card" href="./guides/search-and-seo.html">
       <strong>Search & SEO →</strong>
       <span>How Pagefind is hooked in, how sitemap/OG/Twitter tags are emitted, where to put your <code>siteUrl</code>.</span>
     </a>
-    <a class="site-guide-card" href="/reference/config.html">
+    <a class="site-guide-card" href="./reference/config.html">
       <strong>Config reference →</strong>
       <span>Every field of <code>MarkbookConfig</code>, with defaults and examples.</span>
     </a>
-    <a class="site-guide-card" href="/reference/cli.html">
+    <a class="site-guide-card" href="./reference/cli.html">
       <strong>CLI reference →</strong>
       <span><code>build</code>, <code>dev</code>, <code>preview</code>, <code>bundle</code>, <code>skills install</code> — every command, every flag.</span>
     </a>

@@ -1,0 +1,68 @@
+name: Deploy docs site
+
+# Build the official Markbook documentation site (examples/markbook-site) and
+# publish it to GitHub Pages at https://doidor.github.io/markbook/.
+#
+# The site is markdown-only, but `markbook build` runs through the CLI, so the
+# @markbook/* packages are compiled first (`pnpm build`). The built output uses
+# relative asset/link paths, so it works correctly under the /markbook/ project
+# sub-path.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Grant the GITHUB_TOKEN the permissions the Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent Pages deployment; let an in-progress run finish
+# (don't cancel a deploy mid-flight).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # pnpm version comes from the root package.json "packageManager" field.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The site builds via the `markbook` CLI, which imports the compiled
+      # @markbook/core + CLI dist — build the packages first.
+      - name: Build packages
+        run: pnpm build
+
+      - name: Build the Markbook docs site
+        run: pnpm example:site:build
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: examples/markbook-site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
