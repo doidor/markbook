@@ -69,23 +69,32 @@ embeds of any of your stories.
 
 ```bash
 # Core + CLI (markdown-only sites need nothing else)
+npm install -D markbook @markbook/core
 pnpm add -D markbook @markbook/core
+yarn add -D markbook @markbook/core
 ```
 
 For live **component stories**, add the matching adapter and its runtime:
 
 ```bash
-# React
+# React — adapter (dev) + react/react-dom runtime
+npm install -D @markbook/adapter-react && npm install react react-dom
 pnpm add -D @markbook/adapter-react && pnpm add react react-dom
+yarn add -D @markbook/adapter-react && yarn add react react-dom
 
-# Vue
+# Vue — adapter (dev) + vue runtime
+npm install -D @markbook/adapter-vue && npm install vue
 pnpm add -D @markbook/adapter-vue && pnpm add vue
+yarn add -D @markbook/adapter-vue && yarn add vue
 
 # Web components — no adapter dependency, no runtime
+npm install -D @markbook/adapter-wc
 pnpm add -D @markbook/adapter-wc
+yarn add -D @markbook/adapter-wc
 ```
 
-Works with any package manager (`npm install --save-dev` / `yarn add -D` too).
+Each block lists the npm / pnpm / yarn form of the same command — use whichever
+package manager your project uses.
 
 > **Using an AI coding agent?** Run `markbook skills install` to drop
 > Markbook-specific skills (`markbook-init`, `markbook-add-component-page`,

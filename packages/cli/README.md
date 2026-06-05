@@ -7,7 +7,9 @@ The command-line entry point for [Markbook](../../README.md). Loads
 ## Install
 
 ```bash
+npm install -D markbook @markbook/core
 pnpm add -D markbook @markbook/core
+yarn add -D markbook @markbook/core
 ```
 
 Pair with a framework adapter (`@markbook/adapter-react`,

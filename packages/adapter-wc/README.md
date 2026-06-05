@@ -6,7 +6,9 @@ custom elements; no framework runtime.
 ## Install
 
 ```bash
+npm install -D @markbook/adapter-wc
 pnpm add -D @markbook/adapter-wc
+yarn add -D @markbook/adapter-wc
 ```
 
 No peer dependencies. The adapter ships no Vite plugin (custom elements are

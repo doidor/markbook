@@ -6,7 +6,9 @@ component (or function returning JSX) into a story placeholder.
 ## Install
 
 ```bash
+npm install -D @markbook/adapter-react react react-dom
 pnpm add -D @markbook/adapter-react react react-dom
+yarn add -D @markbook/adapter-react react react-dom
 ```
 
 `react` and `react-dom` are peer dependencies (and stay external in

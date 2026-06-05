@@ -5,7 +5,9 @@ Vue 3 mount adapter for [Markbook](../../README.md).
 ## Install
 
 ```bash
+npm install -D @markbook/adapter-vue vue
 pnpm add -D @markbook/adapter-vue vue
+yarn add -D @markbook/adapter-vue vue
 ```
 
 `vue` is a peer dependency (stays external in `--mode package` bundles).

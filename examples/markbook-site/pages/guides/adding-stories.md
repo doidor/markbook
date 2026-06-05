@@ -17,11 +17,12 @@ Markbook ships three:
 | `@markbook/adapter-vue` | Vue 3 components | `vue` (peer) |
 | `@markbook/adapter-wc` | Custom elements | (none — vanilla DOM) |
 
-Install one + its runtime:
+Install one + its runtime (npm / pnpm / yarn):
 
 ```bash
-pnpm add -D @markbook/adapter-react
-pnpm add react react-dom
+npm install -D @markbook/adapter-react && npm install react react-dom
+pnpm add -D @markbook/adapter-react && pnpm add react react-dom
+yarn add -D @markbook/adapter-react && yarn add react react-dom
 ```
 
 Then wire it into `markbook.config.ts`:

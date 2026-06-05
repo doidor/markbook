@@ -11,17 +11,17 @@ this page exists to show what real Markbook documentation looks like.
 ## Install
 
 ```bash
-pnpm add skyline
-# or
 npm install skyline
+pnpm add skyline
+yarn add skyline
 ```
 
 ## Scaffold a project
 
 ```bash
-pnpm skyline init my-app
+npx skyline init my-app   # pnpm: pnpm skyline init my-app · yarn: yarn skyline init my-app
 cd my-app
-pnpm install
+npm install               # or: pnpm install · yarn install
 ```
 
 The generator creates a minimal layout:
@@ -38,7 +38,7 @@ my-app/
 ## Run the dev server
 
 ```bash
-pnpm dev
+npm run dev   # or: pnpm dev · yarn dev
 ```
 
 Skyline listens on port `4000` by default; navigate to <http://localhost:4000>.
