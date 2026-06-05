@@ -54,7 +54,16 @@ layout: landing
     Two reading paths, depending on what you're building.
   </p>
 
+  <div class="hero-spotlight" style="margin:1.25rem 0;padding:1rem;border-radius:8px;background:var(--markbook-spot-bg, #f6f8fa);">
+    <h3 style="margin:0 0 .25rem 0">Try the interactive demo</h3>
+    <p style="margin:0">Explore a live React component demo built with Markbook — stories, variants, and interactive examples. <a href="./demos/react-demo/">Open the React demo →</a></p>
+  </div>
+
   <div class="site-guide-grid">
+    <a class="site-guide-card" href="./demos/react-demo/">
+      <strong>React demo →</strong>
+      <span>Live demo of the React component library built with Markbook. Available at <code>/demos/react-demo/</code> on the published docs site.</span>
+    </a>
     <a class="site-guide-card" href="./guides/getting-started.html">
       <strong>Getting started →</strong>
       <span>Install, scaffold a project, run the dev server. Five minutes from zero to your first page.</span>
@@ -74,10 +83,6 @@ layout: landing
     <a class="site-guide-card" href="./guides/search-and-seo.html">
       <strong>Search & SEO →</strong>
       <span>How Pagefind is hooked in, how sitemap/OG/Twitter tags are emitted, where to put your <code>siteUrl</code>.</span>
-    </a>
-    <a class="site-guide-card" href="./demos/react-demo/">
-      <strong>React demo →</strong>
-      <span>Live demo of the React component library built with Markbook. Available at <code>/demos/react-demo/</code> on the published docs site.</span>
     </a>
     <a class="site-guide-card" href="./reference/config.html">
       <strong>Config reference →</strong>
