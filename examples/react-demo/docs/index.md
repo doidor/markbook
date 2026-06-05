@@ -5,7 +5,7 @@ description: Markbook's own demo site, built around the Pixie made-up component 
 
 # Pixie
 
-This is a [Markbook](https://github.com/popatudor/markbook) site documenting **Pixie**, a small made-up component library that lives at `examples/react-demo/src/pixie/` in this repo.
+This is a [Markbook](https://github.com/doidor/markbook) site documenting **Pixie**, a small made-up component library that lives at `examples/react-demo/src/pixie/` in this repo.
 
 Each component page below contains:
 

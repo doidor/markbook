@@ -27,7 +27,7 @@ export default defineConfig({
     'A library that renders markdown into HTML, with adapters for React, Vue, and web components — so it can also do component-library showcases like Storybook.',
   layoutsDir: 'layouts',
   css: ['./markbook.css'],
-  siteUrl: 'https://microsoft.github.io/markbook',
+  siteUrl: 'https://doidor.github.io/markbook',
   themeColor: '#a78bfa',
   playground: false,
   directives: {

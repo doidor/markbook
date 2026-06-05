@@ -1387,7 +1387,7 @@ The hybrid pattern is documented in `examples/markbook-site/README.md` as "a com
 - Root scripts: `example:site:{build,dev,preview}`.
 - CI: new "Build the Markbook site" step in `.github/workflows/ci.yml` so the site stays buildable forever.
 - `public/favicon.svg` — branded violet "M" badge, copied to dist root by Vite's `publicDir`.
-- `siteUrl: 'https://microsoft.github.io/markbook'` — placeholder origin; flips on canonical + OG URL + sitemap + robots.
+- `siteUrl: 'https://doidor.github.io/markbook'` — placeholder origin; flips on canonical + OG URL + sitemap + robots.
 
 ### Build output
 
@@ -1689,3 +1689,15 @@ Frontmatter reference doc + core README frontmatter table + DOM contract section
 **Why:** The user reported in screenshots that (a) the Guides sidebar listed pages alphabetically by file path, so "Getting started" — the page everyone should read first — was 4th in the list; (b) fenced code blocks in light mode had no visual treatment (no syntax highlighting, no distinct background, no copy button) and looked indistinguishable from prose. Both are table-stakes for a documentation tool. The fixes are scoped: existing story code disclosures keep their dedicated `.markbook-code` styling (the new `.markbook-fenced-code` class scopes the new visual treatment); existing pages without `order:` keep their existing alphabetical-by-filename order (only the addition of `order:` to a sibling moves things). Reuses the existing copy-button boot script — zero new runtime JS.
 
 **Next:** None specific. If we ever expose Shiki's transformers API (line highlighting, focus blocks, etc.) it'd come as a new `config.codeHighlight` field; the current implementation is intentionally minimal (lang detection + theme swap + copy button) to keep the v1.0 freeze surface small.
+
+---
+
+## 2026-05-09 — scrubbed Microsoft branding + normalized GitHub username
+
+**What changed:** Removed every "Microsoft" reference from tracked files and normalized any GitHub-username variation to `doidor`. 11 files touched: `README.md` ("Internal Microsoft project" license blurb → "Personal project"); `examples/markbook-site/{markbook.config.ts,README.md,layouts/landing.html,pages/guides/{custom-directives,customization}.md}` (siteUrl + GitHub URLs + footer attribution + dogfood mentions, all microsoft/markbook → doidor/markbook and microsoft.github.io → doidor.github.io); `packages/core/README.md` (docs URL); `packages/cli/skills/style/SKILL.md` (token reference URL); `examples/react-demo/docs/{components/Card/Basic.stories.tsx,index.md}` (popatudor → doidor). PROGRESS line 1390 (historical journal entry about the markbook-site siteUrl placeholder) updated in-place to match the new origin — append-only convention waived for the one-off ownership scrub. Landing footer claim "open source under the MIT licence" softened to "license TBD before v1.0" to match the README until the user picks a real license.
+
+Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avatar story `name="Tudor Popa"`, frontmatter author examples, html-template substitution test fixture, etc.) — those are sample personal-name strings, not username references, and rewriting all of them would touch unrelated test/example content. Also not touched: `.markbook-skill.json` files under `examples/react-demo/.claude/skills/markbook-*/` which mention the cwd path `/Users/doidor/src/microsoft/markbook/...` — those are gitignored (per `.gitignore` line 12: `examples/*/.claude/skills/markbook-*/`) and get regenerated when the user re-runs `markbook skills install`. The on-disk cwd path itself (`/Users/doidor/src/microsoft/markbook`) is outside the repo's reach — `mv` is the user's call.
+
+**Why:** User clarification: this is a personal project, not Microsoft-affiliated. The previous strings were placeholders inherited from earlier scaffolding — better to fix them now than after the repo is published.
+
+**Next:** None specific. If the user wants the sample human-name placeholders genericized too (Alice/Bob/etc.) that's a separate, larger sweep across stories + tests + frontmatter examples — happy to do it on request.

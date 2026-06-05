@@ -150,7 +150,7 @@ Use sparingly. If you find yourself doing more than a regex or two, you probably
 
 ## A worked example
 
-[`examples/marketing-demo/`](https://github.com/microsoft/markbook/tree/main/examples/marketing-demo) in the Markbook repo combines layers 2 + 3:
+[`examples/marketing-demo/`](https://github.com/doidor/markbook/tree/main/examples/marketing-demo) in the Markbook repo combines layers 2 + 3:
 
 - `disableBaseCss: true` — Markbook ships zero CSS.
 - `layoutsDir: 'layouts'` + `layout: 'default'` — replaces the docs shell with a marketing layout (top nav + content + footer).

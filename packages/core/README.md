@@ -52,7 +52,7 @@ export default defineConfig({
 
 Handlers can be inline (as above), or imported from external modules (jiti loads the whole config tree transparently — TypeScript imports work through to `directives/callout.ts` etc.). For directive output that's more than a one-liner, the `htmlTemplate(new URL('./template.html', import.meta.url))` helper lets the markup live in a real `.html` file with `{{ key }}` substitution — handler imports the template, calls `render({ vars })`. Both leaf + container forms are supported. Handlers can be async; results can include `markdown` (for the `llms.txt` mirror) and `dependencies` (for dev-mode re-rendering on external-file changes). Errors are wrapped with `file:line:col` and preserve the original via `Error.cause`.
 
-See the [custom directives guide](https://microsoft.github.io/markbook/guides/custom-directives.html) for the full surface (descriptor form, type pinning, llms.txt fallback, dev-mode dependency tracking, etc.) and ADR-0025 for the design rationale.
+See the [custom directives guide](https://doidor.github.io/markbook/guides/custom-directives.html) for the full surface (descriptor form, type pinning, llms.txt fallback, dev-mode dependency tracking, etc.) and ADR-0025 for the design rationale.
 
 ### `:::story` — single story per file (built-in)
 

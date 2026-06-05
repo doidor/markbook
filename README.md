@@ -158,7 +158,7 @@ pnpm example:site:dev|build|preview  # the official Markbook site (hybrid layout
 
 ## License
 
-Internal Microsoft project — license TBD before v1.0.
+Personal project — license TBD before v1.0.
 
 [pagefind]: https://pagefind.app/
 [llmstxt]: https://llmstxt.org/

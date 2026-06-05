@@ -57,7 +57,7 @@ Shipped under this skill's `presets/` directory. Open any one — they're
 
 Open the generated `markbook.css` and edit any `--mb-*` token. The token
 reference is in `node_modules/@markbook/core/README.md` or
-https://github.com/microsoft/markbook/blob/main/packages/core/README.md.
+https://github.com/doidor/markbook/blob/main/packages/core/README.md.
 Common tweaks:
 
 ```css

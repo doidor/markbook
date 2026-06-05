@@ -1,6 +1,6 @@
 # Markbook site
 
-The official [Markbook](https://github.com/microsoft/markbook) website, built with Markbook itself (eating our own dogfood).
+The official [Markbook](https://github.com/doidor/markbook) website, built with Markbook itself (eating our own dogfood).
 
 ## What's in here
 

@@ -14,7 +14,7 @@ Markbook's `:::story`, `:::stories`, and `:::props` directives are useful, but t
 This is the same extension point [Markbook's own site uses](/index.html) for the callout boxes in these guides:
 
 :::callout{type=info}
-This callout — and every other one in this site's guides — is rendered by a custom `:::callout` directive defined in [`markbook-site/directives/callout.ts`](https://github.com/microsoft/markbook/blob/main/examples/markbook-site/directives/callout.ts). The full handler is 5 lines.
+This callout — and every other one in this site's guides — is rendered by a custom `:::callout` directive defined in [`markbook-site/directives/callout.ts`](https://github.com/doidor/markbook/blob/main/examples/markbook-site/directives/callout.ts). The full handler is 5 lines.
 :::
 
 ## Register a directive
@@ -114,7 +114,7 @@ describe('callout', () => {
 });
 ```
 
-The official Markbook site uses this pattern — see [`examples/markbook-site/directives/callout.ts`](https://github.com/microsoft/markbook/blob/main/examples/markbook-site/directives/callout.ts).
+The official Markbook site uses this pattern — see [`examples/markbook-site/directives/callout.ts`](https://github.com/doidor/markbook/blob/main/examples/markbook-site/directives/callout.ts).
 
 ## Templates in HTML files
 
