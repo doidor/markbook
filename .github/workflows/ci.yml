@@ -14,14 +14,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # pnpm version comes from the root package.json "packageManager" field
-      # (pnpm@8.15.9). Don't also pin it here — pnpm/action-setup@v4 errors out
+      # (pnpm@8.15.9). Don't also pin it here — pnpm/action-setup errors out
       # when a version is specified in both places.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
