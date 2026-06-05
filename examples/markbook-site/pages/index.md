@@ -54,9 +54,9 @@ layout: landing
     Two reading paths, depending on what you're building.
   </p>
 
-  <div class="hero-spotlight" style="margin:1.25rem 0;padding:1rem;border-radius:8px;background:var(--markbook-spot-bg, #f6f8fa);">
-    <h3 style="margin:0 0 .25rem 0">Try the interactive demo</h3>
-    <p style="margin:0">Explore a live React component demo built with Markbook — stories, variants, and interactive examples. <a href="./demos/react-demo/">Open the React demo →</a></p>
+  <div class="site-hero-spotlight">
+    <h3>Try the interactive demo</h3>
+    <p>Explore a live React component demo built with Markbook — stories, variants, and interactive examples. <a href="./demos/react-demo/">Open the React demo →</a></p>
   </div>
 
   <div class="site-guide-grid">
