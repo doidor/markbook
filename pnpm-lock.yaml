@@ -112,6 +112,9 @@ importers:
 
   packages/adapter-react:
     dependencies:
+      '@markbook/adapter-shared':
+        specifier: workspace:*
+        version: link:../adapter-shared
       '@markbook/core':
         specifier: workspace:*
         version: link:../core
@@ -135,8 +138,17 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/adapter-shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/adapter-vue:
     dependencies:
+      '@markbook/adapter-shared':
+        specifier: workspace:*
+        version: link:../adapter-shared
       '@markbook/core':
         specifier: workspace:*
         version: link:../core
@@ -153,6 +165,9 @@ importers:
 
   packages/adapter-wc:
     dependencies:
+      '@markbook/adapter-shared':
+        specifier: workspace:*
+        version: link:../adapter-shared
       '@markbook/core':
         specifier: workspace:*
         version: link:../core

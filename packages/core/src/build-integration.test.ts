@@ -76,6 +76,18 @@ describe('writePages — built-in shell (no layout)', () => {
     expect(html).toMatch(/class="markbook-brand"[\s\S]*?Skyline[\s\S]*?<\/a>/);
   });
 
+  it('HTML-escapes apostrophes in titles (canonical 5-char escaping)', async () => {
+    fx = await setupFixture({
+      'docs/index.md': "---\ntitle: Lottie's Guide\n---\n\n# Lottie's Guide\n",
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<title>Lottie&#39;s Guide</title>');
+    // The raw apostrophe must not leak into the escaped <title>.
+    expect(html).not.toContain('<title>Lottie&#39;s Guide</title>'.replace('&#39;', "'"));
+  });
+
   it('omits the entry script when a page has no stories (markdown-only)', async () => {
     fx = await setupFixture({
       'docs/index.md': '# Static only\n\nNo stories here.',

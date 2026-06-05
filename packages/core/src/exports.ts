@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import ts from 'typescript';
+import { hasExportModifier, pickScriptKind } from './ts-utils.js';
 
 const exportsCache = new Map<string, string[] | null>();
 
@@ -86,20 +87,6 @@ function collectRuntimeExports(source: string, fileName: string): string[] {
   }
 
   return out;
-}
-
-function hasExportModifier(node: ts.Node): boolean {
-  const mods = (node as ts.HasModifiers).modifiers;
-  if (!mods) return false;
-  return mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-}
-
-function pickScriptKind(fileName: string): ts.ScriptKind {
-  if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX;
-  if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX;
-  if (fileName.endsWith('.js')) return ts.ScriptKind.JS;
-  if (fileName.endsWith('.ts')) return ts.ScriptKind.TS;
-  return ts.ScriptKind.Unknown;
 }
 
 /** Convert a PascalCase or camelCase export name into kebab-case. */

@@ -515,3 +515,43 @@ defineConfig({
 - **Reserved name validation.** Built-in conflict throws at `createContext`; invalid characters throw too (remark-directive's parser only matches `/[a-z][a-z0-9-]*/i`, so anything else would silently never fire — better to throw than to ship a no-op).
 - **`escapeHtml` / `escapeAttribute` re-exported.** Same implementation today, separately named so handler authors reach for the right tool — and so a future minor can diverge (e.g. percent-encoding for URLs) without breaking callers.
 - **Public API gains 8 new exports**: `BUILTIN_DIRECTIVES`, `DirectiveHandler`, `DirectiveHandlerFn`, `DirectiveHandlerDescriptor`, `DirectiveContext`, `DirectiveResult`, `DirectiveResultObject`, `escapeHtml`, `escapeAttribute`. Every one has a TSDoc explaining intent. The surface is small but each piece is locked in for v1.0.
+
+## ADR-0026 — Shared adapter runtime in `@markbook/adapter-shared`
+
+**Status:** Accepted (2026-06-05).
+
+**Context.** The three framework adapters (`adapter-react`, `adapter-vue`, `adapter-wc`) each shipped their own byte-for-byte copies of the browser-side mount plumbing — `injectCss`, `applyParameters`, `resolveMountTarget`, the `LAYOUT_CLASSES` constant, and the `StoryParameters` / `MountOptions` shapes. The web-components copy had already drifted (its comments referenced "see adapter-react's injectCss"), which is exactly how three copies silently diverge. The CSS-injection helper in particular is non-trivial (shadow-root vs `document.head`, dedup by `cssId`) and a subtle fix to one copy would not propagate.
+
+**Decision.** Extract the framework-agnostic browser runtime into a new first-class package, `@markbook/adapter-shared`, that every adapter depends on at runtime.
+
+- **Pure DOM, zero deps.** It imports nothing from Node and nothing from any framework, so it bundles into each adapter's *default browser entry* without violating the two-entry split (ADR-0005). It builds with the same `tsc -b` + `tsconfig.base.json` (which already includes the `DOM` lib) as the other packages.
+- **Share the helpers + the common option subset, not a single `MountOptions`.** Exports `applyParameters`, `resolveMountTarget`, `injectCss`, `StoryParameters`, and `BaseMountOptions` (`{ isolation?, parameters?, css?, cssId? }`). Each adapter `extends BaseMountOptions` with what it actually supports — React/Vue add `args` + their own decorator type; web components use the base as-is. A single shared `MountOptions` was rejected: it would let the WC adapter appear to accept `args`/decorators it doesn't implement, or erase React/Vue decorator specificity.
+- **Runtime dependency, `workspace:*`.** Each adapter lists `@markbook/adapter-shared` under `dependencies` (not `devDependencies`) so the published npm packages declare it correctly; `workspace:*` is rewritten to the real version on publish. It must be published/versioned in lockstep with the adapters.
+
+**Alternatives considered.**
+- **A shared source file outside `packages/`.** Rejected — it wouldn't publish cleanly; the adapters ship only their own `dist/`, so anything they import at runtime has to be a real package.
+- **Put the helpers in `@markbook/core`.** Rejected — `core` pulls in Vite, the TS compiler, Pagefind, and `node:` built-ins; importing it into a browser bundle would drag all of that across the two-entry split. The shared runtime must stay browser-only.
+- **Leave the duplication.** Rejected — three copies of a 100-line DOM module that already drifted is a maintenance trap; a one-line CSS-injection fix should land in one place.
+
+**Consequences.**
+- New package surface to maintain, version, and publish in lockstep with the adapters (the cost the ADR accepts in exchange for de-duplication).
+- The adapters' public API is unchanged: each still exports `mount` (and React `setupControls` / `ArgType`) and re-exports `StoryParameters` (now from the shared package, same shape).
+- `tsc -b` topological ordering builds `adapter-shared` before the adapters; the verify cycle's typecheck step relies on the shared `dist/` existing (the same pre-existing constraint that already applies to `@markbook/core`).
+
+## ADR-0027 — `tsc --noEmit` typecheck resolves workspace deps from source
+
+**Status:** Accepted (2026-06-05).
+
+**Context.** The downstream packages (`cli`, `adapter-react`, `adapter-vue`, `adapter-wc`) import `@markbook/core` (and now `@markbook/adapter-shared`). With `moduleResolution: "Bundler"`, TypeScript resolves those bare specifiers through `node_modules` to each package's `types` → `./dist/index.d.ts`. On a clean checkout that file doesn't exist until `pnpm build`, so `pnpm typecheck` (which CI runs *before* `pnpm build`) failed with `TS2307: Cannot find module '@markbook/core'`. It only appeared to pass locally because a prior build had left `dist/` lying around. Adding `paths` to the shared `tsconfig.base.json` fixed resolution but broke the emit build: the build configs set `rootDir: ./src`, so pulling sibling source in via `paths` tripped `TS6059` ("not under rootDir").
+
+**Decision.** Split typecheck from build. Each downstream package's `typecheck` script runs `tsc -p tsconfig.typecheck.json`, a config that extends `tsconfig.typecheck.base.json` (root). That base sets `noEmit: true`, no `rootDir`/`outDir`, and `paths` mapping the three workspace specifiers to their `src/index.ts`. The per-package *build* configs (`tsconfig.json`, used by `tsc -b`) are untouched and still resolve deps from `dist/` in pnpm's topological order. `core` and `adapter-shared` keep plain `tsc --noEmit` — they have no workspace dependencies, so they already typecheck standalone.
+
+**Alternatives considered.**
+- **`paths` in `tsconfig.base.json`.** Rejected — shared by the emit build, which then hits `TS6059` because the path-mapped source sits outside each package's `rootDir`.
+- **Build before typecheck** (`typecheck: pnpm build && tsc --noEmit`, or reorder CI). Rejected — slower, and leaves typecheck unable to stand on its own; the point is a fast, build-independent type gate.
+- **TypeScript project references.** Rejected for now — heavier migration (every package needs `composite: true` + `references`), and `tsc -b` still emits `.d.ts` to consume, so it doesn't make `--noEmit` typecheck build-free the way source `paths` do.
+
+**Consequences.**
+- `pnpm typecheck` (and `pnpm --filter <pkg> typecheck`) now pass from a clean checkout with no `dist/` present — CI's lint → typecheck → build order is self-consistent.
+- Type errors in a dependency's public API surface at the consumer immediately (typecheck reads source, not a stale `dist/`), which is strictly better feedback.
+- New files to keep in sync: `tsconfig.typecheck.base.json` + one `tsconfig.typecheck.json` per downstream package. When a new workspace package is consumed by another, add it to the `paths` map.

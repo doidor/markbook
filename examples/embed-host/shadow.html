@@ -18,6 +18,7 @@
   .demo { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
   /* Host-page CSS reset that WOULD break the story if it leaked into the shadow.
      Inside the shadow it has no effect — proving the isolation works. */
+  /* biome-ignore lint/complexity/noImportantStyles: intentional aggressive host-page reset — the whole point of this demo is that shadow-DOM isolation stops it from leaking in. */
   .demo button { all: revert; opacity: 0.3 !important; background: pink !important; }
   .demo .mount { padding: 1.25rem; background: var(--soft); border-radius: 6px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
   a { color: var(--accent); }

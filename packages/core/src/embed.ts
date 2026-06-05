@@ -6,6 +6,8 @@ import { parseMarkdown, kebabExportName } from './parse.js';
 import { discoverStoryExports } from './exports.js';
 import { createContext, makeLoadTemplate, type BuildContext } from './build.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
+import { escapeHtml } from './directive-utils.js';
+import { MB_CSF_HELPER } from './entry-runtime.js';
 import type { MarkbookConfig } from './config.js';
 
 /**
@@ -380,13 +382,8 @@ function buildEntryImports(
 /**
  * Shared with build.ts's page entry generator — the same predicate decides
  * whether a story export is a Storybook CSF v3 object (`{ render, args... }`)
- * or a plain function / component. See `MB_CSF_HELPER` in build.ts.
+ * or a plain function / component. Defined in `entry-runtime.ts`.
  */
-const MB_CSF_HELPER = `function __mb_isCsf(v) {
-  if (!v || typeof v !== 'object') return false;
-  if (typeof v.render !== 'function') return false;
-  return !!(v.args || v.argTypes || v.parameters || typeof v.name === 'string');
-}`;
 
 function buildMountOptsExpr(
   decoratorRefs: string[],
@@ -531,12 +528,4 @@ ${cards}
 </body>
 </html>
 `;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

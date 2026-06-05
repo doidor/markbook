@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { withCustomConfig, withDefaultConfig } from 'react-docgen-typescript';
+import { escapeHtml } from './directive-utils.js';
 
 type Parser = ReturnType<typeof withDefaultConfig>;
 const parserCache = new Map<string, Parser>();
@@ -91,12 +92,4 @@ function findTsConfig(start: string): string | null {
     dir = path.dirname(dir);
   }
   return null;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

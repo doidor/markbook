@@ -1701,3 +1701,23 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** User clarification: this is a personal project, not Microsoft-affiliated. The previous strings were placeholders inherited from earlier scaffolding — better to fix them now than after the repo is published.
 
 **Next:** None specific. If the user wants the sample human-name placeholders genericized too (Alice/Bob/etc.) that's a separate, larger sweep across stories + tests + frontmatter examples — happy to do it on request.
+
+---
+
+## 2026-06-05 — DRY/KISS pass across `packages/` + `build.ts` split + `@markbook/adapter-shared`
+
+**What changed:** Consolidated ~9 duplicated HTML-escapers onto `directive-utils`' canonical `escapeHtml`/`escapeAttribute`; extracted shared internals in `@markbook/core` (`ts-utils.ts` for `pickScriptKind`/`hasExportModifier`/a new AST `extractModuleSpecifiers`, `placeholder.ts` for `stringify`/`getDotPath`/comment-protection, `code-block.ts` for the Shiki config + copy button, `entry-runtime.ts` for the CSF helper string); reused `resolve.ts`'s `isPathLikeSpec`; split the 2255-line `build.ts` into focused modules (`assets.ts`, `pagefind.ts`, `nav.ts`, `llms.ts`, `sitemap.ts`, `render.ts`) with `build.ts` (now 908 lines) kept as a re-export façade so `internal.ts` stays stable; de-duplicated the three adapters' browser runtime into a new pure-DOM `@markbook/adapter-shared` package. 256 core + 21 CLI tests green (added an apostrophe-escaping test); all seven example builds + embed/package bundles pass.
+
+**Why:** The adapters' mount plumbing had already drifted between copies, `build.ts` mixed ~8 concerns plus ~600 lines of inline CSS/JS, and escaping/AST/template helpers were copy-pasted across the engine — all maintenance traps. See ADR-0026 for the shared-adapter-package rationale.
+
+**Next:** Consider promoting the WC adapter's `MountOptions` to an exported type for parity with React, and (separately) fix the pre-existing `examples/embed-host/shadow.html` Biome `!important` error that leaves repo-wide `pnpm lint` red.
+
+---
+
+## 2026-06-05 — clean lint + build-independent typecheck
+
+**What changed:** Suppressed the intentional `!important` host-page reset in `examples/embed-host/shadow.html` with a scoped `biome-ignore` (it demonstrates shadow-DOM isolation, so it must stay) and removed two now-ineffective `noExplicitAny` suppression comments in `fenced-code.ts` — `pnpm lint` is now fully clean (0 errors, 0 warnings). Separately, gave the four downstream packages a `tsconfig.typecheck.json` (extending a new root `tsconfig.typecheck.base.json`) that maps `@markbook/core` / `@markbook/adapter-shared` to source with `noEmit` and no `rootDir`, so `pnpm typecheck` now passes from a clean checkout with no `dist/` present. The emit build (`tsc -b`) configs are untouched.
+
+**Why:** `pnpm lint` was red on a pre-existing example, and `pnpm typecheck` silently depended on a prior build (it only passed because stale `dist/` lingered) — CI runs typecheck before build, so a truly clean run would have failed. See ADR-0027.
+
+**Next:** None outstanding — full verify cycle (lint, typecheck, test, build, all example builds + bundles) is green.

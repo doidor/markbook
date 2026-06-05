@@ -52,6 +52,7 @@ packages/
   adapter-react/  AGENTS.md README.md
   adapter-vue/          README.md
   adapter-wc/           README.md
+  adapter-shared/       README.md   ← shared browser runtime for the adapters (ADR-0026)
 examples/
   react-demo/                       ← Pixie component library (canonical dogfood)
   vue-demo/  wc-demo/               ← framework-agnostic proofs

@@ -21,12 +21,13 @@
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -b -w",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -p tsconfig.typecheck.json"
   },
   "peerDependencies": {
     "vue": "^3.0.0"
   },
   "dependencies": {
+    "@markbook/adapter-shared": "workspace:*",
     "@markbook/core": "workspace:*",
     "@vitejs/plugin-vue": "^5.0.0"
   },

@@ -12,6 +12,8 @@ import { applyTemplate } from './template.js';
 import { humanizeExportName } from './exports.js';
 import { resolveSpec } from './resolve.js';
 import { highlightFencedCodeBlocks } from './fenced-code.js';
+import { copyButton } from './code-block.js';
+import { escapeHtml } from './directive-utils.js';
 
 export interface StoryCodeFile {
   label: string;
@@ -714,18 +716,8 @@ function buildSlotReplacement(
 // downstream consumers (embed.ts).
 export { kebabExportName, humanizeExportName } from './exports.js';
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function renderCodeDisclosure(storyId: string, files: StoryCodeFile[]): string {
-  const copyBtn =
-    '<button type="button" class="markbook-code-copy" data-markbook-copy aria-label="Copy code"><span class="markbook-copy-label">Copy</span></button>';
+  const copyBtn = copyButton();
   if (files.length === 1) {
     const f = files[0]!;
     return `<details class="markbook-code" data-pagefind-ignore><summary>Show code</summary><div class="markbook-code-file"><div class="markbook-code-file-label">${escapeHtml(f.label)}</div><div class="markbook-code-pre-wrap">${copyBtn}${f.codeHtml}</div></div></details>`;

@@ -1,6 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
+import { isPathLikeSpec } from './resolve.js';
+import { extractModuleSpecifiers } from './ts-utils.js';
 
 export interface InlinedFile {
   /** Absolute path on disk. */
@@ -52,8 +54,8 @@ export async function resolveInlinedSources(opts: ResolveOptions): Promise<Inlin
     if (source === null) continue;
 
     const fromDir = path.dirname(absPath);
-    for (const spec of extractImportSpecifiers(source)) {
-      if (!isRelativeOrAbsolute(spec)) continue;
+    for (const spec of extractModuleSpecifiers(source, absPath, { includeExports: true })) {
+      if (!isPathLikeSpec(spec)) continue;
 
       const resolved = await resolveImport(fromDir, spec);
       if (resolved === null) continue;
@@ -83,10 +85,6 @@ export async function resolveInlinedSources(opts: ResolveOptions): Promise<Inlin
 async function buildEligibleSet(root: string, patterns: string[]): Promise<Set<string>> {
   const matches = await glob(patterns, { cwd: root, absolute: true });
   return new Set(matches);
-}
-
-function isRelativeOrAbsolute(spec: string): boolean {
-  return spec.startsWith('./') || spec.startsWith('../') || path.isAbsolute(spec);
 }
 
 /**
@@ -145,25 +143,4 @@ async function readOrNull(p: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-/**
- * Extract every import specifier from a source file. Handles:
- *   - `import x from 'y'`
- *   - `import { a, b } from 'y'`
- *   - `import * as ns from 'y'`
- *   - `import 'y'` (side-effect)
- *   - `import type { T } from 'y'`
- *   - `export { x } from 'y'`
- *   - `export * from 'y'`
- *
- * Skipped: dynamic `import('y')` (would require AST work; rare in story files).
- */
-function extractImportSpecifiers(source: string): string[] {
-  const specs: string[] = [];
-  const re = /(?:^|[\s;])(?:import|export)\s+(?:[^'"`;]*?\s+from\s+)?['"]([^'"]+)['"]/g;
-  for (const m of source.matchAll(re)) {
-    if (m[1]) specs.push(m[1]);
-  }
-  return specs;
 }

@@ -1,3 +1,6 @@
+import { escapeHtml } from './directive-utils.js';
+import { getDotPath, protectHtmlComments, stringify } from './placeholder.js';
+
 /**
  * Apply a markdown template to page content, substituting `{{ key }}` tokens
  * from the page's frontmatter.
@@ -90,17 +93,8 @@ export function applyHtmlLayout(
 ): string {
   // Temporarily replace HTML comments with opaque sentinels so the
   // placeholder regex doesn't see (or count) tokens inside them. Restore
-  // afterwards so the comments make it to the output unchanged. We use
-  // Unicode Private Use Area code points so the sentinel never collides
-  // with real HTML, JS, or CSS the layout might contain.
-  const comments: string[] = [];
-  const protectedBody = layoutBody.replace(/<!--[\s\S]*?-->/g, (match) => {
-    const idx = comments.length;
-    comments.push(match);
-    return `\uE000MB_HTML_COMMENT_${idx}\uE000`;
-  });
-  const restore = (s: string): string =>
-    s.replace(/\uE000MB_HTML_COMMENT_(\d+)\uE000/g, (_m, n: string) => comments[Number(n)] ?? '');
+  // afterwards so the comments make it to the output unchanged.
+  const { body: protectedBody, restore } = protectHtmlComments(layoutBody);
 
   const contentMatches = protectedBody.match(/\{\{\s*content\s*\}\}/g);
   if (!contentMatches || contentMatches.length === 0) {
@@ -133,30 +127,4 @@ export function applyHtmlLayout(
   });
 
   return restore(substituted);
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function getDotPath(obj: unknown, dotPath: string): unknown {
-  const parts = dotPath.split('.');
-  let cur: unknown = obj;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
-}
-
-function stringify(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
 }

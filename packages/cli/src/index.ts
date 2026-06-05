@@ -36,21 +36,58 @@ async function loadConfig(root: string, explicit?: string): Promise<MarkbookConf
 
 const cli = cac('markbook');
 
+interface BaseCommandOpts {
+  root?: string;
+  config?: string;
+}
+
+/**
+ * Shared command runner: resolves the project root, loads the config, and
+ * applies a consistent `✗ Markbook <label> failed:` error envelope (exit 1)
+ * around every command body. The body receives the merged config (with
+ * `root` applied) and the resolved root.
+ */
+async function runCommand<T extends BaseCommandOpts>(
+  label: string,
+  opts: T,
+  fn: (config: MarkbookConfig, root: string) => Promise<void>,
+): Promise<void> {
+  try {
+    const root = path.resolve(opts.root ?? process.cwd());
+    const config = await loadConfig(root, opts.config);
+    await fn({ ...config, root: config.root ?? root }, root);
+  } catch (err) {
+    console.error(`✗ Markbook ${label} failed:`);
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+/** Apply `--port` / `--host` overrides onto a config's `dev` block. */
+function withDevOverrides(
+  config: MarkbookConfig,
+  opts: { port?: string; host?: string },
+): MarkbookConfig {
+  const port = opts.port ? parseInt(opts.port, 10) : undefined;
+  return {
+    ...config,
+    dev: {
+      ...config.dev,
+      ...(port !== undefined ? { port } : {}),
+      ...(opts.host !== undefined ? { host: opts.host } : {}),
+    },
+  };
+}
+
 cli
   .command('build', 'Build the static documentation site')
   .option('-c, --config <path>', 'Path to markbook.config.{ts,mts,js,mjs}')
   .option('--root <path>', 'Project root (defaults to cwd)')
-  .action(async (opts: { root?: string; config?: string }) => {
-    try {
-      const root = path.resolve(opts.root ?? process.cwd());
-      const config = await loadConfig(root, opts.config);
-      await build({ ...config, root: config.root ?? root });
+  .action(async (opts: BaseCommandOpts) => {
+    await runCommand('build', opts, async (config) => {
+      await build(config);
       console.log('✓ Markbook build complete');
-    } catch (err) {
-      console.error('✗ Markbook build failed:');
-      console.error(err);
-      process.exit(1);
-    }
+    });
   });
 
 cli
@@ -59,25 +96,10 @@ cli
   .option('--root <path>', 'Project root (defaults to cwd)')
   .option('--port <port>', 'Port to listen on (default: 5173)')
   .option('--host <host>', 'Host to bind to')
-  .action(async (opts: { root?: string; config?: string; port?: string; host?: string }) => {
-    try {
-      const root = path.resolve(opts.root ?? process.cwd());
-      const config = await loadConfig(root, opts.config);
-      const port = opts.port ? parseInt(opts.port, 10) : undefined;
-      await dev({
-        ...config,
-        root: config.root ?? root,
-        dev: {
-          ...config.dev,
-          ...(port !== undefined ? { port } : {}),
-          ...(opts.host !== undefined ? { host: opts.host } : {}),
-        },
-      });
-    } catch (err) {
-      console.error('✗ Markbook dev failed:');
-      console.error(err);
-      process.exit(1);
-    }
+  .action(async (opts: BaseCommandOpts & { port?: string; host?: string }) => {
+    await runCommand('dev', opts, async (config) => {
+      await dev(withDevOverrides(config, opts));
+    });
   });
 
 cli
@@ -89,25 +111,10 @@ cli
   .option('--root <path>', 'Project root (defaults to cwd)')
   .option('--port <port>', 'Port to listen on (default: 4173)')
   .option('--host <host>', 'Host to bind to')
-  .action(async (opts: { root?: string; config?: string; port?: string; host?: string }) => {
-    try {
-      const root = path.resolve(opts.root ?? process.cwd());
-      const config = await loadConfig(root, opts.config);
-      const port = opts.port ? parseInt(opts.port, 10) : undefined;
-      await preview({
-        ...config,
-        root: config.root ?? root,
-        dev: {
-          ...config.dev,
-          ...(port !== undefined ? { port } : {}),
-          ...(opts.host !== undefined ? { host: opts.host } : {}),
-        },
-      });
-    } catch (err) {
-      console.error('✗ Markbook preview failed:');
-      console.error(err);
-      process.exit(1);
-    }
+  .action(async (opts: BaseCommandOpts & { port?: string; host?: string }) => {
+    await runCommand('preview', opts, async (config) => {
+      await preview(withDevOverrides(config, opts));
+    });
   });
 
 cli
@@ -119,31 +126,17 @@ cli
   .action(
     async (
       storyId: string | undefined,
-      opts: {
-        root?: string;
-        config?: string;
-        mode?: string;
-        isolation?: string;
-      },
+      opts: BaseCommandOpts & { mode?: string; isolation?: string },
     ) => {
-      try {
-        const root = path.resolve(opts.root ?? process.cwd());
-        const config = await loadConfig(root, opts.config);
+      await runCommand('bundle', opts, async (config) => {
         const mode = opts.mode === 'package' ? 'package' : 'embed';
         const isolation = opts.isolation === 'shadow' ? 'shadow' : undefined;
-        await bundleEmbed(
-          { ...config, root: config.root ?? root },
-          {
-            ...(storyId ? { storyId } : {}),
-            mode,
-            ...(isolation ? { isolation } : {}),
-          },
-        );
-      } catch (err) {
-        console.error('✗ Markbook bundle failed:');
-        console.error(err);
-        process.exit(1);
-      }
+        await bundleEmbed(config, {
+          ...(storyId ? { storyId } : {}),
+          mode,
+          ...(isolation ? { isolation } : {}),
+        });
+      });
     },
   );
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { getDotPath, protectHtmlComments, stringify } from './placeholder.js';
 
 /**
  * Load an HTML file once and return a render function that substitutes
@@ -87,36 +88,10 @@ const templateCache = new Map<string, string>();
 
 function substituteHtmlTemplate(template: string, vars: Record<string, unknown>): string {
   // Protect HTML comments so `{{ key }}` mentions inside them don't get
-  // substituted. Same Unicode-private-use sentinel pattern as
-  // `applyHtmlLayout`.
-  const comments: string[] = [];
-  const protectedBody = template.replace(/<!--[\s\S]*?-->/g, (match) => {
-    const idx = comments.length;
-    comments.push(match);
-    return `\uE000MB_HT_COMMENT_${idx}\uE000`;
-  });
+  // substituted, then restore them verbatim afterwards.
+  const { body: protectedBody, restore } = protectHtmlComments(template);
   const substituted = protectedBody.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, key: string) => {
-    return stringify(resolvePath(vars, key));
+    return stringify(getDotPath(vars, key));
   });
-  return substituted.replace(
-    /\uE000MB_HT_COMMENT_(\d+)\uE000/g,
-    (_match, n: string) => comments[Number(n)] ?? '',
-  );
-}
-
-function resolvePath(obj: unknown, dotPath: string): unknown {
-  const parts = dotPath.split('.');
-  let cur: unknown = obj;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
-}
-
-function stringify(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
+  return restore(substituted);
 }

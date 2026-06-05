@@ -1,7 +1,9 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import ts from 'typescript';
-import { codeToHtml } from 'shiki';
+import { highlightCode } from './code-block.js';
+import { extractModuleSpecifiers, hasExportModifier, pickScriptKind } from './ts-utils.js';
+import { isPathLikeSpec } from './resolve.js';
 
 const fileCache = new Map<string, string | null>();
 
@@ -52,9 +54,9 @@ export async function extractStoryCode(
   const files: CodeFile[] = [await toCodeFile(absStoryFile, storySource)];
 
   const seen = new Set<string>([absStoryFile]);
-  for (const spec of importSpecifiers(source)) {
+  for (const spec of extractModuleSpecifiers(source, absStoryFile)) {
     if (!isStyleSpecifier(spec)) continue;
-    if (!spec.startsWith('./') && !spec.startsWith('../') && !path.isAbsolute(spec)) continue;
+    if (!isPathLikeSpec(spec)) continue;
     const abs = path.resolve(path.dirname(absStoryFile), spec);
     if (seen.has(abs)) continue;
     seen.add(abs);
@@ -126,12 +128,6 @@ function sliceExport(source: string, fileName: string, exportName: string): stri
   return out;
 }
 
-function hasExportModifier(node: ts.Node): boolean {
-  const mods = (node as ts.HasModifiers).modifiers;
-  if (!mods) return false;
-  return mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-}
-
 function declaresExportName(stmt: ts.Statement, name: string): boolean {
   if (ts.isVariableStatement(stmt)) {
     return stmt.declarationList.declarations.some(
@@ -153,14 +149,6 @@ function matchesNamedExport(stmt: ts.ExportDeclaration, name: string): boolean {
   return stmt.exportClause.elements.some((spec) => !spec.isTypeOnly && spec.name.text === name);
 }
 
-function pickScriptKind(fileName: string): ts.ScriptKind {
-  if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX;
-  if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX;
-  if (fileName.endsWith('.js')) return ts.ScriptKind.JS;
-  if (fileName.endsWith('.ts')) return ts.ScriptKind.TS;
-  return ts.ScriptKind.Unknown;
-}
-
 async function readCached(absPath: string): Promise<string | null> {
   if (fileCache.has(absPath)) return fileCache.get(absPath) ?? null;
   try {
@@ -176,21 +164,8 @@ async function readCached(absPath: string): Promise<string | null> {
 async function toCodeFile(absPath: string, source: string): Promise<CodeFile> {
   const code = source.trim();
   const lang = langFor(absPath);
-  const codeHtml = await codeToHtml(code, {
-    lang,
-    themes: { light: 'github-light', dark: 'github-dark' },
-    defaultColor: false,
-  });
+  const codeHtml = await highlightCode(code, lang);
   return { label: path.basename(absPath), lang, code, codeHtml };
-}
-
-function importSpecifiers(source: string): string[] {
-  const specs: string[] = [];
-  const re = /(?:^|[\s;])import\s+(?:[^'"`;]*?\s+from\s+)?['"]([^'"]+)['"]/g;
-  for (const m of source.matchAll(re)) {
-    if (m[1]) specs.push(m[1]);
-  }
-  return specs;
 }
 
 function isStyleSpecifier(spec: string): boolean {

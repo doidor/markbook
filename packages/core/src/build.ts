@@ -2,7 +2,6 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { glob } from 'tinyglobby';
 import { build as viteBuild, createLogger, createServer, preview as vitePreview } from 'vite';
-import * as pagefind from 'pagefind';
 import chokidar from 'chokidar';
 import { parseMarkdown } from './parse.js';
 import { extractStoryCode, invalidateCodeCache } from './code.js';
@@ -12,12 +11,34 @@ import { buildPlaygroundDescriptors } from './playground.js';
 import { resolveInlinedSources } from './inline-sources.js';
 import { isPathLikeSpec, resolveSpec } from './resolve.js';
 import { BUILTIN_DIRECTIVES, staticAdapter } from './config.js';
-import { applyHtmlLayout, type HtmlLayoutSubstitutions } from './template.js';
-import { minifyCss, minifyJs } from './minify.js';
+import { escapeHtml, escapeAttribute } from './directive-utils.js';
+import { MB_CSF_HELPER } from './entry-runtime.js';
+import { ensureInlineAssetsMinified } from './assets.js';
+import { minifyCss } from './minify.js';
+import { runPagefind } from './pagefind.js';
+import { buildNav, capitalize } from './nav.js';
+import { emitLlms, emitPerPageLlmsTxt } from './llms.js';
+import { emitSitemapAndRobots, normalizeSiteUrl } from './sitemap.js';
+import {
+  buildPageRenderContext,
+  renderBuiltinShell,
+  renderLayout,
+  resolvePageLayout,
+} from './render.js';
 import type { ParsedPage, StoryRef } from './parse.js';
 import type { MarkbookConfig, MarkbookAdapter, PlaygroundConfig } from './config.js';
 
-interface PageRecord {
+// Façade re-exports: these symbols moved into focused sibling modules but
+// stay reachable from `./build.js` so `internal.ts` and existing deep
+// imports keep working.
+export { runPagefind } from './pagefind.js';
+export { sortNavItems, sortIndexFirst, isIndexHref, capitalize } from './nav.js';
+export type { NavItem, NavGroup } from './nav.js';
+export { resolvePageLayout } from './render.js';
+export { emitLlms } from './llms.js';
+export { emitSitemapAndRobots, normalizeSiteUrl } from './sitemap.js';
+
+export interface PageRecord {
   file: string;
   relPath: string;
   htmlRelPath: string;
@@ -26,25 +47,6 @@ interface PageRecord {
   fileId: string;
   groupKey: string | null;
   parsed: ParsedPage;
-}
-
-export interface NavItem {
-  id: string;
-  title: string;
-  htmlRelPath: string;
-  /**
-   * Explicit sort key from frontmatter `order:`. When set on at least one
-   * sibling, ordered pages appear before unordered ones, sorted ascending
-   * by `order`. Unordered pages preserve their existing file-discovery
-   * order (alphabetical by file path) — adding `order:` to one page does
-   * not silently reshuffle the others.
-   */
-  order?: number;
-}
-
-export interface NavGroup {
-  label: string | null;
-  items: NavItem[];
 }
 
 export interface BuildContext {
@@ -110,19 +112,30 @@ export interface BuildContext {
   userDirectives: Record<string, import('./config.js').DirectiveHandler>;
 }
 
+/**
+ * Read `<dir>/<name><ext>` from the first directory in `dirs` that has it.
+ * Returns `null` when none match (so callers can throw a loader-specific
+ * error). Re-throws any non-ENOENT fs error.
+ */
+async function loadFirstMatch(dirs: string[], name: string, ext: string): Promise<string | null> {
+  for (const dir of dirs) {
+    const candidate = path.join(dir, `${name}${ext}`);
+    try {
+      return await fs.readFile(candidate, 'utf8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+  }
+  return null;
+}
+
 export function makeLoadTemplate(
   templateDirs: string[],
   root: string,
 ): (name: string) => Promise<string> {
   return async (name: string) => {
-    for (const dir of templateDirs) {
-      const candidate = path.join(dir, `${name}.md`);
-      try {
-        return await fs.readFile(candidate, 'utf8');
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-      }
-    }
+    const body = await loadFirstMatch(templateDirs, name, '.md');
+    if (body !== null) return body;
     const searched = templateDirs.map((d) => path.relative(root, d) || d).join(', ');
     throw new Error(`Markbook: template '${name}' not found in: ${searched}`);
   };
@@ -139,14 +152,8 @@ export function makeLoadHtmlLayout(
   root: string,
 ): (name: string) => Promise<string> {
   return async (name: string) => {
-    for (const dir of layoutDirs) {
-      const candidate = path.join(dir, `${name}.html`);
-      try {
-        return await fs.readFile(candidate, 'utf8');
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-      }
-    }
+    const body = await loadFirstMatch(layoutDirs, name, '.html');
+    if (body !== null) return body;
     const searched =
       layoutDirs.length > 0
         ? layoutDirs.map((d) => path.relative(root, d) || d).join(', ')
@@ -156,6 +163,27 @@ export function makeLoadHtmlLayout(
         `Create '${name}.html' in a layouts directory or set layoutsDir in markbook.config.ts.`,
     );
   };
+}
+
+/** Normalize an optional scalar-or-array config value into an array. */
+function toList<T>(raw: T | T[] | undefined): T[] {
+  if (raw == null) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
+/**
+ * Resolve a path-like or bare specifier to an absolute path, throwing a
+ * consistent, actionable error (keyed by `kind`) when it can't be resolved.
+ */
+function resolveSpecOrThrow(spec: string, root: string, kind: string): string {
+  const resolved = resolveSpec(spec, root);
+  if (!resolved) {
+    throw new Error(
+      `Markbook: ${kind} '${spec}' could not be resolved from ${root}. ` +
+        `Use a relative path or install the bare-specifier package.`,
+    );
+  }
+  return resolved;
 }
 
 export async function createContext(config: MarkbookConfig): Promise<BuildContext> {
@@ -183,44 +211,15 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
   const siteUrl = normalizeSiteUrl(config.siteUrl);
   const themeColor = config.themeColor ?? '#0a1228';
   const ogImage = config.ogImage ?? null;
-  const templateDirs = (() => {
-    const raw = config.templatesDir ?? 'templates';
-    const list = Array.isArray(raw) ? raw : [raw];
-    return list.map((d) => path.resolve(root, d));
-  })();
-  const layoutDirs = (() => {
-    const raw = config.layoutsDir ?? 'layouts';
-    const list = Array.isArray(raw) ? raw : [raw];
-    return list.map((d) => path.resolve(root, d));
-  })();
+  const templateDirs = toList(config.templatesDir ?? 'templates').map((d) => path.resolve(root, d));
+  const layoutDirs = toList(config.layoutsDir ?? 'layouts').map((d) => path.resolve(root, d));
   const defaultLayout = config.layout ?? null;
   const adapter = config.adapter ?? staticAdapter();
-  const decoratorPaths = (adapter.decoratorModules ?? []).map((m) => {
-    const resolved = resolveSpec(m, root);
-    if (!resolved) {
-      throw new Error(
-        `Markbook: decorator module '${m}' could not be resolved from ${root}. ` +
-          `Use a relative path or install the bare-specifier package.`,
-      );
-    }
-    return resolved;
-  });
+  const decoratorPaths = (adapter.decoratorModules ?? []).map((m) =>
+    resolveSpecOrThrow(m, root, 'decorator module'),
+  );
   const adapterPlugins = adapter.vitePlugins ? await adapter.vitePlugins() : [];
-  const cssPaths = (() => {
-    const raw = config.css;
-    if (!raw) return [];
-    const list = Array.isArray(raw) ? raw : [raw];
-    return list.map((p) => {
-      const resolved = resolveSpec(p, root);
-      if (!resolved) {
-        throw new Error(
-          `Markbook: css file '${p}' could not be resolved from ${root}. ` +
-            `Use a relative path or install the bare-specifier package.`,
-        );
-      }
-      return resolved;
-    });
-  })();
+  const cssPaths = toList(config.css).map((p) => resolveSpecOrThrow(p, root, 'css file'));
   const userCss = await loadUserCss(cssPaths);
 
   const userDirectives = (() => {
@@ -287,50 +286,6 @@ async function loadUserCss(cssPaths: string[]): Promise<string> {
   // to ~12KB compounds across HTML output sizes (and silences Lighthouse's
   // "Minify CSS" warning).
   return minifyCss(sources.join('\n'));
-}
-
-/**
- * One-time minification of the static inline assets — boot scripts +
- * BASE_CSS. These are module-level constants that never change between
- * builds, so we minify lazily on first use and mutate the captured
- * variables in place. After this resolves, every subsequent
- * `buildHeadInjections` call reads the minified strings synchronously.
- *
- * Called from `createContext` so every entry point (`build`, `dev`,
- * `preview`) inherits the optimization without needing to await
- * anything later in the pipeline.
- */
-let _inlineAssetsMinified = false;
-async function ensureInlineAssetsMinified(): Promise<void> {
-  if (_inlineAssetsMinified) return;
-  const [
-    themeMin,
-    tabsMin,
-    playgroundMin,
-    copyMin,
-    permalinkMin,
-    searchKbdMin,
-    copyMdMin,
-    baseCssMin,
-  ] = await Promise.all([
-    minifyJs(THEME_BOOT_SCRIPT),
-    minifyJs(TABS_BOOT_SCRIPT),
-    minifyJs(PLAYGROUND_BOOT_SCRIPT),
-    minifyJs(COPY_BOOT_SCRIPT),
-    minifyJs(PERMALINK_BOOT_SCRIPT),
-    minifyJs(SEARCH_KBD_BOOT_SCRIPT),
-    minifyJs(COPY_MD_BOOT_SCRIPT),
-    minifyCss(BASE_CSS),
-  ]);
-  THEME_BOOT_SCRIPT = themeMin;
-  TABS_BOOT_SCRIPT = tabsMin;
-  PLAYGROUND_BOOT_SCRIPT = playgroundMin;
-  COPY_BOOT_SCRIPT = copyMin;
-  PERMALINK_BOOT_SCRIPT = permalinkMin;
-  SEARCH_KBD_BOOT_SCRIPT = searchKbdMin;
-  COPY_MD_BOOT_SCRIPT = copyMdMin;
-  BASE_CSS = baseCssMin;
-  _inlineAssetsMinified = true;
 }
 
 interface WritePagesResult {
@@ -769,41 +724,6 @@ export async function dev(config: MarkbookConfig): Promise<void> {
 }
 
 /**
- * Run Pagefind across `outDir` to produce the static search index at
- * `<outDir>/pagefind/`. Called by `build()` against the production
- * `outDir`, and by `dev()` against `tmpDir` so the dev server's `{{ search }}`
- * slot actually finds something.
- *
- * Exported for tests / advanced consumers building their own pipeline on
- * top of `writePages`. Most consumers should just use `build()` or `dev()`.
- */
-export async function runPagefind(outDir: string): Promise<void> {
-  const create = await pagefind.createIndex({});
-  const errs = (create as { errors?: string[] }).errors;
-  if (errs && errs.length > 0) {
-    throw new Error(`Pagefind createIndex: ${errs.join(', ')}`);
-  }
-  const index = (create as { index?: unknown }).index;
-  if (!index) throw new Error('Pagefind: failed to create index');
-
-  const idx = index as {
-    addDirectory: (opts: { path: string }) => Promise<{ errors?: string[] }>;
-    writeFiles: (opts: { outputPath: string }) => Promise<{ errors?: string[] }>;
-  };
-
-  const addRes = await idx.addDirectory({ path: outDir });
-  if (addRes.errors && addRes.errors.length > 0) {
-    throw new Error(`Pagefind addDirectory: ${addRes.errors.join(', ')}`);
-  }
-  const writeRes = await idx.writeFiles({
-    outputPath: path.join(outDir, 'pagefind'),
-  });
-  if (writeRes.errors && writeRes.errors.length > 0) {
-    throw new Error(`Pagefind writeFiles: ${writeRes.errors.join(', ')}`);
-  }
-}
-
-/**
  * Tiny Vite plugin for `markbook dev` — stamps `Content-Type: text/plain;
  * charset=utf-8` on every `.txt` response. Without it, Vite (like Python's
  * `http.server`) sends bare `text/plain`, and browsers fall back to a
@@ -839,233 +759,6 @@ function utf8TxtPlugin() {
       });
     },
   };
-}
-
-function buildNav(pages: PageRecord[]): NavGroup[] {
-  const groupMap = new Map<string | null, NavItem[]>();
-  for (const p of pages) {
-    if (!groupMap.has(p.groupKey)) groupMap.set(p.groupKey, []);
-    const rawOrder = p.parsed.frontmatter.order;
-    const order = typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : undefined;
-    groupMap.get(p.groupKey)!.push({
-      id: p.fileId,
-      title: p.parsed.title,
-      htmlRelPath: p.htmlRelPath,
-      order,
-    });
-  }
-  const groups: NavGroup[] = [];
-  if (groupMap.has(null)) {
-    groups.push({ label: null, items: sortNavItems(groupMap.get(null)!) });
-  }
-  const named = [...groupMap.entries()]
-    .filter(([k]) => k !== null)
-    .sort(([a], [b]) => (a as string).localeCompare(b as string));
-  for (const [k, v] of named) {
-    groups.push({ label: k as string, items: sortNavItems(v) });
-  }
-  return groups;
-}
-
-/**
- * Sort sidebar items: index page first, then frontmatter-ordered pages
- * ascending, then any pages without `order:` in their original
- * file-discovery order (stable). Ties on `order` also fall back to
- * file-discovery order. The stability matters: users who rely on
- * filename prefixes for sort order (`01-intro.md`, `02-setup.md`)
- * don't get silently reshuffled by adding `order:` to one sibling.
- */
-export function sortNavItems(items: NavItem[]): NavItem[] {
-  const indexed = items.map((item, originalIndex) => ({ item, originalIndex }));
-  indexed.sort((a, b) => {
-    const aIdx = isIndexHref(a.item.htmlRelPath);
-    const bIdx = isIndexHref(b.item.htmlRelPath);
-    if (aIdx !== bIdx) return aIdx ? -1 : 1;
-
-    const aOrdered = a.item.order !== undefined;
-    const bOrdered = b.item.order !== undefined;
-    if (aOrdered !== bOrdered) return aOrdered ? -1 : 1;
-    if (aOrdered && bOrdered && a.item.order !== b.item.order) {
-      return (a.item.order as number) - (b.item.order as number);
-    }
-
-    return a.originalIndex - b.originalIndex;
-  });
-  return indexed.map(({ item }) => item);
-}
-
-/** @deprecated Use `sortNavItems`. Kept as a thin alias for backward compatibility with any consumer reaching into the internals. */
-export function sortIndexFirst(items: NavItem[]): NavItem[] {
-  return sortNavItems(items);
-}
-
-export function isIndexHref(href: string): boolean {
-  return href === 'index.html' || href.endsWith('/index.html');
-}
-
-/**
- * Emit the top-level `llms.txt` index plus every page's per-page mirror
- * under `<outDir>/llms/`. Called by `build()` against the production
- * `outDir`, and by `dev()` against `tmpDir` so the layout's
- * `<a href="/llms.txt">` link AND the per-page "View / Copy as Markdown"
- * buttons both work in dev — not just in `markbook build`.
- *
- * Exported for tests / advanced consumers.
- */
-export async function emitLlms(
-  pages: PageRecord[],
-  outDir: string,
-  siteTitle: string | null,
-  siteDescription: string | undefined,
-): Promise<void> {
-  await emitPerPageLlmsTxt(pages, outDir);
-
-  // Fall back to the index page's title (or the first page's) so the
-  // llms.txt index still has a meaningful H1 when no `config.title` was
-  // supplied.
-  const indexPage = pages.find((p) => isIndexHref(p.htmlRelPath));
-  const titleH1 = siteTitle ?? indexPage?.parsed.title ?? pages[0]?.parsed.title ?? 'Documentation';
-
-  const lines: string[] = [];
-  lines.push(`# ${titleH1}`);
-  lines.push('');
-  lines.push(
-    '> **Note:** This is a summary overview using the LLMs.txt format (https://llmstxt.org/). Each section links to its full documentation file in plain text format.',
-  );
-  lines.push('');
-  if (siteDescription) {
-    lines.push(siteDescription);
-    lines.push('');
-  }
-
-  for (const page of pages) {
-    const linkText = formatLinkText(page);
-    const url = `./llms/${page.txtRelPath.replace(/\\/g, '/')}`;
-    const desc =
-      typeof page.parsed.frontmatter.description === 'string'
-        ? `: ${page.parsed.frontmatter.description}`
-        : '';
-    lines.push(`- [${linkText}](${url})${desc}`);
-  }
-
-  await fs.writeFile(path.join(outDir, 'llms.txt'), `${UTF8_BOM}${lines.join('\n')}\n`);
-}
-
-/**
- * Write every page's plain-markdown mirror to `<base>/llms/<page>.txt`.
- * Used both by `emitLlms` (for the static dist output) and `writePages`
- * (for the dev/build tmpDir so the "View as Markdown" buttons resolve).
- *
- * Each file starts with a UTF-8 BOM so browsers (and naive readers that
- * don't honour HTTP `charset=utf-8`) detect the encoding from the bytes
- * themselves. Without it, hosts that serve `.txt` as `text/plain` with
- * no charset (Vite's default, Python's `http.server`, some CDNs) cause
- * browsers to fall back to Latin-1 — emojis and em-dashes display as
- * mojibake.
- */
-async function emitPerPageLlmsTxt(pages: PageRecord[], baseDir: string): Promise<void> {
-  const llmsDir = path.join(baseDir, 'llms');
-  for (const page of pages) {
-    const txtAbs = path.join(llmsDir, page.txtRelPath);
-    await fs.mkdir(path.dirname(txtAbs), { recursive: true });
-    const startsWithH1 = /^#\s/.test(page.parsed.plainMarkdown);
-    const txtContent = startsWithH1
-      ? page.parsed.plainMarkdown
-      : `# ${page.parsed.title}\n\n${page.parsed.plainMarkdown}`;
-    await fs.writeFile(txtAbs, `${UTF8_BOM}${txtContent}\n`);
-  }
-}
-
-/**
- * UTF-8 byte-order mark — `EF BB BF` when serialised. Prepended to every
- * emitted `.txt` (per-page mirrors AND the top-level index) so browsers
- * decode the file as UTF-8 regardless of the host's `Content-Type` header.
- * Modern markdown parsers and LLM ingestion pipelines strip BOMs
- * transparently; the cost is 3 bytes per file.
- */
-const UTF8_BOM = '\uFEFF';
-
-/**
- * Normalize a user-supplied `siteUrl` for canonical/OG/sitemap use:
- *   - Returns `null` if unset.
- *   - Strips any trailing slash so concatenation with page paths is clean.
- *   - Throws on an obviously-malformed input (must parse as an `http(s)`
- *     URL with no path, query, or fragment).
- */
-export function normalizeSiteUrl(raw: string | undefined | null): string | null {
-  if (raw == null || raw === '') return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw new Error(
-      `Markbook: invalid siteUrl '${raw}' — expected an absolute http(s) URL like 'https://example.com'.`,
-    );
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Markbook: siteUrl '${raw}' must use http or https; got '${parsed.protocol}'.`);
-  }
-  if (parsed.search || parsed.hash) {
-    throw new Error(`Markbook: siteUrl '${raw}' must not contain a query string or fragment.`);
-  }
-  // Normalize: keep origin + any base path, strip trailing slash.
-  let normalized = `${parsed.origin}${parsed.pathname}`;
-  if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
-  return normalized;
-}
-
-/**
- * Emit `dist/sitemap.xml` listing every built page, plus a `dist/robots.txt`
- * that references the sitemap. Skipped when `siteUrl` is not configured —
- * the sitemap spec requires absolute URLs.
- *
- * Exported for tests / advanced consumers. `build()` calls this
- * automatically after Vite finishes.
- */
-export async function emitSitemapAndRobots(
-  pages: PageRecord[],
-  outDir: string,
-  siteUrl: string | null,
-): Promise<void> {
-  if (!siteUrl) return;
-  const today = new Date().toISOString().slice(0, 10);
-  const urls = pages
-    .map((p) => {
-      const url = `${siteUrl}/${p.htmlRelPath.replace(/\\/g, '/')}`;
-      // index.html → canonical URL ends at the directory (cleaner sitemap entry).
-      const canonical = url.endsWith('/index.html') ? url.slice(0, -'index.html'.length) : url;
-      return `  <url>\n    <loc>${escapeXml(canonical)}</loc>\n    <lastmod>${today}</lastmod>\n  </url>`;
-    })
-    .join('\n');
-  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
-  await fs.writeFile(path.join(outDir, 'sitemap.xml'), sitemap);
-
-  const robots = `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
-  await fs.writeFile(path.join(outDir, 'robots.txt'), robots);
-}
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function formatLinkText(page: PageRecord): string {
-  const segments = page.relPath.replace(/\.md$/, '').split(/[\\/]/);
-  const last = segments[segments.length - 1];
-  if (segments.length === 1 && last && last.toLowerCase() === 'index') {
-    return page.parsed.title;
-  }
-  const dirSegments = segments.slice(0, -1).map(capitalize);
-  const dir = dirSegments.join('/');
-  return dir ? `${dir}/${page.parsed.title}` : page.parsed.title;
-}
-
-export function capitalize(s: string): string {
-  return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
@@ -1132,19 +825,11 @@ async function renderPlaygroundButtons(
   const buttons = descriptors
     .map((d) => {
       const payload = Buffer.from(JSON.stringify(d), 'utf8').toString('base64');
-      return `<button type="button" class="markbook-playground-btn" data-markbook-playground data-payload="${payload}" title="${escapeAttr(d.label)}">${escapeText(d.label)}</button>`;
+      return `<button type="button" class="markbook-playground-btn" data-markbook-playground data-payload="${payload}" title="${escapeAttribute(d.label)}">${escapeHtml(d.label)}</button>`;
     })
     .join('');
 
   return `<div class="markbook-playground">${buttons}</div>`;
-}
-
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function generateEntry(
@@ -1221,1073 +906,3 @@ ${
 
   return `${importLines.join('\n')}\n${MB_CSF_HELPER}\n${setups.join('\n')}\n`;
 }
-
-/**
- * Runtime helper that distinguishes a Storybook CSF v3 story object from
- * a plain component object (e.g. Vue's `defineComponent({ render })` or
- * React's `forwardRef`). To be considered a CSF story, the value must:
- *   - be a non-null object
- *   - have a `render` function
- *   - carry at least one of the CSF metadata fields (args, argTypes,
- *     parameters, or name) so we don't unwrap arbitrary component objects
- *     that happen to expose a `render` method.
- */
-const MB_CSF_HELPER = `function __mb_isCsf(v) {
-  if (!v || typeof v !== 'object') return false;
-  if (typeof v.render !== 'function') return false;
-  return !!(v.args || v.argTypes || v.parameters || typeof v.name === 'string');
-}`;
-
-/**
- * Bundle the data that's reused across the built-in shell and HTML
- * layouts when rendering a single page. Computed once per page in
- * `writePages`, then passed into `renderBuiltinShell` / `renderLayout`.
- */
-interface PageRenderContext {
-  page: PageRecord;
-  nav: NavGroup[];
-  siteTitle: string | null;
-  entryBasename: string | null;
-  searchEnabled: boolean;
-  userCss: string;
-  disableBaseCss: boolean;
-  llmsButtons: boolean;
-  /** Site-wide description (frontmatter overrides per-page). */
-  siteDescription: string | undefined;
-  /** Canonical site origin (no trailing slash), or null if not configured. */
-  siteUrl: string | null;
-  /** `<meta name="theme-color">` value. */
-  themeColor: string;
-  /** Default Open Graph image URL, or null if not configured. */
-  defaultOgImage: string | null;
-  /** Function that rewrites a `target` path (e.g. `index.html`) to a relative href from this page. */
-  resolveHref: (target: string) => string;
-  /** Relative path from this page to `pagefind/` (no trailing slash). */
-  pagefindBase: string;
-  /** Effective browser-tab title for this page. */
-  browserTitle: string;
-  /** What goes in the header brand on the built-in shell. */
-  brandText: string;
-  /** Effective page description (frontmatter > config.description > ''). */
-  effectiveDescription: string;
-  /** Effective Open Graph image URL (frontmatter `ogImage` > config.ogImage > null). */
-  effectiveOgImage: string | null;
-  /** Canonical absolute URL for this page if `siteUrl` is set, else null. */
-  canonicalUrl: string | null;
-}
-
-function buildPageRenderContext(
-  page: PageRecord,
-  nav: NavGroup[],
-  ctx: BuildContext,
-  entryBasename: string | null,
-  searchEnabled: boolean,
-): PageRenderContext {
-  const fromDir = path.dirname(page.htmlRelPath);
-
-  const resolveHref = (target: string): string => {
-    let rel = path.relative(fromDir, target).replace(/\\/g, '/');
-    if (rel === '') rel = path.basename(target);
-    if (!rel.startsWith('.') && !rel.startsWith('/')) rel = `./${rel}`;
-    return rel;
-  };
-
-  const pagefindBase = (() => {
-    let rel = path.relative(fromDir, 'pagefind').replace(/\\/g, '/');
-    if (rel === '') rel = 'pagefind';
-    if (!rel.startsWith('.') && !rel.startsWith('/')) rel = `./${rel}`;
-    return rel;
-  })();
-
-  const pageTitle = page.parsed.title;
-  const browserTitle = ctx.siteTitle ? `${pageTitle} — ${ctx.siteTitle}` : pageTitle;
-  const brandText = ctx.siteTitle ?? pageTitle;
-
-  // Description / OG image: per-page frontmatter wins, falls back to config.
-  const fmDescription =
-    typeof page.parsed.frontmatter.description === 'string'
-      ? page.parsed.frontmatter.description
-      : undefined;
-  const effectiveDescription = fmDescription ?? ctx.siteDescription ?? '';
-  const fmOgImage =
-    typeof page.parsed.frontmatter.ogImage === 'string'
-      ? page.parsed.frontmatter.ogImage
-      : undefined;
-  const effectiveOgImage = fmOgImage ?? ctx.ogImage;
-
-  // Canonical URL — only emit when siteUrl is set; build from absolute path
-  // so URL is portable regardless of resolveHref's relative output.
-  const canonicalUrl = ctx.siteUrl
-    ? `${ctx.siteUrl}/${page.htmlRelPath.replace(/\\/g, '/')}`
-    : null;
-
-  return {
-    page,
-    nav,
-    siteTitle: ctx.siteTitle,
-    entryBasename,
-    searchEnabled,
-    userCss: ctx.userCss,
-    disableBaseCss: ctx.disableBaseCss,
-    llmsButtons: ctx.llmsButtons,
-    siteDescription: ctx.siteDescription,
-    siteUrl: ctx.siteUrl,
-    themeColor: ctx.themeColor,
-    defaultOgImage: ctx.ogImage,
-    resolveHref,
-    pagefindBase,
-    browserTitle,
-    brandText,
-    effectiveDescription,
-    effectiveOgImage,
-    canonicalUrl,
-  };
-}
-
-/**
- * Build the Markbook-required content that lives inside `<head>` and is
- * inserted via the `{{ head }}` placeholder in HTML layouts.
- *
- * Deliberately does NOT include `<title>`, `<meta charset>`, or `<meta
- * viewport>` — those are the layout author's call. Use
- * `{{ browserTitle }}` for the title string.
- */
-function buildHeadInjections(prc: PageRenderContext): string {
-  const pagefindLink = prc.searchEnabled
-    ? `<link href="${prc.pagefindBase}/pagefind-ui.css" rel="stylesheet">`
-    : '';
-  const parts = [
-    `<script>${THEME_BOOT_SCRIPT}</script>`,
-    `<script>${TABS_BOOT_SCRIPT}</script>`,
-    `<script>${PLAYGROUND_BOOT_SCRIPT}</script>`,
-    `<script>${COPY_BOOT_SCRIPT}</script>`,
-    `<script>${PERMALINK_BOOT_SCRIPT}</script>`,
-  ];
-  if (prc.llmsButtons) parts.push(`<script>${COPY_MD_BOOT_SCRIPT}</script>`);
-  if (prc.searchEnabled) parts.push(`<script>${SEARCH_KBD_BOOT_SCRIPT}</script>`);
-  if (pagefindLink) parts.push(pagefindLink);
-  if (!prc.disableBaseCss) parts.push(`<style>${BASE_CSS}</style>`);
-  if (prc.userCss) parts.push(`<style data-markbook-user-css>${prc.userCss}</style>`);
-  // SEO + browser-chrome meta. Always emitted; per-page values come from
-  // the PageRenderContext (frontmatter > config defaults).
-  parts.push(buildSeoMeta(prc));
-  return parts.join('\n');
-}
-
-/**
- * Build the SEO / Open Graph / Twitter Card / theme-color meta block.
- * Lives inside `{{ head }}` so layouts get it automatically, and the
- * built-in shell gets it too (its `<head>` template embeds head
- * injections directly).
- *
- * Per-page values cascade frontmatter > config defaults. Tags that
- * require a canonical URL (canonical, og:url) are emitted only when
- * `siteUrl` is set in the config.
- */
-function buildSeoMeta(prc: PageRenderContext): string {
-  const lines: string[] = [];
-  // Per-page description — first-class SEO requirement. Skip if empty
-  // (don't emit `<meta content="">` — Lighthouse flags it as "no
-  // description").
-  if (prc.effectiveDescription) {
-    lines.push(`<meta name="description" content="${escapeAttr(prc.effectiveDescription)}">`);
-  }
-  // Browser chrome tinting + dark-mode hint. theme-color works on mobile
-  // browsers + PWAs; color-scheme tells the browser which native form
-  // controls / scrollbars to use.
-  lines.push(`<meta name="theme-color" content="${escapeAttr(prc.themeColor)}">`);
-  lines.push('<meta name="color-scheme" content="light dark">');
-  // Canonical + og:url only when siteUrl is set (otherwise we'd emit a
-  // relative-path canonical, which Lighthouse flags).
-  if (prc.canonicalUrl) {
-    lines.push(`<link rel="canonical" href="${escapeAttr(prc.canonicalUrl)}">`);
-  }
-  // Open Graph — required (or strongly recommended) properties.
-  lines.push('<meta property="og:type" content="website">');
-  lines.push(`<meta property="og:title" content="${escapeAttr(prc.browserTitle)}">`);
-  if (prc.effectiveDescription) {
-    lines.push(
-      `<meta property="og:description" content="${escapeAttr(prc.effectiveDescription)}">`,
-    );
-  }
-  if (prc.siteTitle) {
-    lines.push(`<meta property="og:site_name" content="${escapeAttr(prc.siteTitle)}">`);
-  }
-  if (prc.canonicalUrl) {
-    lines.push(`<meta property="og:url" content="${escapeAttr(prc.canonicalUrl)}">`);
-  }
-  if (prc.effectiveOgImage) {
-    lines.push(`<meta property="og:image" content="${escapeAttr(prc.effectiveOgImage)}">`);
-  }
-  // Twitter Card — picks up og:* fallback automatically, but explicit
-  // tags rank higher in Twitter's preview UI.
-  lines.push(
-    `<meta name="twitter:card" content="${prc.effectiveOgImage ? 'summary_large_image' : 'summary'}">`,
-  );
-  lines.push(`<meta name="twitter:title" content="${escapeAttr(prc.browserTitle)}">`);
-  if (prc.effectiveDescription) {
-    lines.push(
-      `<meta name="twitter:description" content="${escapeAttr(prc.effectiveDescription)}">`,
-    );
-  }
-  if (prc.effectiveOgImage) {
-    lines.push(`<meta name="twitter:image" content="${escapeAttr(prc.effectiveOgImage)}">`);
-  }
-  return lines.join('\n');
-}
-
-/**
- * Build the Markbook-required content that goes at end-of-body — the
- * Pagefind UI script + init, plus the story entry module script. Inserted
- * via the `{{ bodyEnd }}` placeholder in HTML layouts.
- */
-function buildBodyEndInjections(prc: PageRenderContext): string {
-  const pagefindScripts = prc.searchEnabled
-    ? `<script src="${prc.pagefindBase}/pagefind-ui.js"></script>
-<script>
-  window.addEventListener('DOMContentLoaded', () => {
-    if (typeof PagefindUI !== 'undefined') {
-      new PagefindUI({ element: '#markbook-search-ui', showSubResults: true });
-    }
-  });
-</script>`
-    : '';
-  const entryScript = prc.entryBasename
-    ? `<script type="module" src="./${prc.entryBasename}"></script>`
-    : '';
-  return [pagefindScripts, entryScript].filter(Boolean).join('\n');
-}
-
-/** The Pagefind search input slot. Empty when search is disabled. */
-function buildSearchSlot(prc: PageRenderContext): string {
-  return prc.searchEnabled ? '<div id="markbook-search-ui" class="markbook-search-ui"></div>' : '';
-}
-
-/** The dark/light toggle button. */
-function buildThemeToggle(): string {
-  return `<button class="markbook-theme-toggle" type="button" data-markbook-theme-toggle aria-label="Toggle theme"><span class="markbook-icon-sun" aria-hidden>☀</span><span class="markbook-icon-moon" aria-hidden>☾</span></button>`;
-}
-
-/**
- * Render a page using the built-in Markbook shell (header + sidebar + TOC).
- * Used when no HTML layout is configured for the page.
- */
-function renderBuiltinShell(prc: PageRenderContext): string {
-  const homeItem = prc.nav.find((g) => g.label === null)?.items[0];
-  const homeHref = homeItem ? prc.resolveHref(homeItem.htmlRelPath) : prc.resolveHref('index.html');
-
-  const navHtml = prc.nav
-    .map((group) => {
-      const itemsHtml = group.items
-        .map((n) => {
-          const href = prc.resolveHref(n.htmlRelPath);
-          const active = n.id === prc.page.fileId;
-          return `<li><a href="${href}"${active ? ' class="active" aria-current="page"' : ''}>${escapeHtml(n.title)}</a></li>`;
-        })
-        .join('');
-      const heading = group.label ? `<h2>${escapeHtml(group.label)}</h2>` : '';
-      return `<div class="markbook-nav-group">${heading}<ul>${itemsHtml}</ul></div>`;
-    })
-    .join('');
-
-  const tocItems = prc.page.parsed.headings.filter((h) => h.level === 2 || h.level === 3);
-  const tocHtml = tocItems
-    .map((h) => `<li class="toc-h${h.level}"><a href="#${h.slug}">${escapeHtml(h.text)}</a></li>`)
-    .join('');
-  const tocBlock =
-    tocItems.length > 0
-      ? `<aside class="markbook-toc"><h3>On this page</h3><ul>${tocHtml}</ul></aside>`
-      : '';
-  const shellClass = tocItems.length > 0 ? 'markbook-shell' : 'markbook-shell no-toc';
-
-  const headInjections = buildHeadInjections(prc);
-  const bodyEndInjections = buildBodyEndInjections(prc);
-  const searchSlot = buildSearchSlot(prc);
-  const themeToggle = buildThemeToggle();
-  const pageActions = prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '';
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(prc.browserTitle)}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-${headInjections}
-</head>
-<body>
-<header class="markbook-header">
-  <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(prc.brandText)}</a>
-  ${searchSlot}
-  ${themeToggle}
-</header>
-<div class="${shellClass}">
-  <aside class="markbook-sidebar">
-    <nav class="markbook-nav" aria-label="Site">${navHtml}</nav>
-  </aside>
-  <main class="markbook-main">
-    <article class="markbook-content" data-pagefind-body>
-${pageActions}${prc.page.parsed.html}
-    </article>
-  </main>
-  ${tocBlock}
-</div>
-${bodyEndInjections}
-</body>
-</html>
-`;
-}
-
-/**
- * Render a page using a user-supplied HTML layout. Builds the
- * substitution map and delegates to `applyHtmlLayout`, which validates
- * that the layout has exactly one `{{ content }}` and rejects unknown
- * placeholders.
- *
- * The layout owns the entire `<html>`/`<head>`/`<body>` structure. The
- * `{{ content }}` placeholder receives the page's INNER HTML — the
- * layout supplies its own `<article ... data-pagefind-body>` wrapper if
- * it wants Pagefind to index the page.
- */
-function renderLayout(prc: PageRenderContext, layoutName: string, layoutBody: string): string {
-  const subs: HtmlLayoutSubstitutions = {
-    raw: {
-      content: prc.page.parsed.html,
-      head: buildHeadInjections(prc),
-      bodyEnd: buildBodyEndInjections(prc),
-      pageActions: prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '',
-      search: buildSearchSlot(prc),
-      themeToggle: buildThemeToggle(),
-    },
-    text: {
-      title: prc.page.parsed.title,
-      description: stringifyOrEmpty(prc.page.parsed.frontmatter.description),
-      siteTitle: prc.siteTitle ?? '',
-      browserTitle: prc.browserTitle,
-    },
-  };
-  return applyHtmlLayout(layoutBody, subs, prc.page.parsed.frontmatter, layoutName);
-}
-
-function stringifyOrEmpty(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
-}
-
-/**
- * Resolve the layout name to use for a given page. Returns `null` when
- * the built-in shell should be used.
- *
- * Resolution order:
- *   1. Per-page frontmatter `layout: <name>` wins (or `layout: false` to
- *      force the built-in shell even when a default is configured).
- *   2. `MarkbookConfig.layout` provides the site-wide default.
- *   3. Otherwise, no layout — built-in shell.
- */
-export function resolvePageLayout(page: PageRecord, defaultLayout: string | null): string | null {
-  const fm = page.parsed.frontmatter.layout;
-  if (fm === false) return null;
-  if (typeof fm === 'string') return fm;
-  if (fm != null) {
-    throw new Error(
-      `Markbook: ${page.relPath} has invalid \`layout:\` frontmatter — expected a string layout name or \`false\`, got ${JSON.stringify(fm)}.`,
-    );
-  }
-  return defaultLayout;
-}
-
-/**
- * Render the "View as Markdown" / "Copy as Markdown" action buttons that
- * point at the page's per-page llms.txt mirror. Wrapped in
- * `data-pagefind-ignore` so Pagefind doesn't index the button labels.
- */
-function renderPageActions(page: PageRecord, resolveHref: (target: string) => string): string {
-  const llmsHref = resolveHref(`llms/${page.txtRelPath}`);
-  return `<div class="markbook-page-actions" role="group" aria-label="Page actions" data-pagefind-ignore><a class="markbook-page-action" href="${llmsHref}" target="_blank" rel="noopener" title="View this page as plain markdown (opens in a new tab)">View as Markdown</a><button type="button" class="markbook-page-action" data-markbook-copy-md data-url="${llmsHref}" title="Copy this page's markdown to clipboard"><span class="markbook-copy-md-label">Copy as Markdown</span></button></div>`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/**
- * Inline IIFE: read the saved theme from localStorage (or the OS preference on
- * first visit), apply it to <html data-theme=…> before paint, and delegate
- * clicks on the theme toggle button to flip it.
- */
-let THEME_BOOT_SCRIPT = `(function(){var s;try{s=localStorage.getItem('markbook-theme')}catch(e){}var t=s==='dark'||s==='light'?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-markbook-theme-toggle]');if(!b)return;var c=document.documentElement.dataset.theme;var n=c==='dark'?'light':'dark';document.documentElement.dataset.theme=n;try{localStorage.setItem('markbook-theme',n)}catch(e){}});})();`;
-
-let TABS_BOOT_SCRIPT = `(function(){function activate(tab){var wrap=tab.closest('[data-markbook-tabs]');if(!wrap)return;var tabs=wrap.querySelectorAll('[role="tab"]');var pid=tab.getAttribute('aria-controls');for(var i=0;i<tabs.length;i++){var t=tabs[i];t.setAttribute('aria-selected',t===tab?'true':'false');t.tabIndex=t===tab?0:-1;}var panels=wrap.querySelectorAll('[role="tabpanel"]');for(var j=0;j<panels.length;j++){panels[j].hidden=panels[j].id!==pid;}}document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(t&&t.closest('[data-markbook-tabs]'))activate(t);});document.addEventListener('keydown',function(e){var t=e.target&&e.target.closest&&e.target.closest('[role="tab"]');if(!t||!t.closest('[data-markbook-tabs]'))return;if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();var tabs=t.parentElement.querySelectorAll('[role="tab"]');var i=Array.prototype.indexOf.call(tabs,t);var n=e.key==='ArrowRight'?(i+1)%tabs.length:(i-1+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n]);});})();`;
-
-/**
- * Delegated click handler for [data-markbook-playground] buttons. Each button
- * carries a base64-encoded JSON descriptor with provider-specific form
- * fields (action URL + named values). On click we decode, build a hidden
- * form, append to body, submit, then remove. Posts in a new tab so the
- * docs page is not navigated away from.
- */
-let PLAYGROUND_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-playground]');if(!b)return;e.preventDefault();var d;try{d=JSON.parse(atob(b.getAttribute('data-payload')||''));}catch(err){console.error('markbook: malformed playground payload',err);return;}var f=document.createElement('form');f.action=d.action;f.method='POST';f.target='_blank';f.style.display='none';for(var i=0;i<d.fields.length;i++){var pair=d.fields[i];var input=document.createElement('input');input.type='hidden';input.name=pair[0];input.value=pair[1];f.appendChild(input);}document.body.appendChild(f);f.submit();f.parentNode.removeChild(f);});})();`;
-
-/**
- * Copy-code button. Delegated click handler reads the nearest `<pre>` block,
- * extracts its textContent, copies via navigator.clipboard, briefly flips
- * the button label to "Copied!" for ~1.2s.
- */
-let COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy]');if(!b)return;e.preventDefault();var wrap=b.closest('.markbook-code-pre-wrap');var pre=wrap&&wrap.querySelector('pre');if(!pre||!navigator.clipboard)return;navigator.clipboard.writeText(pre.textContent||'').then(function(){var lbl=b.querySelector('.markbook-copy-label');if(!lbl)return;var prev=lbl.textContent;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: clipboard write failed',err);});});})();`;
-
-/**
- * Heading permalinks. Click on a [data-markbook-permalink] anchor copies the
- * canonical page URL + fragment to the clipboard (still navigates, so the
- * URL bar updates as expected). Modifier-clicks (cmd/ctrl/shift) skip the
- * clipboard write so users can open in a new tab via standard browser UX.
- */
-let PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-markbook-permalink]');if(!a)return;if(e.metaKey||e.ctrlKey||e.shiftKey)return;if(!navigator.clipboard)return;var h=a.getAttribute('href')||'';var url=location.origin+location.pathname+h;navigator.clipboard.writeText(url).catch(function(){});});})();`;
-
-/**
- * Cmd-K / Ctrl-K opens the Pagefind search input. Slash key also works
- * (Algolia DocSearch / GitHub convention). Only active when search is
- * enabled — handler is omitted from the HTML in dev mode.
- */
-let SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
-
-/**
- * "Copy as Markdown" button handler. Delegated click reads the button's
- * data-url, fetches the per-page llms.txt mirror, writes the content to
- * the clipboard, and flips the label to "Copied!" for ~1.2s. Detects
- * file:// (where fetch can't reach the .txt file) and shows a tooltip
- * instead of silently failing.
- */
-let COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=document.querySelectorAll('[data-markbook-copy-md]');for(var i=0;i<btns.length;i++){var b=btns[i];b.disabled=true;b.title='Serve this site over http(s) to copy markdown.';b.style.opacity='0.5';b.style.cursor='not-allowed';}return;}document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy-md]');if(!b)return;e.preventDefault();if(!navigator.clipboard){return;}var url=b.getAttribute('data-url')||'';var lbl=b.querySelector('.markbook-copy-md-label');var prev=lbl?lbl.textContent:'';fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.text();}).then(function(text){return navigator.clipboard.writeText(text);}).then(function(){if(!lbl)return;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: copy-as-markdown failed',err);if(!lbl)return;lbl.textContent='Copy failed';setTimeout(function(){lbl.textContent=prev;},1500);});});})();`;
-
-let BASE_CSS = `
-:root {
-  --mb-bg: #ffffff;
-  --mb-fg: #1a1a1a;
-  --mb-fg-muted: #5b5b66;
-  --mb-border: #e6e6eb;
-  --mb-bg-elev: #f7f7f9;
-  --mb-bg-soft: #fafafa;
-  --mb-accent: #6c5ce7;
-  --mb-accent-fg: #ffffff;
-  --mb-link: #4a3aff;
-  --mb-code-bg: #f6f6fa;
-  --mb-radius: 6px;
-  --mb-font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-  --mb-font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --mb-content-width: 720px;
-  --mb-sidebar-width: 240px;
-  --mb-toc-width: 200px;
-  --mb-header-height: 56px;
-  color-scheme: light;
-}
-[data-theme="dark"] {
-  --mb-bg: #0e0e12;
-  --mb-fg: #e6e6eb;
-  --mb-fg-muted: #94949e;
-  --mb-border: #2a2a32;
-  --mb-bg-elev: #1a1a22;
-  --mb-bg-soft: #16161c;
-  --mb-accent: #8b7eff;
-  --mb-accent-fg: #ffffff;
-  --mb-link: #b6acff;
-  --mb-code-bg: #1a1a22;
-  color-scheme: dark;
-}
-*,*::before,*::after { box-sizing: border-box; }
-/* The 'scrollbar-gutter: stable' rule reserves space for the vertical
-   scrollbar even on short pages, so navigation between long and short
-   pages doesn't cause the layout to jitter horizontally (the viewport
-   width stays constant whether or not the scrollbar is drawn). */
-html {
-  scrollbar-gutter: stable;
-}
-html, body {
-  margin: 0;
-  background: var(--mb-bg);
-  color: var(--mb-fg);
-  font-family: var(--mb-font-sans);
-  font-size: 16px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-a { color: var(--mb-link); text-decoration: none; }
-a:hover { text-decoration: underline; }
-.markbook-header {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; gap: 1rem;
-  height: var(--mb-header-height);
-  padding: 0 1.5rem;
-  background: var(--mb-bg);
-  border-bottom: 1px solid var(--mb-border);
-}
-.markbook-brand {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--mb-fg);
-  display: inline-flex; align-items: center; gap: 0.5rem;
-}
-.markbook-brand:hover { text-decoration: none; }
-.markbook-logo { font-size: 1.2rem; }
-.markbook-theme-toggle {
-  background: transparent;
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  color: var(--mb-fg-muted);
-  font-size: 0.95rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-family: inherit;
-  flex-shrink: 0;
-}
-.markbook-theme-toggle:hover {
-  color: var(--mb-fg);
-  background: var(--mb-bg-elev);
-}
-.markbook-theme-toggle .markbook-icon-sun,
-.markbook-theme-toggle .markbook-icon-moon { display: none; }
-[data-theme="dark"] .markbook-theme-toggle .markbook-icon-sun { display: inline; }
-:root:not([data-theme="dark"]) .markbook-theme-toggle .markbook-icon-moon { display: inline; }
-.markbook-content .shiki,
-.markbook-content .shiki span {
-  color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
-}
-[data-theme="dark"] .markbook-content .shiki,
-[data-theme="dark"] .markbook-content .shiki span {
-  color: var(--shiki-dark);
-  background-color: var(--shiki-dark-bg);
-}
-.markbook-search-ui {
-  position: relative;
-  width: 360px;
-  max-width: 50vw;
-  margin-left: auto;
-  --pagefind-ui-scale: 1;
-  --pagefind-ui-primary: var(--mb-accent);
-  --pagefind-ui-text: var(--mb-fg);
-  --pagefind-ui-background: var(--mb-bg);
-  --pagefind-ui-border: var(--mb-border);
-  --pagefind-ui-tag: var(--mb-bg-elev);
-  --pagefind-ui-border-width: 1px;
-  --pagefind-ui-border-radius: var(--mb-radius);
-  --pagefind-ui-font: var(--mb-font-sans);
-}
-.markbook-search-ui .pagefind-ui__search-input {
-  height: 36px;
-  padding: 0 36px 0 32px;
-  font-size: 0.875rem;
-  font-weight: 400;
-  background: var(--mb-bg-elev);
-  color: var(--mb-fg);
-  border-color: var(--mb-border);
-}
-.markbook-search-ui .pagefind-ui__form::before {
-  width: 14px;
-  height: 14px;
-  top: 11px;
-  left: 11px;
-  opacity: 0.5;
-}
-.markbook-search-ui .pagefind-ui__search-clear {
-  height: 30px;
-  top: 3px;
-  right: 3px;
-  padding: 0 0.6rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--mb-fg-muted);
-  background: transparent;
-  border-radius: 4px;
-}
-.markbook-search-ui .pagefind-ui__search-clear:hover {
-  color: var(--mb-fg);
-  background: var(--mb-bg-elev);
-}
-.markbook-search-ui .pagefind-ui__drawer {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  left: auto;
-  width: 480px;
-  max-width: min(calc(100vw - 3rem), 600px);
-  max-height: 70vh;
-  overflow-y: auto;
-  background: var(--mb-bg);
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  padding: 0.25rem 0.5rem;
-  margin: 0;
-  z-index: 20;
-  gap: 0;
-  flex-direction: column;
-}
-.markbook-search-ui .pagefind-ui__results-area {
-  min-width: 0;
-  margin-top: 0;
-}
-.markbook-search-ui .pagefind-ui__message {
-  height: auto;
-  padding: 0.5rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--mb-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0;
-}
-.markbook-search-ui .pagefind-ui__results { padding: 0; }
-.markbook-search-ui .pagefind-ui__result {
-  padding: 0.6rem 0.5rem;
-  border-top: 1px solid var(--mb-border);
-  gap: 0;
-}
-.markbook-search-ui .pagefind-ui__result:last-of-type { border-bottom: none; }
-.markbook-search-ui .pagefind-ui__result-thumb { display: none; }
-.markbook-search-ui .pagefind-ui__result-inner {
-  flex: 1;
-  margin-top: 0;
-  gap: 0;
-}
-.markbook-search-ui .pagefind-ui__result-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin: 0 0 0.2rem;
-}
-.markbook-search-ui .pagefind-ui__result-excerpt {
-  font-size: 0.8rem;
-  color: var(--mb-fg-muted);
-  line-height: 1.5;
-  min-width: 0;
-  margin-top: 0;
-}
-.markbook-search-ui .pagefind-ui__result-link {
-  color: var(--mb-fg);
-  text-decoration: none;
-}
-.markbook-search-ui .pagefind-ui__result-link:hover { color: var(--mb-link); }
-.markbook-search-ui .pagefind-ui__result-nested {
-  padding-left: 0.875rem;
-  padding-top: 0.4rem;
-}
-.markbook-search-ui .pagefind-ui__result-nested .pagefind-ui__result-link::before {
-  font-size: 0.85em;
-  opacity: 0.5;
-}
-.markbook-search-ui mark {
-  background: color-mix(in srgb, var(--mb-accent) 22%, transparent);
-  color: var(--mb-fg);
-  padding: 0 2px;
-  border-radius: 2px;
-  font-weight: 500;
-}
-.markbook-search-ui .pagefind-ui__button {
-  height: 32px;
-  padding: 0 1rem;
-  font-size: 0.85rem;
-  margin: 0.5rem 0;
-  font-weight: 500;
-  background: var(--mb-bg-elev);
-  border-color: var(--mb-border);
-  color: var(--mb-fg);
-}
-.markbook-search-ui .pagefind-ui__button:hover {
-  background: var(--mb-border);
-  border-color: var(--mb-border);
-  color: var(--mb-fg);
-}
-.markbook-shell {
-  display: grid;
-  grid-template-columns: var(--mb-sidebar-width) 1fr var(--mb-toc-width);
-  gap: 1.5rem;
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-.markbook-shell.no-toc { grid-template-columns: var(--mb-sidebar-width) 1fr; }
-.markbook-sidebar {
-  position: sticky;
-  top: calc(var(--mb-header-height) + 1.5rem);
-  align-self: start;
-  max-height: calc(100vh - var(--mb-header-height) - 3rem);
-  overflow-y: auto;
-}
-.markbook-nav-group + .markbook-nav-group { margin-top: 1rem; }
-.markbook-nav-group h2 {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--mb-fg-muted);
-  margin: 0 0 0.5rem;
-  padding-left: 0.5rem;
-}
-.markbook-nav-group ul { list-style: none; padding: 0; margin: 0; }
-.markbook-nav-group li a {
-  display: block;
-  padding: 0.4rem 0.65rem;
-  font-size: 0.9rem;
-  color: var(--mb-fg);
-  border-radius: var(--mb-radius);
-}
-.markbook-nav-group li a:hover { background: var(--mb-bg-elev); text-decoration: none; }
-.markbook-nav-group li a.active { background: var(--mb-accent); color: var(--mb-accent-fg); }
-.markbook-nav-group li a.active:hover { text-decoration: none; }
-.markbook-main { min-width: 0; }
-.markbook-content { max-width: var(--mb-content-width); }
-.markbook-content > *:first-child { margin-top: 0; }
-.markbook-content > h1 + p {
-  font-size: 1.05rem;
-  color: var(--mb-fg-muted);
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-}
-.markbook-content h1 {
-  font-size: 2.25rem;
-  font-weight: 700;
-  margin: 0 0 0.75rem;
-  line-height: 1.15;
-}
-.markbook-content h2 {
-  font-size: 1.4rem;
-  font-weight: 600;
-  margin: 2rem 0 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--mb-border);
-  scroll-margin-top: 80px;
-}
-.markbook-content h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 1.25rem 0 0.5rem;
-  scroll-margin-top: 80px;
-}
-.markbook-content p { margin: 0.75rem 0; }
-.markbook-content code {
-  font-family: var(--mb-font-mono);
-  font-size: 0.85em;
-  background: var(--mb-code-bg);
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-}
-.markbook-content pre {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  font-size: 0.85rem;
-  line-height: 1.55;
-}
-.markbook-content pre code { background: transparent; padding: 0; }
-.markbook-story-block { margin: 1rem 0; }
-.markbook-story {
-  padding: 2rem;
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius) var(--mb-radius) 0 0;
-  background: var(--mb-bg-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 96px;
-}
-.markbook-story.markbook-story--centered {
-  align-items: center;
-  justify-content: center;
-}
-.markbook-story.markbook-story--padded { padding: 3rem 2rem; }
-.markbook-story.markbook-story--fullscreen {
-  padding: 0;
-  min-height: 360px;
-  align-items: stretch;
-  justify-content: stretch;
-}
-.markbook-controls {
-  border-left: 1px solid var(--mb-border);
-  border-right: 1px solid var(--mb-border);
-  background: var(--mb-bg);
-  padding: 0.75rem 1rem;
-  display: grid;
-  grid-template-columns: minmax(80px, max-content) 1fr;
-  gap: 0.5rem 0.85rem;
-  font-size: 0.85rem;
-}
-.markbook-controls:empty { display: none; }
-.markbook-playground {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  border-left: 1px solid var(--mb-border);
-  border-right: 1px solid var(--mb-border);
-  background: var(--mb-bg);
-  padding: 0.5rem 1rem;
-}
-.markbook-playground-btn {
-  appearance: none;
-  border: 1px solid var(--mb-border);
-  background: var(--mb-bg-soft);
-  color: var(--mb-fg-muted);
-  font-family: var(--mb-font-sans);
-  font-size: 0.78rem;
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: border-color .12s ease, color .12s ease, background .12s ease;
-}
-.markbook-playground-btn:hover {
-  border-color: var(--mb-accent);
-  color: var(--mb-fg);
-  background: var(--mb-bg-elev);
-}
-.markbook-playground-btn:focus-visible {
-  outline: 2px solid var(--mb-accent);
-  outline-offset: 2px;
-}
-.markbook-page-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin: -0.5rem 0 1.5rem;
-}
-.markbook-page-action {
-  appearance: none;
-  border: 1px solid var(--mb-border);
-  background: var(--mb-bg-soft);
-  color: var(--mb-fg-muted);
-  font-family: var(--mb-font-sans);
-  font-size: 0.78rem;
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: border-color .12s ease, color .12s ease, background .12s ease;
-}
-.markbook-page-action:hover {
-  border-color: var(--mb-accent);
-  color: var(--mb-fg);
-  background: var(--mb-bg-elev);
-}
-.markbook-page-action:focus-visible {
-  outline: 2px solid var(--mb-accent);
-  outline-offset: 2px;
-}
-.markbook-page-action.is-copied {
-  border-color: var(--mb-accent);
-  color: var(--mb-accent);
-}
-.markbook-control { display: contents; }
-.markbook-control label {
-  font-family: var(--mb-font-mono);
-  font-size: 0.78rem;
-  color: var(--mb-fg-muted);
-  align-self: center;
-  white-space: nowrap;
-}
-.markbook-control input[type="text"],
-.markbook-control input[type="number"],
-.markbook-control select {
-  font-family: var(--mb-font-sans);
-  font-size: 0.85rem;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid var(--mb-border);
-  border-radius: 4px;
-  background: var(--mb-bg-elev);
-  color: var(--mb-fg);
-  width: 100%;
-}
-.markbook-control input[type="checkbox"] {
-  align-self: center;
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  justify-self: start;
-}
-.markbook-code {
-  border: 1px solid var(--mb-border);
-  border-top: none;
-  border-radius: 0 0 var(--mb-radius) var(--mb-radius);
-  background: var(--mb-bg);
-}
-.markbook-code summary {
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
-  color: var(--mb-fg-muted);
-  user-select: none;
-}
-.markbook-code summary:hover { color: var(--mb-fg); }
-.markbook-code[open] summary { border-bottom: 1px solid var(--mb-border); }
-.markbook-code pre { padding: 1rem; margin: 0; overflow-x: auto; }
-.markbook-code-file + .markbook-code-file { border-top: 1px solid var(--mb-border); }
-.markbook-code-file-label {
-  padding: 0.4rem 1rem;
-  font-size: 0.75rem;
-  font-family: var(--mb-font-mono);
-  color: var(--mb-fg-muted);
-  background: var(--mb-bg-soft);
-  border-bottom: 1px solid var(--mb-border);
-}
-.markbook-code-pre-wrap { position: relative; }
-.markbook-code-copy {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  appearance: none;
-  border: 1px solid var(--mb-border);
-  background: var(--mb-bg);
-  color: var(--mb-fg-muted);
-  font-family: var(--mb-font-sans);
-  font-size: 0.72rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity .12s ease, color .12s ease, border-color .12s ease;
-}
-.markbook-code-pre-wrap:hover .markbook-code-copy,
-.markbook-code-copy:focus-visible { opacity: 1; }
-.markbook-code-copy:hover { color: var(--mb-fg); border-color: var(--mb-accent); }
-.markbook-code-copy.is-copied { opacity: 1; color: var(--mb-accent); border-color: var(--mb-accent); }
-.markbook-code-copy:focus-visible { outline: 2px solid var(--mb-accent); outline-offset: 2px; }
-
-/* Fenced markdown code blocks (triple-backtick blocks in any page).
-   Layered AFTER the global .markbook-content .shiki rules so the bg
-   override wins. */
-.markbook-content .markbook-code-pre-wrap.markbook-fenced-code {
-  margin: 1rem 0;
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  overflow: hidden;
-  background: var(--mb-code-bg);
-}
-.markbook-content .markbook-fenced-code pre {
-  margin: 0;
-  padding: 1rem 1.25rem;
-  overflow-x: auto;
-  background: transparent;
-}
-.markbook-content .markbook-fenced-code pre code {
-  background: transparent;
-  padding: 0;
-  font-size: 0.85em;
-}
-.markbook-content .markbook-fenced-code .shiki,
-.markbook-content .markbook-fenced-code .shiki span {
-  background-color: transparent;
-}
-.markbook-heading-anchor {
-  display: inline-block;
-  margin-left: 0.35rem;
-  color: var(--mb-fg-muted);
-  font-weight: 400;
-  text-decoration: none;
-  opacity: 0;
-  transition: opacity .12s ease, color .12s ease;
-}
-.markbook-content h2:hover .markbook-heading-anchor,
-.markbook-content h3:hover .markbook-heading-anchor,
-.markbook-heading-anchor:focus-visible { opacity: 1; }
-.markbook-heading-anchor:hover { color: var(--mb-accent); }
-.markbook-heading-anchor:focus-visible { outline: 2px solid var(--mb-accent); outline-offset: 2px; border-radius: 3px; }
-.markbook-code-tablist {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  background: var(--mb-bg-soft);
-  border-bottom: 1px solid var(--mb-border);
-  padding: 0 0.5rem;
-}
-.markbook-code-tablist [role="tab"] {
-  appearance: none;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 0.5rem 0.75rem;
-  font-family: var(--mb-font-mono);
-  font-size: 0.75rem;
-  color: var(--mb-fg-muted);
-  cursor: pointer;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
-}
-.markbook-code-tablist [role="tab"]:hover { color: var(--mb-fg); }
-.markbook-code-tablist [role="tab"][aria-selected="true"] {
-  color: var(--mb-fg);
-  border-bottom-color: var(--mb-accent);
-}
-.markbook-code-tablist [role="tab"]:focus-visible {
-  outline: 2px solid var(--mb-accent);
-  outline-offset: -2px;
-}
-.markbook-code-tabs [role="tabpanel"] { display: block; }
-.markbook-code-tabs [role="tabpanel"][hidden] { display: none; }
-.markbook-code-tabs pre { padding: 1rem; margin: 0; overflow-x: auto; }
-.markbook-props {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.875rem;
-  border: 1px solid var(--mb-border);
-  border-radius: var(--mb-radius);
-  overflow: hidden;
-}
-.markbook-props th {
-  text-align: left;
-  padding: 0.5rem 0.75rem;
-  background: var(--mb-bg-elev);
-  border-bottom: 1px solid var(--mb-border);
-  font-weight: 600;
-  font-size: 0.75rem;
-  color: var(--mb-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.markbook-props td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--mb-border);
-  vertical-align: top;
-}
-.markbook-props tr:last-child td { border-bottom: none; }
-.markbook-props code { font-size: 0.85em; word-break: break-word; }
-.markbook-required { color: #d23; font-weight: 700; margin-left: 2px; }
-.markbook-toc {
-  position: sticky;
-  top: calc(var(--mb-header-height) + 1.5rem);
-  align-self: start;
-  max-height: calc(100vh - var(--mb-header-height) - 3rem);
-  overflow-y: auto;
-  font-size: 0.85rem;
-}
-.markbook-toc h3 {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--mb-fg-muted);
-  margin: 0 0 0.5rem;
-}
-.markbook-toc ul { list-style: none; padding: 0; margin: 0; }
-.markbook-toc li a {
-  display: block;
-  padding: 0.25rem 0.5rem;
-  color: var(--mb-fg-muted);
-  font-size: 0.85rem;
-  border-radius: 4px;
-}
-.markbook-toc li a:hover { color: var(--mb-fg); background: var(--mb-bg-elev); text-decoration: none; }
-.markbook-toc li.toc-h3 a { padding-left: 1.25rem; font-size: 0.8rem; }
-@media (max-width: 1100px) {
-  .markbook-shell { grid-template-columns: var(--mb-sidebar-width) 1fr; }
-  .markbook-toc { display: none; }
-}
-@media (max-width: 700px) {
-  .markbook-shell { grid-template-columns: 1fr; padding: 1rem; }
-  .markbook-sidebar { display: none; }
-}
-`;

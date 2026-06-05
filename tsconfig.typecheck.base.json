@@ -1,0 +1,21 @@
+{
+  // Typecheck-only config (see ADR-0027). Maps the workspace package
+  // specifiers to their SOURCE so `tsc --noEmit` resolves cross-package types
+  // without a prior build. It deliberately sets no `rootDir`/`outDir` and
+  // `noEmit: true`, so the path-mapped source files from sibling packages
+  // don't trip TS6059 (which the emit build configs would). The emit build
+  // (`tsc -b` via each package's own tsconfig.json) is unchanged and still
+  // resolves deps from `dist/` in pnpm's topological order.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "paths": {
+      "@markbook/core": ["./packages/core/src/index.ts"],
+      "@markbook/core/internal": ["./packages/core/src/internal.ts"],
+      "@markbook/adapter-shared": ["./packages/adapter-shared/src/index.ts"]
+    }
+  }
+}

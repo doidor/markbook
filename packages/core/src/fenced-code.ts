@@ -1,8 +1,6 @@
-import { codeToHtml } from 'shiki';
 import { visit } from 'unist-util-visit';
-
-const COPY_BUTTON_HTML =
-  '<button type="button" class="markbook-code-copy" data-markbook-copy data-pagefind-ignore="all" aria-label="Copy code"><span class="markbook-copy-label">Copy</span></button>';
+import { copyButton, highlightCode } from './code-block.js';
+import { escapeHtml } from './directive-utils.js';
 
 /**
  * Rehype tree transformer: walk every `<pre><code>` pair (with or without a
@@ -33,27 +31,22 @@ export async function highlightFencedCodeBlocks(tree: unknown): Promise<void> {
   }
   const targets: Target[] = [];
 
-  visit(
-    tree as never,
-    'element',
-    // biome-ignore lint/suspicious/noExplicitAny: hast types are loose; this transformer treats nodes as plain objects.
-    (node: any, index: number | undefined, parent: any) => {
-      if (node?.tagName !== 'pre') return;
-      if (!Array.isArray(node.children) || node.children.length !== 1) return;
-      const only = node.children[0];
-      if (!only || only.type !== 'element' || only.tagName !== 'code') return;
-      if (index === undefined || !parent || !Array.isArray(parent.children)) return;
+  visit(tree as never, 'element', (node: any, index: number | undefined, parent: any) => {
+    if (node?.tagName !== 'pre') return;
+    if (!Array.isArray(node.children) || node.children.length !== 1) return;
+    const only = node.children[0];
+    if (!only || only.type !== 'element' || only.tagName !== 'code') return;
+    if (index === undefined || !parent || !Array.isArray(parent.children)) return;
 
-      const className = only.properties?.className;
-      const langCls = Array.isArray(className)
-        ? className.find((c: unknown) => typeof c === 'string' && c.startsWith('language-'))
-        : undefined;
-      const lang = typeof langCls === 'string' ? langCls.slice('language-'.length) : null;
-      const code = textContent(only).replace(/\n$/, '');
+    const className = only.properties?.className;
+    const langCls = Array.isArray(className)
+      ? className.find((c: unknown) => typeof c === 'string' && c.startsWith('language-'))
+      : undefined;
+    const lang = typeof langCls === 'string' ? langCls.slice('language-'.length) : null;
+    const code = textContent(only).replace(/\n$/, '');
 
-      targets.push({ parent, index, lang, code });
-    },
-  );
+    targets.push({ parent, index, lang, code });
+  });
 
   // Process in reverse document order so an earlier splice can't shift
   // the index of a later target inside the same parent.
@@ -68,33 +61,19 @@ async function renderBlock(code: string, lang: string | null): Promise<string> {
   let inner: string;
   if (lang) {
     try {
-      inner = await codeToHtml(code, {
-        lang,
-        themes: { light: 'github-light', dark: 'github-dark' },
-        defaultColor: false,
-      });
+      inner = await highlightCode(code, lang);
     } catch {
       inner = `<pre><code>${escapeHtml(code)}</code></pre>`;
     }
   } else {
     inner = `<pre><code>${escapeHtml(code)}</code></pre>`;
   }
-  return `<div class="markbook-code-pre-wrap markbook-fenced-code">${COPY_BUTTON_HTML}${inner}</div>`;
+  return `<div class="markbook-code-pre-wrap markbook-fenced-code">${copyButton(true)}${inner}</div>`;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: walking loose hast.
 function textContent(node: any): string {
   if (!node) return '';
   if (node.type === 'text') return typeof node.value === 'string' ? node.value : '';
   if (!Array.isArray(node.children)) return '';
   return node.children.map(textContent).join('');
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
