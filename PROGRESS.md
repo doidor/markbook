@@ -1721,3 +1721,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** `pnpm lint` was red on a pre-existing example, and `pnpm typecheck` silently depended on a prior build (it only passed because stale `dist/` lingered) — CI runs typecheck before build, so a truly clean run would have failed. See ADR-0027.
 
 **Next:** None outstanding — full verify cycle (lint, typecheck, test, build, all example builds + bundles) is green.
+
+---
+
+## 2026-06-06 — interactive controls parity for Vue + WC adapters
+
+**What changed:** Brought `hasControls` parity to the Vue and WC adapters. Moved the framework-agnostic `setupControls`/`ArgType` out of `adapter-react/src/controls.ts` into the shared pure-DOM package as `@markbook/adapter-shared/src/controls.ts`; all three adapters now re-export it from their browser entry. `vueAdapter()` and `wcAdapter()` set `hasControls: true`, and `adapter-wc`'s `mount` now invokes function stories with the current `args` (`story(args)`) and exports its `MountOptions` type. Added `Interactive` `args`/`argTypes`/`parameters` demo stories to `vue-demo` and `wc-demo` (Vue `Counter` gained a `label` prop, `click-counter` now honors `label`/`accent` attributes), wired into each `Counter.md`. All 6 packages + all example builds pass; the controls runtime is confirmed bundled into both demos' `dist`.
+
+**Why:** Closes the ROADMAP "Vue + WC interactive controls" deferred item so any adapter renders an editable controls panel from a story's `args`, matching React. Hosting the panel in `@markbook/adapter-shared` follows the shared-runtime rationale of ADR-0026.
+
+**Next:** The remaining adapter-parity gaps are Vue + WC `:::props` tables (`vue-component-meta` / custom-elements-manifest paths) and WC decorators (slot-projection model).

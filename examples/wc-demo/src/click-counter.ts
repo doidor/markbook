@@ -4,11 +4,12 @@ class ClickCounter extends HTMLElement {
 
   connectedCallback(): void {
     if (this.button) return;
+    const accent = this.getAttribute('accent') ?? '#ff8c42';
     const button = document.createElement('button');
     button.style.cssText = [
       'padding: 0.5rem 1rem',
       'font-size: 0.95rem',
-      'background: #ff8c42',
+      `background: ${accent}`,
       'color: white',
       'border: none',
       'border-radius: 6px',
@@ -25,7 +26,8 @@ class ClickCounter extends HTMLElement {
   }
 
   private update(): void {
-    if (this.button) this.button.textContent = `Clicks: ${this.count}`;
+    const label = this.getAttribute('label') ?? 'Clicks';
+    if (this.button) this.button.textContent = `${label}: ${this.count}`;
   }
 }
 

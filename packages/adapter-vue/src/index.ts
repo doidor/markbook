@@ -57,3 +57,5 @@ function wrapWithDecorators(story: Component, decorators: Component[]): Componen
 }
 
 export type { StoryParameters } from '@markbook/adapter-shared';
+export { setupControls } from '@markbook/adapter-shared';
+export type { ArgType } from '@markbook/adapter-shared';

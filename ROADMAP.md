@@ -10,5 +10,4 @@ Once the deferred carve-outs land (or are explicitly punted to v1.x), freeze `ma
 
 - **Shadow-DOM CSS injection.** Embed bundles inject `<style>` into `document.head`, which doesn't reach shadow roots. The story renders unstyled inside the shadow.
 - **Vue + WC props tables.** `:::props` currently delegates to `react-docgen-typescript` (React-only). A `vue-component-meta`-based path and a custom-elements-manifest path are both feasible.
-- **Vue + WC interactive controls.** `hasControls: false` on both adapters today. Equivalent `setupControls` implementations should be straightforward.
 - **WC decorators.** Custom-element slot composition is a different mental model; supporting `decoratorModules` cleanly probably means a slot-projection helper rather than the React/Vue wrapping pattern.

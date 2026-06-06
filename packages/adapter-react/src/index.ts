@@ -53,5 +53,5 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
 
 export type { MountOptions };
 export type { StoryParameters } from '@markbook/adapter-shared';
-export { setupControls } from './controls.js';
-export type { ArgType } from './controls.js';
+export { setupControls } from '@markbook/adapter-shared';
+export type { ArgType } from '@markbook/adapter-shared';

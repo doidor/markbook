@@ -1,4 +1,15 @@
 /**
+ * Framework-agnostic interactive controls panel, shared by every Markbook
+ * adapter that advertises `hasControls: true`. Pure DOM — no framework
+ * imports — so each adapter (`-react`, `-vue`, `-wc`) re-exports it from its
+ * browser entry without violating the two-entry split (ADR-0005).
+ *
+ * The panel reads/writes a plain `args` record (mutated in place) and calls
+ * `onChange` after every edit, so the caller can re-mount the story with the
+ * updated values. It knows nothing about how a story renders.
+ */
+
+/**
  * Per-arg control descriptor. If `argTypes` is omitted on the story,
  * controls are inferred from the runtime value: boolean → checkbox,
  * number → number input, anything else → text input.

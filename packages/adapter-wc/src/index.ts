@@ -5,7 +5,14 @@ import {
   type BaseMountOptions,
 } from '@markbook/adapter-shared';
 
-type MountOptions = BaseMountOptions;
+type MountOptions = BaseMountOptions & {
+  /**
+   * Current props passed to the story when it's a function: `story(args)`.
+   * The controls panel mutates this record in place and re-mounts, so a story
+   * that reads `args` re-renders with the edited values.
+   */
+  args?: Record<string, unknown>;
+};
 
 /**
  * Mount a web-components story into the placeholder element.
@@ -15,6 +22,9 @@ type MountOptions = BaseMountOptions;
  *   - a function returning a `Node` (appended)
  *   - an HTMLElement / Node directly (appended)
  *   - a string (set as `innerHTML`)
+ *
+ * When the export is a function it receives the current `args` record, so
+ * interactive controls can drive the rendered markup.
  *
  * Pass `{ isolation: 'shadow' }` to wrap the mount inside an open shadow root.
  * Pass `{ css, cssId }` (set automatically by the embed bundle) to apply the
@@ -30,7 +40,7 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
 
   let result: unknown = story;
   if (typeof story === 'function') {
-    result = (story as () => unknown)();
+    result = (story as (args?: Record<string, unknown>) => unknown)(opts?.args);
   }
 
   while (target.firstChild) target.removeChild(target.firstChild);
@@ -46,4 +56,7 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
   }
 }
 
+export type { MountOptions };
 export type { StoryParameters } from '@markbook/adapter-shared';
+export { setupControls } from '@markbook/adapter-shared';
+export type { ArgType } from '@markbook/adapter-shared';

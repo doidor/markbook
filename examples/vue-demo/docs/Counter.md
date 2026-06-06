@@ -21,3 +21,11 @@ A small Vue 3 component built with the composition API and a render function. Ea
 
 :::story{src=./Counter/StepOfFive.stories.ts}
 :::
+
+## Interactive
+
+Every prop in `args` renders an editable control below the preview. Changing a
+control re-mounts the story with the new props.
+
+:::story{src=./Counter/Interactive.stories.ts}
+:::

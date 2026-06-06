@@ -16,3 +16,11 @@ A `<click-counter>` custom element implemented in plain TypeScript. Each story i
 
 :::story{src=./Counter/Multiple.stories.ts}
 :::
+
+## Interactive
+
+The story function receives the current `args`, so the `label` and `accent`
+controls below re-render the element with new attributes on every edit.
+
+:::story{src=./Counter/Interactive.stories.ts}
+:::

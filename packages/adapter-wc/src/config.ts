@@ -4,5 +4,6 @@ export function wcAdapter(): MarkbookAdapter {
   return {
     packageName: '@markbook/adapter-wc',
     packagePeerDeps: [],
+    hasControls: true,
   };
 }

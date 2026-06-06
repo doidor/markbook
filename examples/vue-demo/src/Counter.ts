@@ -5,6 +5,7 @@ export const Counter = defineComponent({
   props: {
     initial: { type: Number, default: 0 },
     step: { type: Number, default: 1 },
+    label: { type: String, default: 'Count' },
   },
   setup(props) {
     const count = ref(props.initial);
@@ -27,7 +28,7 @@ export const Counter = defineComponent({
             fontFamily: 'inherit',
           },
         },
-        `Count: ${count.value}`,
+        `${props.label}: ${count.value}`,
       );
   },
 });

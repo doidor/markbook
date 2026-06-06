@@ -47,10 +47,17 @@ component or a CSF v3 object `{ render, args?, argTypes?, parameters?, name? }`.
 The CSF detector requires at least one metadata field so plain
 `defineComponent({ render })` exports are NOT misclassified as CSF.
 
+## Interactive controls
+
+`hasControls: true`. Export an `args` record from a story and Markbook renders
+an editable control panel below the preview; each edit re-mounts the component
+with the new props (Vue passes `args` to the root component via
+`createApp(Comp, args)`). Add an optional `argTypes` map to pick the input kind
+(`text` / `number` / `boolean` / `select` with `options`); otherwise the kind is
+inferred from the runtime value. `setupControls` is re-exported for advanced use.
+
 ## Caveats vs. React
 
-- **No interactive controls.** `hasControls: false`. `args`/`argTypes` are
-  forwarded to the mount but no control panel renders.
 - **Decorators** are supported but configured slightly differently from
   React. Each decorator module's default export should be a Vue component
   with a default slot:

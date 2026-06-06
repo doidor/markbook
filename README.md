@@ -268,8 +268,9 @@ export const Primary = {
 };
 ```
 
-- **`args`** — initial prop values. The React adapter renders an interactive
-  **controls panel** under the story so readers can tweak props live.
+- **`args`** — initial prop values. The React, Vue, and web-component adapters
+  render an interactive **controls panel** under the story so readers can tweak
+  props live.
 - **`argTypes`** — control hints (`text` / `number` / `boolean` / `select`);
   inferred from `args` when omitted.
 - **Decorators** — wrap every story in shared providers (theme, i18n, router)

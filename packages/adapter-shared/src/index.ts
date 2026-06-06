@@ -4,9 +4,12 @@
  * framework imports — so it bundles cleanly into the adapters' default
  * browser entry without violating the two-entry split (ADR-0005).
  *
- * Each adapter wires its own `mount()` (and React additionally `setupControls`)
- * but the placeholder/shadow/CSS plumbing is identical, so it lives here.
+ * Each adapter wires its own `mount()` but the placeholder/shadow/CSS plumbing
+ * and the interactive controls panel are identical, so they live here.
  */
+
+export { setupControls } from './controls.js';
+export type { ArgType } from './controls.js';
 
 export interface StoryParameters {
   /** Container layout preset. */
@@ -16,10 +19,11 @@ export interface StoryParameters {
 }
 
 /**
- * The framework-agnostic subset of every adapter's `MountOptions`. React and
- * Vue extend this with `args` plus their own decorator type; web components
- * use it as-is. Deliberately does NOT include `args`/`decorators` so an
- * adapter can't accidentally advertise support it doesn't implement.
+ * The framework-agnostic subset of every adapter's `MountOptions`. Each
+ * adapter extends this with `args` (controls write into it); React and Vue
+ * additionally add their own decorator type. Deliberately does NOT include
+ * `args`/`decorators` so an adapter can't accidentally advertise support it
+ * doesn't implement.
  */
 export interface BaseMountOptions {
   /** Wrap the mount in an open shadow root so host-page CSS can't leak in. */
