@@ -4,17 +4,16 @@ export interface MarkbookAdapter {
   /**
    * Paths (relative to project root, or absolute) of decorator modules.
    * Each module's default export must be a component that receives
-   * `{ children }` (or a default slot, for Vue) and wraps the story before
-   * mount. Decorators are applied **outer-to-inner**: `[A, B]` produces
-   * `<A><B><Story /></B></A>`. Use this for stacked global providers (theme,
-   * i18n, router, ...).
+   * `{ children }` and wraps the story before mount. Decorators are applied
+   * **outer-to-inner**: `[A, B]` produces `<A><B><Story /></B></A>`. Use this
+   * for stacked global providers (theme, i18n, router, ...).
    */
   decoratorModules?: string[];
   /**
    * In `--mode package` bundles, these dependencies stay external (declared as
    * peer dependencies on the published package). For React: `['react',
-   * 'react-dom']`; for Vue: `['vue']`; for vanilla web components: `[]`.
-   * Embed-mode bundles ignore this — they always inline everything.
+   * 'react-dom']`. Embed-mode bundles ignore this — they always inline
+   * everything.
    */
   packagePeerDeps?: string[];
   /**
@@ -37,7 +36,7 @@ export interface MarkbookAdapter {
  * no controls. Markbook uses this implicitly when `MarkbookConfig.adapter`
  * is omitted. If a page tries to use `:::story` / `:::stories` directives
  * with this adapter, the builder throws a clear error pointing at the
- * framework-specific adapters (`reactAdapter`, `vueAdapter`, `wcAdapter`).
+ * React adapter (`reactAdapter`). (Vue + Web Components adapters are planned.)
  */
 export function staticAdapter(): MarkbookAdapter {
   return {
@@ -200,9 +199,9 @@ export interface MarkbookConfig {
   /**
    * Markbook ships with an internal `staticAdapter()` (no framework, no
    * Vite plugins) for markdown-only sites. Supply an explicit adapter
-   * (`reactAdapter`, `vueAdapter`, `wcAdapter`) when pages use `:::story`
-   * or `:::stories` directives — Markbook throws a clear error if a page
-   * tries to mount stories without one.
+   * (`reactAdapter`) when pages use `:::story` or `:::stories` directives —
+   * Markbook throws a clear error if a page tries to mount stories without
+   * one.
    */
   adapter?: MarkbookAdapter;
   /**

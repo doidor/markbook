@@ -20,7 +20,7 @@ argument-hint: [storyId|all] [--mode embed|package] [--isolation shadow]
    ```bash
    pnpm --filter @markbook/example-react-demo exec markbook bundle [storyId] [--mode package] [--isolation shadow]
    ```
-   For other demos use `@markbook/example-vue-demo` or `@markbook/example-wc-demo`.
+   (React is the only adapter today; Vue + Web Components demos are planned — see `ROADMAP.md`.)
 2. **Verify the output:**
    - Embed: `ls examples/react-demo/dist/embed/` — should contain `<slug>.js` + `index.html` (the sandbox)
    - Package: `ls examples/react-demo/dist/packages/<slug>/` — `package.json`, `dist/index.js`, `README.md`
@@ -34,7 +34,7 @@ argument-hint: [storyId|all] [--mode embed|package] [--isolation shadow]
 ## Common failure modes
 
 - **"duplicate story slug"** — two stories collide on the same slug. Disambiguate via `:::story{… id=unique-slug}` on one of them.
-- **Story renders blank in the host page** — usually the host's `<div data-markbook-embed="<slug>">` placeholder uses the wrong slug, OR the bundle's framework runtime can't find `react`/`vue` (package mode only). For package mode the host must provide the framework via an importmap.
+- **Story renders blank in the host page** — usually the host's `<div data-markbook-embed="<slug>">` placeholder uses the wrong slug, OR the bundle's framework runtime can't find `react` (package mode only). For package mode the host must provide the framework via an importmap.
 
 ## Prevention tests
 

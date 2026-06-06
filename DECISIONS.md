@@ -555,3 +555,24 @@ defineConfig({
 - `pnpm typecheck` (and `pnpm --filter <pkg> typecheck`) now pass from a clean checkout with no `dist/` present — CI's lint → typecheck → build order is self-consistent.
 - Type errors in a dependency's public API surface at the consumer immediately (typecheck reads source, not a stale `dist/`), which is strictly better feedback.
 - New files to keep in sync: `tsconfig.typecheck.base.json` + one `tsconfig.typecheck.json` per downstream package. When a new workspace package is consumed by another, add it to the `paths` map.
+
+---
+
+## ADR-0028 — Remove the Vue and Web Components adapters; React-only until they're rebuilt
+
+**Status:** Accepted (2026-06-06).
+
+**Context.** The repo shipped three framework adapters (`@markbook/adapter-react`, `-vue`, `-wc`) plus two proof demos (`examples/vue-demo`, `examples/wc-demo`). In practice only the React adapter was carried to feature parity — `:::props` tables are React-only (`react-docgen-typescript`), interactive controls were React-only, and decorators were React/Vue-only. The Vue and WC packages were thin and under-exercised, and every doc that listed "three adapters" overstated what actually works. Maintaining (and documenting) three adapters while only one is first-class was a recurring source of drift.
+
+**Decision.** Delete `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`. Keep `@markbook/adapter-react` and `@markbook/adapter-shared` (React still consumes the shared browser runtime). Document everywhere — root `README.md`, the docsite (`examples/markbook-site`), `ROADMAP.md`, and the agent harness (`AGENTS.md`, `.copilot/`) — that **React is the only implemented adapter** and that Vue + Web Components adapters are planned, not shipped. The CI matrix, root `package.json` scripts, and `scripts/examples-dev.mjs` drop the Vue/WC builds.
+
+**Alternatives considered.**
+- **Keep the packages as "experimental".** Rejected — they still appeared in install docs and the adapter table as if production-ready, which is the exact dishonesty this change removes.
+- **Keep the demos, delete only the packages.** Rejected — the demos can't build without their adapters, so they'd be dead weight and a broken CI step.
+- **Fold `@markbook/adapter-shared` back into `@markbook/adapter-react`.** Deferred — `adapter-shared` is the seam the future Vue/WC adapters will reuse (ADR-0026), so keeping it avoids re-extracting it later. It's now a single-consumer package, which is acceptable.
+
+**Consequences.**
+- The framework-adapter surface is honest: one package, one demo path, one set of docs.
+- Vue + Web Components adapters move to `ROADMAP.md` as a single deferred item to be rebuilt against the unchanged `MarkbookAdapter` contract (each consuming `@markbook/adapter-shared`).
+- The `MarkbookAdapter` contract, `staticAdapter()`, and the core engine are unchanged — re-adding an adapter later is purely additive and needs no core changes.
+- The published `markbook` CLI skills (`init`, `bulk-generate`, …) now scaffold/detect React only; a future adapter re-adds its branch.

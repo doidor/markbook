@@ -2,8 +2,8 @@
 
 A fictional cloud-platform marketing site, built with Markbook.
 
-This demo is intentionally the polar opposite of the React / Vue / WC docs
-demos. It exists to prove that Markbook isn't locked into a docs layout — the
+This demo is intentionally the polar opposite of the React docs
+demo. It exists to prove that Markbook isn't locked into a docs layout — the
 same engine that renders a sidebar / TOC / content split can also render a
 landing page with a hero, top nav, feature grids, pricing tiers, and a footer.
 

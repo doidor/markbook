@@ -47,12 +47,6 @@ jobs:
       - name: Bundle React demo (embed)
         run: pnpm example:bundle
 
-      - name: Build Vue demo
-        run: pnpm example:vue:build
-
-      - name: Build web-components demo
-        run: pnpm example:wc:build
-
       - name: Build static demo (markdown-only, no adapter)
         run: pnpm example:static:build
 

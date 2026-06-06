@@ -10,7 +10,7 @@
  * Add a new example by appending to EXAMPLES below — pick the next free
  * port. Per-example `pnpm example:<x>:dev` scripts still work standalone
  * (they use markbook's default port 5173); only this orchestrator overrides
- * ports so the five servers don't collide.
+ * ports so the servers don't collide.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,8 +18,6 @@ import concurrently from 'concurrently';
 
 const EXAMPLES = [
   { name: 'react', pkg: '@markbook/example-react-demo', port: 5173, color: 'cyan' },
-  { name: 'vue', pkg: '@markbook/example-vue-demo', port: 5174, color: 'green' },
-  { name: 'wc', pkg: '@markbook/example-wc-demo', port: 5175, color: 'magenta' },
   { name: 'static', pkg: '@markbook/example-static-demo', port: 5176, color: 'yellow' },
   { name: 'marketing', pkg: '@markbook/example-marketing-demo', port: 5177, color: 'red' },
 ];

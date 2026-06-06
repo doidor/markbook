@@ -30,8 +30,11 @@ Framework concerns live in the corresponding adapter packages:
 | --- | --- |
 | `mount(el, story, opts)` for React | `@markbook/adapter-react` |
 | `setupControls(...)` for React | `@markbook/adapter-react` |
-| Vue `createApp` orchestration | `@markbook/adapter-vue` |
-| Custom-element mount logic | `@markbook/adapter-wc` |
+| Vue / custom-element mount logic | the planned `@markbook/adapter-vue` / `-wc` (not yet built — see `ROADMAP.md` / ADR-0028) |
+
+> Only `@markbook/adapter-react` exists today. The Vue imports above stay on
+> the forbidden list regardless — core must never depend on a framework, even
+> a future one's runtime.
 
 Core knows about: markdown parsing, directive expansion, Vite orchestration,
 embed bundling, template engine, TS-AST extraction. Nothing else.

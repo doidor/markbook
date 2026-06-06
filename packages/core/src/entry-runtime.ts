@@ -5,10 +5,11 @@
  *
  * `__mb_isCsf(v)` distinguishes a Storybook CSF v3 story object
  * (`{ render, args?, argTypes?, parameters?, name? }`) from a plain
- * component object (e.g. Vue's `defineComponent({ render })` or React's
- * `forwardRef`). To count as CSF, the value must be a non-null object with
- * a `render` function AND at least one CSF metadata field — otherwise we'd
- * unwrap arbitrary component objects that merely expose a `render` method.
+ * component object (e.g. a React `forwardRef`, or any object that merely
+ * exposes a `render` method). To count as CSF, the value must be a non-null
+ * object with a `render` function AND at least one CSF metadata field —
+ * otherwise we'd unwrap arbitrary component objects that merely expose a
+ * `render` method.
  */
 export const MB_CSF_HELPER = `function __mb_isCsf(v) {
   if (!v || typeof v !== 'object') return false;

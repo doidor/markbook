@@ -54,7 +54,7 @@ directive against a sibling stories file scaffold.
 
 ## Edge cases
 
-- **No detectable component export.** Tell the user the file doesn't look like a React/Vue component. Suggest naming the export PascalCase and re-running.
+- **No detectable component export.** Tell the user the file doesn't look like a React component. Suggest naming the export PascalCase and re-running.
 - **JSDoc absent.** Use a placeholder description (`'TODO: describe <Name>'`) and call it out in the "next steps" so the user knows to fill it in.
 - **Component without TypeScript types.** The props table won't have columns. Note this and link to `@types/...` packages if the framework is React.
 

@@ -1721,3 +1721,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** `pnpm lint` was red on a pre-existing example, and `pnpm typecheck` silently depended on a prior build (it only passed because stale `dist/` lingered) — CI runs typecheck before build, so a truly clean run would have failed. See ADR-0027.
 
 **Next:** None outstanding — full verify cycle (lint, typecheck, test, build, all example builds + bundles) is green.
+
+---
+
+## 2026-06-06 — remove Vue + WC adapters; React is the only shipped adapter
+
+**What changed:** Deleted `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`, and refreshed the lockfile (−13 packages). Kept `@markbook/adapter-react` + `@markbook/adapter-shared`. Dropped the Vue/WC steps from `.github/workflows/ci.yml`, the `example:vue:*`/`example:wc:*` scripts from root `package.json`, and the two entries from `scripts/examples-dev.mjs`. Rewrote every "three adapters" claim to "React-only, Vue/WC planned" across the root `README.md`, the docsite (`examples/markbook-site` index + getting-started + adding-stories + config description), the agent harness (`AGENTS.md`, `.copilot/skills/verify-build`, `.copilot/skills/bundle-story`, `.copilot/rules/core-no-framework`, `.copilot/skills/add-stories`), `ROADMAP.md`, the published CLI skills (`init`, `bulk-generate`, `add-component-page`), and in-source comments (`core/src/{config,build,entry-runtime}.ts`, `adapter-shared`). Added ADR-0028.
+
+**Why:** Only the React adapter was ever first-class (props tables, controls, decorators were React-centric); listing three adapters as if production-ready overstated reality and was a recurring documentation-drift trap. See ADR-0028. User requested the removal with the React-only status surfaced in the harness, the README, and the docsite.
+
+**Next:** Rebuild the Vue + Web Components adapters against the unchanged `MarkbookAdapter` contract (each consuming `@markbook/adapter-shared`) when prioritized — tracked as a single deferred item in `ROADMAP.md`.

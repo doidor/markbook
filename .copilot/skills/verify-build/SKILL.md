@@ -1,6 +1,6 @@
 ---
 name: verify-build
-description: Pre-handoff verification loop — lint, typecheck, test, build, plus the three example demo builds. Iteration cap N=3.
+description: Pre-handoff verification loop — lint, typecheck, test, build, plus the example demo builds. Iteration cap N=3.
 trigger: Before claiming a change is done. Before opening a PR. Before invoking another agent for review.
 allowed-tools: Bash Read
 argument-hint: [--quick]
@@ -19,9 +19,13 @@ pnpm test            # @markbook/core Vitest suite
 pnpm build           # tsc -b across packages
 pnpm example:build           # React demo (most code-path coverage)
 pnpm example:bundle          # React demo embed bundles (catches embed-path regressions)
-pnpm example:vue:build       # Proves adapter-agnostic core changes don't regress Vue
-pnpm example:wc:build        # Proves the zero-runtime WC path
+pnpm example:static:build    # markdown-only path (no adapter)
+pnpm example:marketing:build # custom layout (disableBaseCss + transformHtml)
+pnpm example:site:build      # the docs site (hybrid layout + custom directive)
 ```
+
+> Only the React adapter ships today, so there are no Vue/WC demo builds.
+> Vue + Web Components adapters are planned — see `ROADMAP.md`.
 
 Total ~60–120 seconds depending on cache state.
 

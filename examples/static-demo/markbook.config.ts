@@ -1,7 +1,7 @@
 import { defineConfig } from '@markbook/core';
 
 /**
- * Markdown-only demo: no adapter, no React/Vue/WC peer deps. Every page
+ * Markdown-only demo: no adapter, no framework peer deps. Every page
  * is plain CommonMark; each page's frontmatter `title:` flows into the
  * browser tab, the header brand (since no `config.title` is set), and the
  * `<h1>` lede.

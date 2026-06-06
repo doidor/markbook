@@ -39,7 +39,7 @@ helpers + just that export, sliced via the TS compiler API.
    };
    ```
    - Each export is EITHER a render function OR a CSF v3 object (`{ render, args?, argTypes?, parameters?, name? }`).
-   - CSF detection requires `render` AND at least one metadata field. Without metadata it would be treated as a plain component (which is what protects Vue `defineComponent({ render })` and React `forwardRef` from being mis-classified).
+   - CSF detection requires `render` AND at least one metadata field. Without metadata it would be treated as a plain component (which is what protects a React `forwardRef` — or any plain function/component export — from being mis-classified).
    - Reserved export names that are NOT fanned out: `default`, `args`, `argTypes`, `parameters`, and any leading-`_` private.
 5. **Edit the docs page** body — replace any singleton blocks with one `:::stories` directive:
    ```md

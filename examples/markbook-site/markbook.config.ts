@@ -24,7 +24,7 @@ export default defineConfig({
   contentDir: 'pages',
   title: 'Markbook',
   description:
-    'A library that renders markdown into HTML, with adapters for React, Vue, and web components — so it can also do component-library showcases like Storybook.',
+    'A library that renders markdown into HTML, with a React adapter (Vue and web components planned) — so it can also do component-library showcases like Storybook.',
   layoutsDir: 'layouts',
   css: ['./markbook.css'],
   siteUrl: 'https://doidor.github.io/markbook',

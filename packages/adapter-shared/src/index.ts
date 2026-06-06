@@ -1,10 +1,11 @@
 /**
- * Browser-side runtime helpers shared by every Markbook framework adapter
- * (`@markbook/adapter-react`, `-vue`, `-wc`). Pure DOM — NO Node and NO
- * framework imports — so it bundles cleanly into the adapters' default
+ * Browser-side runtime helpers used by the Markbook React adapter
+ * (`@markbook/adapter-react`). Vue + Web Components adapters are planned and
+ * will reuse this package too (see ROADMAP.md / ADR-0028). Pure DOM — NO Node
+ * and NO framework imports — so it bundles cleanly into an adapter's default
  * browser entry without violating the two-entry split (ADR-0005).
  *
- * Each adapter wires its own `mount()` (and React additionally `setupControls`)
+ * An adapter wires its own `mount()` (and React additionally `setupControls`)
  * but the placeholder/shadow/CSS plumbing is identical, so it lives here.
  */
 
@@ -16,10 +17,10 @@ export interface StoryParameters {
 }
 
 /**
- * The framework-agnostic subset of every adapter's `MountOptions`. React and
- * Vue extend this with `args` plus their own decorator type; web components
- * use it as-is. Deliberately does NOT include `args`/`decorators` so an
- * adapter can't accidentally advertise support it doesn't implement.
+ * The framework-agnostic subset of an adapter's `MountOptions`. The React
+ * adapter extends this with `args` plus its decorator type. Deliberately does
+ * NOT include `args`/`decorators` so an adapter can't accidentally advertise
+ * support it doesn't implement. (Future Vue/WC adapters extend it the same way.)
  */
 export interface BaseMountOptions {
   /** Wrap the mount in an open shadow root so host-page CSS can't leak in. */

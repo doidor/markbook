@@ -1,6 +1,6 @@
 ---
 title: Markbook
-description: A library that renders markdown into HTML, with adapters for React, Vue, and web components — so it can also do component-library showcases like Storybook.
+description: A library that renders markdown into HTML, with a React adapter (Vue and web components planned) — so it can also do component-library showcases like Storybook.
 layout: landing
 ---
 
@@ -9,9 +9,10 @@ layout: landing
   <p class="site-section-lede">
     Markbook turns a directory of markdown files into a static HTML site,
     with built-in search, dark mode, llms.txt, sitemap, and OG tags.
-    Three thin adapters let you mount React, Vue, or web-component
+    A thin React adapter lets you mount component
     stories into the same pages — turning the same engine into a
-    Storybook alternative when you need one.
+    Storybook alternative when you need one. (Vue and web-component
+    adapters are on the roadmap.)
   </p>
 
   <div class="site-feature-grid">
@@ -23,7 +24,7 @@ layout: landing
     <div class="site-feature">
       <div class="site-feature-icon">🧩</div>
       <h3>Component stories, optional</h3>
-      <p>Drop a <code>:::story</code> directive in any page to mount a React, Vue, or web-component story. Skip the directive — and the adapter — for pure docs sites.</p>
+      <p>Drop a <code>:::story</code> directive in any page to mount a React component story. Skip the directive — and the adapter — for pure docs sites. (Vue and web-component adapters are planned.)</p>
     </div>
     <div class="site-feature">
       <div class="site-feature-icon">🔍</div>
@@ -70,7 +71,7 @@ layout: landing
     </a>
     <a class="site-guide-card" href="./guides/adding-stories.html">
       <strong>Adding component stories →</strong>
-      <span>Wire up an adapter (React / Vue / web components), drop your first <code>:::story</code> directive, view it in the docs.</span>
+      <span>Wire up the React adapter, drop your first <code>:::story</code> directive, view it in the docs.</span>
     </a>
     <a class="site-guide-card" href="./guides/customization.html">
       <strong>Customization →</strong>
