@@ -18,24 +18,16 @@ yarn add -D markbook @markbook/core
 
 Markbook works with any package manager — each install block below lists the npm / pnpm / yarn form of the same command.
 
-If you want React / Vue / web-component stories in your pages, also add the corresponding adapter and the framework runtime:
+If you want React component stories in your pages, also add the React adapter and the framework runtime:
 
 ```bash
 # React — adapter (dev) + react/react-dom runtime
 npm install -D @markbook/adapter-react && npm install react react-dom
 pnpm add -D @markbook/adapter-react && pnpm add react react-dom
 yarn add -D @markbook/adapter-react && yarn add react react-dom
-
-# Vue — adapter (dev) + vue runtime
-npm install -D @markbook/adapter-vue && npm install vue
-pnpm add -D @markbook/adapter-vue && pnpm add vue
-yarn add -D @markbook/adapter-vue && yarn add vue
-
-# Web components — no adapter dependency, no runtime
-npm install -D @markbook/adapter-wc
-pnpm add -D @markbook/adapter-wc
-yarn add -D @markbook/adapter-wc
 ```
+
+> React is the only adapter available today. Vue and Web Components adapters are [planned](https://github.com/doidor/markbook/blob/main/ROADMAP.md).
 
 If you only need a markdown-driven site (no component stories), skip the adapter — Markbook's default `staticAdapter` handles markdown-only sites out of the box.
 
@@ -116,7 +108,7 @@ With just the four steps above:
 
 ## Next steps
 
-- [Adding component stories →](./adding-stories.html) — wire up an adapter and start mounting React/Vue/web-component examples.
+- [Adding component stories →](./adding-stories.html) — wire up the React adapter and start mounting component examples.
 - [Customization →](./customization.html) — change colors, swap the HTML shell, or post-process pages.
 - [Search & SEO →](./search-and-seo.html) — turn on canonical URLs, sitemap.xml, and OG tags.
 - [Config reference →](../reference/config.html) — every field of `MarkbookConfig`.

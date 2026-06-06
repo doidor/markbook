@@ -49,7 +49,7 @@ export default defineConfig({
 
 | Field | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `adapter` | `MarkbookAdapter` | `staticAdapter()` | Framework adapter for `:::story` directives. Provided by `@markbook/adapter-react`, `-vue`, or `-wc`. Omit for markdown-only sites. |
+| `adapter` | `MarkbookAdapter` | `staticAdapter()` | Framework adapter for `:::story` directives. Provided by `@markbook/adapter-react` (Vue + Web Components adapters are planned). Omit for markdown-only sites. |
 
 The default `staticAdapter` errors clearly if any page tries to use a story directive without an explicit adapter.
 

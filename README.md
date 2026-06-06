@@ -2,20 +2,21 @@
 
 **A lightweight, markdown-first Storybook alternative.** Author your
 documentation as plain **Markdown**; reference component stories that live in
-adjacent `.tsx` / `.ts` / `.vue` / `.js` files via directives. The build emits
+adjacent `.tsx` / `.ts` / `.jsx` / `.js` files via directives. The build emits
 a static, Starlight-style HTML site with full-text search, dark mode, an
 [`llms.txt`][llmstxt] mirror, SEO tags, and a sitemap — plus portable, drop-in
 embeds of any of your stories.
 
 📖 **[Read the docs →](https://doidor.github.io/markbook)** &nbsp;·&nbsp;
-🧩 React / Vue / Web Components &nbsp;·&nbsp;
+🧩 React stories (Vue + Web Components planned) &nbsp;·&nbsp;
 🔍 Pagefind search &nbsp;·&nbsp;
 📦 Portable story embeds
 
-> **Status:** pre-1.0. The public API (`defineConfig`, `build`/`dev`/`bundle`,
-> the adapter contract, directives, frontmatter, theme tokens) is documented
-> and largely stable, but minor releases may still break things until v1.0
-> freezes it.
+> **Status:** pre-1.0. **Only the React adapter ships today** — Vue and Web
+> Components adapters are on the [roadmap](ROADMAP.md). The public API
+> (`defineConfig`, `build`/`dev`/`bundle`, the adapter contract, directives,
+> frontmatter, theme tokens) is documented and largely stable, but minor
+> releases may still break things until v1.0 freezes it.
 
 ---
 
@@ -47,8 +48,9 @@ embeds of any of your stories.
   site and the `llms.txt` mirror are two views of one AST. No MDX, no JSX in
   your prose, no JSON sidecars, no JS templates to learn.
 - **🧩 Component stories, optional.** Drop a `:::story` directive into any page
-  to mount a React, Vue, or web-component example. Skip the directive — and the
-  adapter — for a pure docs/marketing site.
+  to mount a React component example. Skip the directive — and the
+  adapter — for a pure docs/marketing site. (Vue and Web Components adapters are
+  [planned](ROADMAP.md); React is the only one implemented today.)
 - **🔍 Search + SEO by default.** [Pagefind][pagefind] builds a full-text index
   at build time. Canonical, Open Graph, Twitter Card, `sitemap.xml`, and
   `robots.txt` are emitted automatically.
@@ -74,24 +76,17 @@ pnpm add -D markbook @markbook/core
 yarn add -D markbook @markbook/core
 ```
 
-For live **component stories**, add the matching adapter and its runtime:
+For live **component stories**, add the React adapter and its runtime:
 
 ```bash
 # React — adapter (dev) + react/react-dom runtime
 npm install -D @markbook/adapter-react && npm install react react-dom
 pnpm add -D @markbook/adapter-react && pnpm add react react-dom
 yarn add -D @markbook/adapter-react && yarn add react react-dom
-
-# Vue — adapter (dev) + vue runtime
-npm install -D @markbook/adapter-vue && npm install vue
-pnpm add -D @markbook/adapter-vue && pnpm add vue
-yarn add -D @markbook/adapter-vue && yarn add vue
-
-# Web components — no adapter dependency, no runtime
-npm install -D @markbook/adapter-wc
-pnpm add -D @markbook/adapter-wc
-yarn add -D @markbook/adapter-wc
 ```
+
+> **React is the only adapter implemented today.** Vue and Web Components
+> adapters are on the [roadmap](ROADMAP.md) but not yet available.
 
 Each block lists the npm / pnpm / yarn form of the same command — use whichever
 package manager your project uses.
@@ -243,14 +238,16 @@ inline template literals. See the
 
 ### Component stories
 
-Three thin adapters mount stories into placeholder elements; the core engine
-knows nothing about any framework.
+The React adapter mounts stories into placeholder elements; the core engine
+knows nothing about any framework, so more adapters can be added without
+touching it.
 
 | Adapter | Mounts | Runtime |
 | --- | --- | --- |
 | `@markbook/adapter-react` | React components | `react`, `react-dom` (peer) |
-| `@markbook/adapter-vue` | Vue 3 components | `vue` (peer) |
-| `@markbook/adapter-wc` | Custom elements | none — vanilla DOM |
+
+> Vue and Web Components adapters are [planned](ROADMAP.md) but not yet
+> implemented — React is the only adapter available today.
 
 A story file is a regular component file. **One story per file** is the
 convention (default export); multiple named exports fan out via `:::stories`.
@@ -398,7 +395,7 @@ in [`packages/core/README.md`](packages/core/README.md).
 - **No theme engine.** Customize via CSS tokens or replace the shell. No
   theme-prop API, no provider hierarchy, no plugin framework to learn.
 - **No bundled UI framework.** Markbook itself is plain HTML + minified IIFE
-  boot scripts. Bring React/Vue for stories if you want them; the engine
+  boot scripts. Bring React for stories if you want them; the engine
   doesn't care.
 
 ## Packages
@@ -408,9 +405,9 @@ in [`packages/core/README.md`](packages/core/README.md).
 | [`markbook`](packages/cli) | The `markbook` CLI (`build`, `dev`, `preview`, `bundle`, `skills`). |
 | [`@markbook/core`](packages/core) | Markdown parser, builder, dev server, embed bundler, directive registry. |
 | [`@markbook/adapter-react`](packages/adapter-react) | Mount React stories (+ controls + decorators). |
-| [`@markbook/adapter-vue`](packages/adapter-vue) | Mount Vue 3 stories (+ decorators). |
-| [`@markbook/adapter-wc`](packages/adapter-wc) | Mount vanilla web components (no runtime). |
-| [`@markbook/adapter-shared`](packages/adapter-shared) | Shared browser runtime for the adapters (internal; see [ADR-0026](DECISIONS.md)). |
+| [`@markbook/adapter-shared`](packages/adapter-shared) | Shared browser runtime for adapters (internal; see [ADR-0026](DECISIONS.md)). |
+
+> Vue and Web Components adapters are [planned](ROADMAP.md), not yet shipped.
 
 ## Repository layout
 
@@ -419,13 +416,9 @@ packages/
   core/             — markdown + builder + dev server + embed bundler + directives
   cli/              — `markbook` binary (cac + jiti)
   adapter-react/    — React mount + controls + decorators
-  adapter-vue/      — Vue 3 mount + decorators
-  adapter-wc/       — web-components mount (no framework runtime)
-  adapter-shared/   — shared pure-DOM runtime for the adapters
+  adapter-shared/   — shared pure-DOM runtime for adapters
 examples/
   react-demo/       — Pixie component library — the canonical dogfood
-  vue-demo/         — Counter component in Vue
-  wc-demo/          — <click-counter> custom element
   static-demo/      — Skyline: a markdown-only docs site, no adapter
   marketing-demo/   — Cumulus: a marketing site with a fully custom layout
   markbook-site/    — the official Markbook website (hybrid layout, custom :::callout)

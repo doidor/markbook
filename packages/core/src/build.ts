@@ -374,7 +374,7 @@ export async function writePages(
       throw new Error(
         `Markbook: ${offending.length} page${offending.length === 1 ? '' : 's'} ` +
           `${offending.length === 1 ? 'uses' : 'use'} \`:::story\` or \`:::stories\` directives but no adapter is configured.\n${sample}\n` +
-          `Add \`adapter: reactAdapter()\` (or vueAdapter / wcAdapter) to markbook.config.ts.`,
+          `Add \`adapter: reactAdapter()\` to markbook.config.ts.`,
       );
     }
   }

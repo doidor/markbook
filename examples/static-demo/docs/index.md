@@ -7,7 +7,7 @@ description: A fictional company documentation site, built with Markbook in mark
 
 Welcome to **Skyline** — a fictional product whose only purpose here is to demonstrate
 what Markbook looks like when you point it at a directory of plain markdown files,
-with no React / Vue / web-components in sight.
+with no framework components in sight.
 
 Everything you see is rendered from CommonMark:
 

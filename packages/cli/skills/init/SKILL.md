@@ -3,25 +3,24 @@ name: markbook-init
 description: Scaffold a new Markbook documentation site in the current project — generates markbook.config.ts, a sample docs page + story, and suggests package.json scripts.
 trigger: When a Markbook consumer is setting up a docs site for the first time, or asks "how do I get started with Markbook?".
 allowed-tools: Bash Read Grep Glob Edit Create
-argument-hint: [--framework react|vue|wc]
 ---
 
 # markbook-init
 
 Generates the minimum viable files for a working Markbook setup in the
-current project. Detects the framework from `package.json` dependencies; the
-`--framework` flag overrides the detection when ambiguous.
+current project. Markbook currently ships a **React adapter only** — Vue and
+Web Components adapters are planned but not yet available, so this skill
+scaffolds a React project.
 
 ## Pre-checks
 
 1. **Confirm the user wants Markbook in this project.** Run `view package.json`
    and report the project name. Abort if the user says "no" or if no
    `package.json` exists at cwd (suggest creating one first).
-2. **Detect framework.** Look in `dependencies` and `devDependencies`:
-   - `react` + `react-dom` → React
-   - `vue` → Vue 3
-   - Neither → web-components (no framework runtime)
-   - If `--framework` was supplied, use it.
+2. **Confirm React is available.** Look in `dependencies` and `devDependencies`
+   for `react` + `react-dom`. If absent, tell the user the React adapter needs
+   them and offer to install them alongside the Markbook packages below.
+   (Vue and Web Components adapters are on the roadmap but not yet shippable.)
 3. **Refuse to clobber.** If `markbook.config.ts` already exists, abort with
    a clear message — suggest the user remove it first.
 
@@ -29,7 +28,6 @@ current project. Detects the framework from `package.json` dependencies; the
 
 ### `markbook.config.ts`
 
-For React:
 ```ts
 import { defineConfig } from '@markbook/core';
 import { reactAdapter } from '@markbook/adapter-react/config';
@@ -40,9 +38,6 @@ export default defineConfig({
   adapter: reactAdapter(),
 });
 ```
-
-Vue: same shape, `vueAdapter()` from `@markbook/adapter-vue/config`.
-WC: same shape, `wcAdapter()` from `@markbook/adapter-wc/config`.
 
 ### `docs/index.md`
 
@@ -82,8 +77,6 @@ export default () => (
 );
 ```
 
-(Vue / WC variants follow the same shape — adjust the renderer.)
-
 ## Suggested package.json scripts
 
 Do NOT mutate `package.json` directly. Print these exact commands and offer
@@ -104,14 +97,9 @@ overwriting.
 Print and offer to install:
 
 ```bash
-# React
 npm install --save-dev markbook @markbook/core @markbook/adapter-react
-
-# Vue
-npm install --save-dev markbook @markbook/core @markbook/adapter-vue
-
-# Web components
-npm install --save-dev markbook @markbook/core @markbook/adapter-wc
+# plus the React runtime, if the project doesn't already have it:
+npm install react react-dom
 ```
 
 ## Next steps prompt
@@ -124,7 +112,7 @@ After files land, tell the user:
 
 ## Prevention tests
 
-- `markbook.config.ts` matches the detected framework's adapter (no React imports in a Vue project).
-- The generated story file uses the file extension matching the framework (`.tsx` for React, `.vue` or `.ts` for Vue, `.ts` for WC).
+- `markbook.config.ts` uses `reactAdapter()` from `@markbook/adapter-react/config`.
+- The generated story file uses the `.tsx` extension (React).
 - Frontmatter on every generated page has a `title:` and no other fields the user didn't ask for.
 - No existing files were overwritten without explicit confirmation.

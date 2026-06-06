@@ -12,8 +12,8 @@ pnpm add -D markbook @markbook/core
 yarn add -D markbook @markbook/core
 ```
 
-Pair with a framework adapter (`@markbook/adapter-react`,
-`@markbook/adapter-vue`, or `@markbook/adapter-wc`).
+Pair with the React adapter (`@markbook/adapter-react`). Vue and Web
+Components adapters are [planned](../../ROADMAP.md) but not yet available.
 
 ## Commands
 
@@ -47,7 +47,7 @@ dist/
 ### `markbook dev`
 
 Start the Vite-backed dev server. Watches markdown, templates, story files,
-and user CSS via chokidar; component/story `.tsx`/`.vue`/etc. hot-reload
+and user CSS via chokidar; component/story `.tsx`/`.ts` files hot-reload
 through Vite.
 
 | Flag | Default | Description |
@@ -75,7 +75,7 @@ page — drop in one `<script type="module">` and you're done.
 
 **package mode** writes `dist/packages/<slug>/` as a publishable npm package
 (`package.json`, `dist/index.js`, `README.md`). The framework runtime stays
-external as a peer dependency, so the consumer's React/Vue is reused.
+external as a peer dependency, so the consumer's React is reused.
 
 `--isolation=shadow` wraps each mount in `attachShadow({ mode: 'open' })` so
 host-page CSS doesn't leak in.

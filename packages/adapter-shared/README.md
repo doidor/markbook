@@ -1,13 +1,14 @@
 # `@markbook/adapter-shared`
 
-Browser-side runtime helpers shared by the Markbook framework adapters
-([`@markbook/adapter-react`](../adapter-react/README.md),
-[`-vue`](../adapter-vue/README.md), [`-wc`](../adapter-wc/README.md)).
+Browser-side runtime helpers used by the Markbook React adapter
+([`@markbook/adapter-react`](../adapter-react/README.md)). The Vue and Web
+Components adapters are [planned](../../ROADMAP.md) (see ADR-0028) and will
+reuse this package once built.
 
 This package is **pure DOM** — no Node APIs, no framework runtime imports — so
-it bundles cleanly into each adapter's default (browser) entry without dragging
+it bundles cleanly into an adapter's default (browser) entry without dragging
 Node-only code across the two-entry split (see
-[ADR-0005](../../DECISIONS.md) / [ADR-0026](../../DECISIONS.md)). Every adapter
+[ADR-0005](../../DECISIONS.md) / [ADR-0026](../../DECISIONS.md)). Each adapter
 implements its own `mount()` (and React additionally `setupControls`), but the
 placeholder / shadow-root / CSS-injection plumbing is identical, so it lives
 here once.

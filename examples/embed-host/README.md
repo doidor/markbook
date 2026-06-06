@@ -30,7 +30,7 @@ pnpm example:bundle           # embed mode → react-demo/dist/embed/*.js
 pnpm example:bundle:package   # package mode → react-demo/dist/packages/<slug>/
 ```
 
-The same `:package` suffix exists for the Vue and WC demos (`example:vue:bundle:package`, `example:wc:bundle:package`) so you can mirror this workflow in any of the three.
+The same `:package` suffix works for any future framework demo's bundle script, so you can mirror this workflow as more adapters land (Vue + Web Components are [planned](../../ROADMAP.md)).
 
 ## Notes
 

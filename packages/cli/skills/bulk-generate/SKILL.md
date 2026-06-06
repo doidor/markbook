@@ -25,12 +25,10 @@ candidate list and supplies `--write`.
 ## Steps
 
 1. **Validate `--from`.** Must exist and be a directory. Bail with a clear error otherwise.
-2. **Glob component files.** Default include: `**/*.{tsx,vue}` minus `**/*.{test,spec,stories}.*` and `**/index.{ts,tsx,js,jsx}`. Apply user `--include` / `--exclude` patterns.
+2. **Glob component files.** Default include: `**/*.{tsx,jsx}` minus `**/*.{test,spec,stories}.*` and `**/index.{ts,tsx,js,jsx}`. Apply user `--include` / `--exclude` patterns.
 3. **Filter to "component-like" candidates.** For each file:
    - **React (`.tsx`/`.jsx`)** — has at least one PascalCase export that returns JSX (heuristic: source contains `return <` or `=>` followed by `<`, or the function name starts with uppercase). Skip files whose only exports are types/interfaces/utilities.
-   - **Vue (`.vue`)** — file has a `<template>` block.
-   - **WC (`.ts`/`.js`)** — file calls `customElements.define(...)`.
-   - **TypeScript-only utility files** — skip. (`.ts` without JSX, no custom element registration → skip.)
+   - **TypeScript-only utility files** — skip. (`.ts` without JSX → skip.)
 
    Be **conservative**: prefer false negatives over false positives. A missed component is a quick `/markbook-add-component-page` away; a generated page for a utility file is noise the user has to delete.
 4. **Build the candidate list.** Table form:

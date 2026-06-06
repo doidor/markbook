@@ -3,7 +3,7 @@ import { defineConfig } from '@markbook/core';
 /**
  * Cumulus — a fictional cloud-platform marketing site.
  *
- * The polar opposite of the React / Vue / WC docs demos. Demonstrates
+ * The polar opposite of the React docs demo. Demonstrates
  * Markbook's deepest customization layers without writing JS in the config:
  *
  *   - `contentDir: 'pages'` — pages live under `pages/`, not `docs/`.

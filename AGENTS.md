@@ -11,7 +11,7 @@ constitution for the repo.
 ## Critical Rules
 
 1. **Markdown is the source of truth.** HTML and `llms.txt` are two views of one AST. Never add features that put authoring content outside `.md` (no MDX, no JSON sidecars).
-2. **No framework code in `@markbook/core`.** React, Vue, web-components runtime concerns live in their adapter packages. Core knows about markdown, directives, Vite orchestration, embed bundling — nothing else. Enforced by `.copilot/rules/core-no-framework.md`.
+2. **No framework code in `@markbook/core`.** React (and the planned Vue / web-components) runtime concerns live in their adapter packages. **Only `@markbook/adapter-react` is implemented today** — Vue + Web Components adapters are on `ROADMAP.md` (see ADR-0028). Core knows about markdown, directives, Vite orchestration, embed bundling — nothing else. Enforced by `.copilot/rules/core-no-framework.md`.
 3. **Public API surface is `index.ts` only.** Anything reachable solely via `internal.ts` (or by deep import from a `.test.ts`) may change in any minor release. Tests import from sibling source modules, not the barrel — keep it that way.
 4. **Verify before handoff.** Before claiming a change is done, run the [`/verify-build`](.copilot/skills/verify-build/SKILL.md) cycle. Iteration cap N=3 on the same failure — beyond that, self-park rather than churn.
 5. **Every user-facing or architectural change updates `PROGRESS.md`.** Use the [`/progress-log`](.copilot/skills/progress-log/SKILL.md) skill. For non-obvious decisions also add an ADR in `DECISIONS.md`. Update affected READMEs in the SAME commit.
@@ -30,6 +30,7 @@ constitution for the repo.
 | "What changed and when?" | `PROGRESS.md` (append-only journal) |
 | "What's planned next?" | `ROADMAP.md` |
 | "What's the package's public API?" | `packages/<name>/README.md` |
+| "Which framework adapters exist?" | **Only `@markbook/adapter-react` is implemented.** Vue + Web Components adapters are planned, not yet built — see `ROADMAP.md` and ADR-0028. Don't reference `@markbook/adapter-vue` / `-wc` as if they exist. |
 | "How is the repo structured?" | `README.md` (directory map at the bottom) |
 | "How do I customize a Markbook site's chrome?" | Four layers in `packages/core/README.md`: `css` → `disableBaseCss` → `layoutsDir` → `transformHtml`. Worked example in `examples/marketing-demo/`. |
 | "How do I register a custom directive?" | `config.directives` from `markbook.config.ts`. See `examples/markbook-site/pages/guides/custom-directives.md` for the public guide, ADR-0025 for the design rationale, and `examples/markbook-site/directives/callout.{ts,html}` for the canonical pattern (handler in `.ts`, output markup in a `.html` template loaded by `htmlTemplate(new URL('./x.html', import.meta.url))`). |
@@ -49,13 +50,11 @@ ROADMAP.md           ← forward-looking work
 packages/
   core/      AGENTS.md README.md   ← engine (markdown + directives + Vite + embed)
   cli/                  README.md   ← markbook binary (thin wrapper around core)
-  adapter-react/  AGENTS.md README.md
-  adapter-vue/          README.md
-  adapter-wc/           README.md
-  adapter-shared/       README.md   ← shared browser runtime for the adapters (ADR-0026)
+  adapter-react/  AGENTS.md README.md   ← the only implemented framework adapter
+  adapter-shared/       README.md   ← shared browser runtime for adapters (ADR-0026)
+  (adapter-vue/, adapter-wc/ are PLANNED — see ROADMAP.md / ADR-0028, not in tree)
 examples/
   react-demo/                       ← Pixie component library (canonical dogfood)
-  vue-demo/  wc-demo/               ← framework-agnostic proofs
   static-demo/                      ← markdown-only docs site (no adapter)
   marketing-demo/                   ← marketing site via disableBaseCss + layouts/
   markbook-site/                    ← the official Markbook website (markdown-only,

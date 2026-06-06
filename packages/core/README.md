@@ -65,8 +65,8 @@ See the [custom directives guide](https://doidor.github.io/markbook/guides/custo
 - `export` — named export to mount (default: `default`)
 - `id` — explicit embed slug for `markbook bundle`. Survives file renames
 
-The story file's default export is the renderer (a function returning JSX, a
-Vue component, or an HTML string for web components).
+The story file's default export is the renderer (a function returning JSX, or
+a React element).
 
 ### `:::stories` — multi-export story file (CSF v3) (built-in)
 

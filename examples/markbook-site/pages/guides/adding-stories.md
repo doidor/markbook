@@ -1,6 +1,6 @@
 ---
 title: Adding component stories
-description: Mount React, Vue, or web-component examples inside your markdown pages.
+description: Mount React component examples inside your markdown pages.
 ---
 
 # Adding component stories
@@ -9,15 +9,15 @@ This is what makes Markbook a Storybook alternative when you need one — the sa
 
 ## Pick an adapter
 
-Markbook ships three:
+Markbook ships one adapter today:
 
 | Package | Mounts | Runtime |
 | --- | --- | --- |
 | `@markbook/adapter-react` | React components | `react`, `react-dom` (peer) |
-| `@markbook/adapter-vue` | Vue 3 components | `vue` (peer) |
-| `@markbook/adapter-wc` | Custom elements | (none — vanilla DOM) |
 
-Install one + its runtime (npm / pnpm / yarn):
+> **React is the only adapter implemented right now.** Vue and Web Components adapters are on the [roadmap](https://github.com/doidor/markbook/blob/main/ROADMAP.md) — the core engine is framework-agnostic, so they're purely additive.
+
+Install it + its runtime (npm / pnpm / yarn):
 
 ```bash
 npm install -D @markbook/adapter-react && npm install react react-dom
@@ -37,11 +37,9 @@ export default defineConfig({
 });
 ```
 
-`reactAdapter()`, `vueAdapter()`, `wcAdapter()` — same shape, same call site.
-
 ## Write a story file
 
-A story file is a regular `.tsx` / `.vue` / `.ts` file that lives next to (or under) your markdown. **One story per file** is the convention:
+A story file is a regular `.tsx` / `.ts` file that lives next to (or under) your markdown. **One story per file** is the convention:
 
 ```tsx
 // pages/Button/Primary.stories.tsx
@@ -111,7 +109,7 @@ export const Primary = {
 
 - **`args`** — initial prop values. With the React adapter, an interactive controls panel renders under the story so readers can tweak props live.
 - **`argTypes`** — control-type hints (`text`, `number`, `boolean`, `select`). Optional; inferred from `args` types when omitted.
-- **`parameters.layout`** — `centered` | `padded` | `fullscreen`. Controls how the story is positioned in its placeholder. Honored by all three adapters.
+- **`parameters.layout`** — `centered` | `padded` | `fullscreen`. Controls how the story is positioned in its placeholder. Honored by the React adapter.
 
 ## Decorators (global providers)
 
