@@ -1771,3 +1771,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** The Release workflow's tag-vs-version guard fired when a `v0.1.1` release was cut while the manifests still said `0.1.0`. The guard is correct; the ergonomic fix is a one-command bump and explicit ordering docs so the mismatch is harder to hit.
 
 **Next:** None outstanding for release tooling.
+
+---
+
+## 2026-06-08 — adopt Changesets release flow (mirroring `@doidor/agentrig`)
+
+**What changed:** Replaced the GitHub-Release-triggered publish flow with a **Changesets**-driven one, matching the `@doidor/agentrig` repo. Added `@changesets/cli` + `@changesets/changelog-github` as root devDeps; `.changeset/config.json` puts the four `@doidor/markbook*` packages in a `fixed` group so they always advance in lockstep, with `access: public` and the GitHub changelog renderer. New root scripts (`changeset`, `version-packages`, `release`); removed `scripts/bump-version.mjs` + the `release:version` helper (Changesets owns bumps now). Rewrote `.github/workflows/release.yml` to run on `push: main` + `workflow_dispatch` with `contents: write` / `pull-requests: write` / `id-token: write`; the `changesets/action@v1` step opens/updates a "Version Packages" PR, and merging it publishes via `pnpm -r publish` — tokenlessly via OIDC trusted publishing, with automatic provenance. Bootstrap changeset queued (will ship as `0.1.2`). RELEASING.md + AGENTS.md updated.
+
+**Why:** The user wants markbook's release process aligned with agentrig's — Changesets is more ergonomic than the bump-then-tag-then-Release dance (which kept tripping on tag-vs-version ordering), and the four packages stay locked in lockstep automatically.
+
+**Next:** Maintainer enables "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General → Workflow permissions) — the Trusted Publishers are already configured. Once this branch merges, the workflow opens the first "Version Packages" PR; merging that publishes `0.1.2`.

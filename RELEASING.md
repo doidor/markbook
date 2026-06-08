@@ -1,115 +1,78 @@
 # Releasing
 
 Markbook is published to npm as four packages under the `@doidor` scope, versioned
-in lockstep:
+in **lockstep** (the `fixed` group in [`.changeset/config.json`](.changeset/config.json)):
 
 - [`@doidor/markbook`](packages/cli) (the CLI)
 - [`@doidor/markbook-core`](packages/core)
 - [`@doidor/markbook-adapter-react`](packages/adapter-react)
 - [`@doidor/markbook-adapter-shared`](packages/adapter-shared)
 
-Publishing runs in CI via [`.github/workflows/release.yml`](.github/workflows/release.yml)
-using npm **trusted publishing** (OIDC) — there is no `NPM_TOKEN` secret and no
-manual `npm publish` step.
+Releases are driven by [**Changesets**](https://github.com/changesets/changesets) +
+[`.github/workflows/release.yml`](.github/workflows/release.yml): version bumps and the npm publish
+are automatic, **tokenlessly via OIDC** (npm Trusted Publishing). You never edit a version by hand
+or push a tag manually.
 
 ## One-time setup
 
-### 1. Bootstrap the first publish (token, once per package)
+1. **Configure a Trusted Publisher on npmjs.com — once per package.** This replaces an
+   `NPM_TOKEN` secret with short-lived OIDC credentials. For **each** of the four packages:
+   - npmjs.com → **Packages → `<package>` → Settings → Trusted Publisher**.
+   - Choose **GitHub Actions** and set: organization/owner `doidor`, repository `markbook`,
+     workflow filename **`release.yml`** (leave *Environment* blank). The workflow filename is
+     case-sensitive.
+   - For maximum security, then set **Publishing access → "Require two-factor authentication and
+     disallow tokens"** so only this workflow can publish.
+2. **Allow Actions to open PRs:** Settings → Actions → General → Workflow permissions →
+   enable *"Allow GitHub Actions to create and approve pull requests"* (the release workflow opens
+   the "Version Packages" PR using the built-in `GITHUB_TOKEN`).
+3. Public access is already configured (`access: "public"` in `.changeset/config.json`), and
+   **provenance is generated automatically** under trusted publishing — no flag or secret needed.
 
-npm does **not** allow the very first publish of a brand-new package over OIDC,
-so each package's `0.x` debut has to be published once with a token. Easiest:
-create an npm **Automation** token (npmjs.com → *Access Tokens* → *Generate New
-Token* → *Classic Token* → **Automation** — it bypasses 2FA), then from a clean
-checkout of `main`:
+> **First publish of a brand-new package name:** a Trusted Publisher is configured on the
+> *package's* settings page, so the package must exist. The four `@doidor/markbook*` packages are
+> already published at `0.1.1`, so this isn't a concern — just configure each one's Trusted
+> Publisher and you're done.
+
+## Day-to-day: how a release happens
+
+1. **Describe each change with a changeset** (commit it alongside your code change):
+   ```bash
+   pnpm changeset
+   ```
+   Pick **patch / minor / major** and write a one-line summary. It creates a file in `.changeset/`.
+   Because the four packages are in a `fixed` group, a changeset on any one of them bumps **all four**
+   in lockstep — pick whichever package the change actually targets.
+2. **Push / merge to `main`.** The **Release** workflow opens (or updates) a **"Version Packages"** PR
+   that bumps every published package's `package.json` and writes per-package `CHANGELOG.md` from the
+   consumed changesets.
+3. **Merge the "Version Packages" PR.** The workflow runs again, sees the bumped versions, and
+   **publishes to npm** via `pnpm -r publish` — authenticated **tokenlessly via OIDC**, with
+   automatic provenance, and pushes a `vX.Y.Z` git tag.
+
+That's it — no manual `npm version`, `npm publish`, or `gh release create`.
+
+## Pre-releases (optional)
+
+Use Changesets pre-release mode when you want `next`-tagged builds:
 
 ```bash
-pnpm install --frozen-lockfile && pnpm build
-echo "//registry.npmjs.org/:_authToken=<AUTOMATION_TOKEN>" > ~/.npmrc
-pnpm -r publish --access public --no-git-checks
+pnpm changeset pre enter next   # then add changesets + push as usual
+pnpm changeset pre exit         # when going back to stable
 ```
 
-This creates all four packages on npm. (You can instead do this via a temporary
-token-based CI run — but the four packages only need bootstrapping once, ever.)
-
-### 2. Configure a trusted publisher for each package
-
-For **each** of the four packages, open
-`https://www.npmjs.com/package/<name>/access` → **Trusted Publisher** → select
-**GitHub Actions** and fill in:
-
-| Field | Value |
-| --- | --- |
-| Organization or user | `doidor` |
-| Repository | `markbook` |
-| Workflow filename | `release.yml` |
-| Environment | *(leave blank)* |
-
-The package's `repository.url` in `package.json` already points at
-`github.com/doidor/markbook`, which OIDC validation also checks.
-
-### 3. (Recommended) Lock down tokens
-
-Once trusted publishing works, on each package's **Settings → Publishing access**
-choose **"Require two-factor authentication and disallow tokens"**, then revoke
-the bootstrap automation token. Trusted publishing keeps working (it uses OIDC,
-not tokens).
-
-Provenance attestations are emitted on every publish (`--provenance`), which
-works because this repository is **public** and the workflow has
-`id-token: write`. If the repo is ever made private, drop `--provenance` (npm
-provenance requires a public source repo).
-
-## Cutting a release
-
-> **Order matters: bump → commit → *then* create the Release.** The Git tag must
-> point at the commit that already contains the bumped versions. The workflow
-> fails fast if the tag (`v0.2.0`) and the package versions (`0.2.0`) disagree.
-
-1. Bump all four packages in lockstep (edits `package.json` only — no commit, no
-   tag):
-
-   ```bash
-   pnpm release:version <new-version>
-   # e.g. pnpm release:version 0.2.0
-   ```
-
-2. Commit the version bump and get it onto `main` (directly or via a merged PR):
-
-   ```bash
-   git commit -am "chore(release): v<new-version>"
-   git push
-   ```
-
-3. **Only now** create a **GitHub Release** whose tag is `v<new-version>` (e.g.
-   `v0.2.0`), targeting `main` — so the tag lands on the bump commit. Publishing
-   the Release triggers the workflow.
-
-   ```bash
-   gh release create v<new-version> --generate-notes --target main
-   ```
-
-The workflow verifies the tag matches the package version, runs
-lint → typecheck → build → test, then `pnpm -r publish --access public
---provenance`. `pnpm -r publish` walks the workspace in dependency order, rewrites
-`workspace:*` to the concrete version, skips private packages (the repo root and
-the `examples/*`), and skips any version already on the registry — so re-running a
-release is safe.
-
-## Recovering from a "tag does not match version" failure
-
-If you tagged/released **before** bumping (so `v0.2.0` points at a `0.1.x`
-commit), the tag-check fails. Re-running won't help until the tag points at a
-bumped commit. Fix it by bumping, then re-pointing the release:
+## Verify
 
 ```bash
-pnpm release:version 0.2.0
-git commit -am "chore(release): v0.2.0" && git push
-gh release delete v0.2.0 --yes --cleanup-tag   # drops the stale tag
-gh release create v0.2.0 --generate-notes --target main
+npm view @doidor/markbook version
+npx @doidor/markbook --version
 ```
 
-## Testing the workflow without publishing
+## Notes
 
-Use the **Run workflow** button (`workflow_dispatch`) on the Release workflow and
-tick **dry-run**. It packs every package and prints the tarball contents but does
-not publish.
+- The published CLI binary is `markbook`, so `npx @doidor/markbook <cmd>` and a global install
+  (`npm i -g @doidor/markbook` → `markbook <cmd>`) both work.
+- `pnpm publish` delegates the upload to the `npm` on `PATH`; trusted publishing needs npm
+  ≥ 11.5.1, so the workflow installs the latest npm before running the publish step.
+- `workspace:*` cross-refs between packages are rewritten to the concrete version by pnpm at
+  publish time, so the four packages' published tarballs depend on the same concrete version.
