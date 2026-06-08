@@ -17,7 +17,14 @@
       "!**/*.tsbuildinfo",
       "!pnpm-lock.yaml",
       "!**/llms.txt",
-      "!**/llms"
+      "!**/llms",
+      "!.agentrig",
+      "!.cursor",
+      "!.github/copilot",
+      "!.github/copilot-instructions.md",
+      "!.github/instructions",
+      "!.vscode/mcp.json",
+      "!.mcp.json"
     ]
   },
   "formatter": {

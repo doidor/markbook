@@ -1781,3 +1781,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** The user wants markbook's release process aligned with agentrig's — Changesets is more ergonomic than the bump-then-tag-then-Release dance (which kept tripping on tag-vs-version ordering), and the four packages stay locked in lockstep automatically.
 
 **Next:** Maintainer enables "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General → Workflow permissions) — the Trusted Publishers are already configured. Once this branch merges, the workflow opens the first "Version Packages" PR; merging that publishes `0.1.2`.
+
+---
+
+## 2026-06-08 — install AgentRig harness (preserving existing markbook harness)
+
+**What changed:** Ran `npx @doidor/agentrig@0.9.0 init --skip-agent --yes` (non-destructive mode) to layer the canonical AgentRig harness on top of markbook's existing one. New: `.agentrig/` (PRINCIPLES, harness state machine, role prompts, eval rubric + dashboard + static-audit), six canonical skills (`self-verify`, `verify-loop`, `fix-ci`, `skill-improver`, `skill-authoring`, `harness-eval`) + four reflex rules (`security`, `code-review`, `coding-standards`, `no-debug-logging`) + wiki scaffolding (`index.md`, `troubleshooting.md`, `_TEMPLATE.md`) under `.copilot/` (reachable via the existing `.agents/` symlinks), MCP config mirrored to `.mcp.json` + `.vscode/mcp.json` + `.github/copilot/mcp.json`, Cursor rules under `.cursor/rules/`, path-scoped `.github/instructions/*.instructions.md`, and `.github/workflows/copilot-setup-steps.yml`. Markbook's curated `AGENTS.md` was preserved (added a "What this repository is" section + an `AGENTRIG:skills-inventory` block so the harness eval hits 100%); `CLAUDE.md` is now agentrig-projected (`@AGENTS.md` import + inlined body). Ignored the agentrig-owned dirs in biome.
+
+**Why:** User wants the same agent-harness baseline as `@doidor/agentrig` on this repo, with the existing markbook-specific rules/skills/wiki/AGENTS preserved. The `--skip-agent` flag installs deterministically (no model calls). `agentrig doctor` reports installed + valid `copilot-setup-steps.yml`; `agentrig eval --static` reports Harness Score 100% (35/35).
+
+**Next:** Future agentrig upgrades flow through `npx @doidor/agentrig update` (machinery overwritten, tailorable files preserved with `--diff` to inspect drift). Optional follow-up: drop the `.claude/hooks/post-edit-reminder.mjs` / `stop-progress-check.mjs` if their behavior is now covered by the canonical `self-verify` / `verify-loop` skills.
