@@ -9,7 +9,7 @@
     "preview": "markbook preview"
   },
   "devDependencies": {
-    "@markbook/core": "workspace:*",
-    "markbook": "workspace:*"
+    "@doidor/markbook-core": "workspace:*",
+    "@doidor/markbook": "workspace:*"
   }
 }

@@ -12,7 +12,7 @@ Story files imported by the generated entries ARE in the graph (so they HMR),
 but markdown files, templates, and `css:` paths are NOT — they're consumed at
 parse time, before any module the watcher knows about.
 
-**Fix:** A dedicated `chokidar` watcher (added as a `@markbook/core` dep)
+**Fix:** A dedicated `chokidar` watcher (added as a `@doidor/markbook-core` dep)
 runs alongside Vite, watching `docsDir`, every `templatesDir` entry, every
 `cssPaths` entry, and every absolute path of every story file referenced by
 any directive (collected by `writePages` and returned in

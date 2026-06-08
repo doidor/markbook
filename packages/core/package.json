@@ -1,7 +1,27 @@
 {
-  "name": "@markbook/core",
-  "version": "0.0.0",
+  "name": "@doidor/markbook-core",
+  "version": "0.1.0",
   "description": "Markbook core — markdown parsing, story extraction, static site building",
+  "keywords": [
+    "markbook",
+    "markdown",
+    "documentation",
+    "static-site-generator",
+    "vite",
+    "remark",
+    "stories"
+  ],
+  "license": "MIT",
+  "author": "doidor",
+  "homepage": "https://doidor.github.io/markbook",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doidor/markbook.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/doidor/markbook/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -47,5 +67,8 @@
   "devDependencies": {
     "@types/node": "^22.7.0",
     "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

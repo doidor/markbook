@@ -13,7 +13,7 @@ agent edits a file matching that glob.
 ```yaml
 ---
 name: core-no-framework
-description: Forbid framework imports in @markbook/core
+description: Forbid framework imports in @doidor/markbook-core
 glob: packages/core/**/*.{ts,tsx}
 priority: 100  # higher number = applied first; specialized rules win
 ---

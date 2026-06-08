@@ -4,7 +4,7 @@ name: Deploy docs site
 # publish it to GitHub Pages at https://doidor.github.io/markbook/.
 #
 # The site is markdown-only, but `markbook build` runs through the CLI, so the
-# @markbook/* packages are compiled first (`pnpm build`). The built output uses
+# @doidor/markbook-* packages are compiled first (`pnpm build`). The built output uses
 # relative asset/link paths, so it works correctly under the /markbook/ project
 # sub-path.
 
@@ -43,7 +43,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # The site builds via the `markbook` CLI, which imports the compiled
-      # @markbook/core + CLI dist — build the packages first.
+      # @doidor/markbook-core + CLI dist — build the packages first.
       - name: Build packages
         run: pnpm build
 

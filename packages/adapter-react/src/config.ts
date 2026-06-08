@@ -1,5 +1,5 @@
 import reactPlugin from '@vitejs/plugin-react';
-import type { MarkbookAdapter } from '@markbook/core';
+import type { MarkbookAdapter } from '@doidor/markbook-core';
 
 export interface ReactAdapterOptions {
   /**
@@ -14,7 +14,7 @@ export interface ReactAdapterOptions {
 
 export function reactAdapter(opts: ReactAdapterOptions = {}): MarkbookAdapter {
   return {
-    packageName: '@markbook/adapter-react',
+    packageName: '@doidor/markbook-adapter-react',
     vitePlugins: () => reactPlugin() as unknown[],
     decoratorModules: opts.decorators,
     packagePeerDeps: ['react', 'react-dom'],

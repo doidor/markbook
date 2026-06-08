@@ -28,7 +28,7 @@ Short ADR-style records of non-obvious choices. Each entry: **Context** (the pro
 
 **Context:** Markbook must work with React, Vue, web components, and any other component runtime without baking framework code into core.
 
-**Decision:** Core mounts story placeholders by emitting `<div data-markbook-story="...">` elements and a per-page entry script. The entry script imports the named story export and a `mount(el, story)` function from a user-chosen adapter package (e.g. `@markbook/adapter-react`).
+**Decision:** Core mounts story placeholders by emitting `<div data-markbook-story="...">` elements and a per-page entry script. The entry script imports the named story export and a `mount(el, story)` function from a user-chosen adapter package (e.g. `@doidor/markbook-adapter-react`).
 
 **Consequences:** Core stays framework-agnostic. Each adapter package is small (~one function plus the relevant Vite plugin). Users pick the adapter in `markbook.config.ts`.
 
@@ -46,11 +46,11 @@ Short ADR-style records of non-obvious choices. Each entry: **Context** (the pro
 
 ## ADR-0005 — Adapter packages have separate browser and config entry points
 
-**Context:** During the v0.1 smoke milestone the example build failed because `@markbook/adapter-react` exported both the browser-side `mount(el, story)` runtime and the Node-side `reactAdapter()` config helper from a single entry. The generated entry script imported `mount` from the package root, which transitively pulled in `@vitejs/plugin-react` → Vite → Babel → Node built-ins, and Vite then tried to bundle that whole tree into the browser bundle.
+**Context:** During the v0.1 smoke milestone the example build failed because `@doidor/markbook-adapter-react` exported both the browser-side `mount(el, story)` runtime and the Node-side `reactAdapter()` config helper from a single entry. The generated entry script imported `mount` from the package root, which transitively pulled in `@vitejs/plugin-react` → Vite → Babel → Node built-ins, and Vite then tried to bundle that whole tree into the browser bundle.
 
 **Decision:** Every adapter package exposes two entry points via `package.json` `exports`: the default (`@markbook/adapter-X`) for the browser-side runtime (`mount`), and `@markbook/adapter-X/config` for the Node-side `Xadapter()` config helper. Users import the config helper in `markbook.config.ts`; core's generated entries only ever import the default.
 
-**Consequences:** No Node-only dependencies leak into browser bundles. Slight authoring cost — users have to remember to import `reactAdapter` from `@markbook/adapter-react/config` rather than the package root. Future Vue and web-components adapters must follow the same convention.
+**Consequences:** No Node-only dependencies leak into browser bundles. Slight authoring cost — users have to remember to import `reactAdapter` from `@doidor/markbook-adapter-react/config` rather than the package root. Future Vue and web-components adapters must follow the same convention.
 
 ---
 
@@ -115,7 +115,7 @@ Both modes share:
 
 ## ADR-0011 — Adapter conventions: one demo per adapter, no per-adapter core logic
 
-**Context:** v0.4 adds Vue and web-components adapters. The question: how much of `@markbook/core` needs to know which adapter is in use? And how do we structure demos when each Markbook site picks exactly one adapter via `markbook.config.ts`?
+**Context:** v0.4 adds Vue and web-components adapters. The question: how much of `@doidor/markbook-core` needs to know which adapter is in use? And how do we structure demos when each Markbook site picks exactly one adapter via `markbook.config.ts`?
 
 **Decision:** Core stays adapter-agnostic — it imports nothing from any adapter. The contract is the `MarkbookAdapter` shape (`packageName`, optional `vitePlugins`, optional `wrapperModule`); each adapter package returns its own instance from a factory in `./config`. Core's generated entry just does `import { mount } from '<adapter.packageName>'` plus the framework-agnostic `mount(el, story, opts?)` call. **One demo workspace per adapter** (`examples/react-demo`, `examples/vue-demo`, `examples/wc-demo`) — there is no multi-adapter demo because there is no multi-adapter site; the adapter is a project-level choice. Each demo dogfoods exactly one adapter and stays small enough that breaking changes to the adapter contract surface immediately. Story file extensions match the adapter's idiom (`.stories.tsx` for React, `.stories.ts` for Vue and WC); the directive doesn't care. Shiki's `lang` adapts to the file extension so highlighting stays accurate.
 
@@ -178,7 +178,7 @@ Both modes share:
 
 - **Story-as-module convention.** A story file remains "one story per file with `export default`" — but may now also export `args`, `argTypes`, and `parameters` as plain values. This piggybacks on the existing convention (no new file types, no new decorators, no metadata sidecar). Vite/Rollup pick them up as named exports.
 - **Runtime detection, not build-time AST parsing.** The entry generator switches from `import default` to `import * as ns` and reads `ns.args`, `ns.argTypes`, `ns.parameters` at runtime in the generated entry script. No TypeScript compiler API parsing for these (unlike v0.1's story-source extraction, which still uses TS API). Rollup warns about `MISSING_EXPORT` for optional fields — silenced via `onwarn` in build / embed / package configs since the access is intentional.
-- **Controls UI is browser-side, adapter-owned.** `setupControls(controlsEl, args, argTypes, onChange)` lives in `@markbook/adapter-react`. The entry generator emits the wiring; the helper builds the form DOM, listens for `input` / `change`, mutates `args` in place, and calls `onChange` to trigger a re-mount. Mutating in place plus a stable callback (closure over `args`) means React's reconciliation diffs props without remounting the story — state preserved.
+- **Controls UI is browser-side, adapter-owned.** `setupControls(controlsEl, args, argTypes, onChange)` lives in `@doidor/markbook-adapter-react`. The entry generator emits the wiring; the helper builds the form DOM, listens for `input` / `change`, mutates `args` in place, and calls `onChange` to trigger a re-mount. Mutating in place plus a stable callback (closure over `args`) means React's reconciliation diffs props without remounting the story — state preserved.
 - **Controls placeholder is always emitted.** Every story-block now contains a `<div class="markbook-controls" data-markbook-controls="<id>">`. CSS `:empty { display: none }` hides it when a story doesn't export `args`. No build-time branching by story.
 - **Adapter declares capability.** `MarkbookAdapter.hasControls?: boolean` controls whether the entry generator imports `setupControls` and emits the wiring. React: `true`. Vue / WC: not yet — Vue could honour it (v0.7 has args support, just not the controls UI); WC's slot model would fight the form.
 
@@ -234,15 +234,15 @@ For `markbook bundle`, fan-out stories always promote their slug to `${baseSlug}
 
 ---
 
-## ADR-0019 — Public vs. internal API split (`@markbook/core` exports map)
+## ADR-0019 — Public vs. internal API split (`@doidor/markbook-core` exports map)
 
-**Context:** Before v1.0 every symbol in `@markbook/core` was re-exported from `index.ts`. Tests imported directly from source modules (`./parse.js`, etc.), but the barrel made `extractStoryCode`, `slugify`, `sortIndexFirst`, and a dozen other internals look like part of the contract. Without a deliberate split, the v1.0 freeze would either lock in too much surface or break advanced consumers who started depending on now-renamed internals.
+**Context:** Before v1.0 every symbol in `@doidor/markbook-core` was re-exported from `index.ts`. Tests imported directly from source modules (`./parse.js`, etc.), but the barrel made `extractStoryCode`, `slugify`, `sortIndexFirst`, and a dozen other internals look like part of the contract. Without a deliberate split, the v1.0 freeze would either lock in too much surface or break advanced consumers who started depending on now-renamed internals.
 
 **Decision:** `package.json` `exports` map has two keys: `.` (stable, semver-guaranteed) and `./internal` (best-effort, may change in minor releases). The main entry exports only `defineConfig`, `build`, `dev`, `bundleEmbed`, and the matching types. The `./internal` entry re-exports parser, code/props extractors, template, exports discovery, nav helpers, slugify, and cache invalidators — anything useful for power tooling but too tied to internal implementation to freeze.
 
 Test files keep importing from sibling source modules (no path change). Cross-package consumers in the workspace (adapter packages, CLI) only use the main entry — verified by grep.
 
-**Consequences:** A user writing a custom CLI around Markbook (e.g. an alternative bundler) can `import { parseMarkdown } from '@markbook/core/internal'` and accept the contract that the function may grow new options at any minor release. The split also informs README writing — `packages/core/README.md` documents only the main-entry surface, while internals are listed in `internal.ts`'s top-of-file comment for discoverability. Future API audits become a refactoring exercise rather than a breaking change: anything that should have been internal can be moved to `./internal` without bumping major.
+**Consequences:** A user writing a custom CLI around Markbook (e.g. an alternative bundler) can `import { parseMarkdown } from '@doidor/markbook-core/internal'` and accept the contract that the function may grow new options at any minor release. The split also informs README writing — `packages/core/README.md` documents only the main-entry surface, while internals are listed in `internal.ts`'s top-of-file comment for discoverability. Future API audits become a refactoring exercise rather than a breaking change: anything that should have been internal can be moved to `./internal` without bumping major.
 
 ---
 
@@ -516,33 +516,33 @@ defineConfig({
 - **`escapeHtml` / `escapeAttribute` re-exported.** Same implementation today, separately named so handler authors reach for the right tool — and so a future minor can diverge (e.g. percent-encoding for URLs) without breaking callers.
 - **Public API gains 8 new exports**: `BUILTIN_DIRECTIVES`, `DirectiveHandler`, `DirectiveHandlerFn`, `DirectiveHandlerDescriptor`, `DirectiveContext`, `DirectiveResult`, `DirectiveResultObject`, `escapeHtml`, `escapeAttribute`. Every one has a TSDoc explaining intent. The surface is small but each piece is locked in for v1.0.
 
-## ADR-0026 — Shared adapter runtime in `@markbook/adapter-shared`
+## ADR-0026 — Shared adapter runtime in `@doidor/markbook-adapter-shared`
 
 **Status:** Accepted (2026-06-05).
 
 **Context.** The three framework adapters (`adapter-react`, `adapter-vue`, `adapter-wc`) each shipped their own byte-for-byte copies of the browser-side mount plumbing — `injectCss`, `applyParameters`, `resolveMountTarget`, the `LAYOUT_CLASSES` constant, and the `StoryParameters` / `MountOptions` shapes. The web-components copy had already drifted (its comments referenced "see adapter-react's injectCss"), which is exactly how three copies silently diverge. The CSS-injection helper in particular is non-trivial (shadow-root vs `document.head`, dedup by `cssId`) and a subtle fix to one copy would not propagate.
 
-**Decision.** Extract the framework-agnostic browser runtime into a new first-class package, `@markbook/adapter-shared`, that every adapter depends on at runtime.
+**Decision.** Extract the framework-agnostic browser runtime into a new first-class package, `@doidor/markbook-adapter-shared`, that every adapter depends on at runtime.
 
 - **Pure DOM, zero deps.** It imports nothing from Node and nothing from any framework, so it bundles into each adapter's *default browser entry* without violating the two-entry split (ADR-0005). It builds with the same `tsc -b` + `tsconfig.base.json` (which already includes the `DOM` lib) as the other packages.
 - **Share the helpers + the common option subset, not a single `MountOptions`.** Exports `applyParameters`, `resolveMountTarget`, `injectCss`, `StoryParameters`, and `BaseMountOptions` (`{ isolation?, parameters?, css?, cssId? }`). Each adapter `extends BaseMountOptions` with what it actually supports — React/Vue add `args` + their own decorator type; web components use the base as-is. A single shared `MountOptions` was rejected: it would let the WC adapter appear to accept `args`/decorators it doesn't implement, or erase React/Vue decorator specificity.
-- **Runtime dependency, `workspace:*`.** Each adapter lists `@markbook/adapter-shared` under `dependencies` (not `devDependencies`) so the published npm packages declare it correctly; `workspace:*` is rewritten to the real version on publish. It must be published/versioned in lockstep with the adapters.
+- **Runtime dependency, `workspace:*`.** Each adapter lists `@doidor/markbook-adapter-shared` under `dependencies` (not `devDependencies`) so the published npm packages declare it correctly; `workspace:*` is rewritten to the real version on publish. It must be published/versioned in lockstep with the adapters.
 
 **Alternatives considered.**
 - **A shared source file outside `packages/`.** Rejected — it wouldn't publish cleanly; the adapters ship only their own `dist/`, so anything they import at runtime has to be a real package.
-- **Put the helpers in `@markbook/core`.** Rejected — `core` pulls in Vite, the TS compiler, Pagefind, and `node:` built-ins; importing it into a browser bundle would drag all of that across the two-entry split. The shared runtime must stay browser-only.
+- **Put the helpers in `@doidor/markbook-core`.** Rejected — `core` pulls in Vite, the TS compiler, Pagefind, and `node:` built-ins; importing it into a browser bundle would drag all of that across the two-entry split. The shared runtime must stay browser-only.
 - **Leave the duplication.** Rejected — three copies of a 100-line DOM module that already drifted is a maintenance trap; a one-line CSS-injection fix should land in one place.
 
 **Consequences.**
 - New package surface to maintain, version, and publish in lockstep with the adapters (the cost the ADR accepts in exchange for de-duplication).
 - The adapters' public API is unchanged: each still exports `mount` (and React `setupControls` / `ArgType`) and re-exports `StoryParameters` (now from the shared package, same shape).
-- `tsc -b` topological ordering builds `adapter-shared` before the adapters; the verify cycle's typecheck step relies on the shared `dist/` existing (the same pre-existing constraint that already applies to `@markbook/core`).
+- `tsc -b` topological ordering builds `adapter-shared` before the adapters; the verify cycle's typecheck step relies on the shared `dist/` existing (the same pre-existing constraint that already applies to `@doidor/markbook-core`).
 
 ## ADR-0027 — `tsc --noEmit` typecheck resolves workspace deps from source
 
 **Status:** Accepted (2026-06-05).
 
-**Context.** The downstream packages (`cli`, `adapter-react`, `adapter-vue`, `adapter-wc`) import `@markbook/core` (and now `@markbook/adapter-shared`). With `moduleResolution: "Bundler"`, TypeScript resolves those bare specifiers through `node_modules` to each package's `types` → `./dist/index.d.ts`. On a clean checkout that file doesn't exist until `pnpm build`, so `pnpm typecheck` (which CI runs *before* `pnpm build`) failed with `TS2307: Cannot find module '@markbook/core'`. It only appeared to pass locally because a prior build had left `dist/` lying around. Adding `paths` to the shared `tsconfig.base.json` fixed resolution but broke the emit build: the build configs set `rootDir: ./src`, so pulling sibling source in via `paths` tripped `TS6059` ("not under rootDir").
+**Context.** The downstream packages (`cli`, `adapter-react`, `adapter-vue`, `adapter-wc`) import `@doidor/markbook-core` (and now `@doidor/markbook-adapter-shared`). With `moduleResolution: "Bundler"`, TypeScript resolves those bare specifiers through `node_modules` to each package's `types` → `./dist/index.d.ts`. On a clean checkout that file doesn't exist until `pnpm build`, so `pnpm typecheck` (which CI runs *before* `pnpm build`) failed with `TS2307: Cannot find module '@doidor/markbook-core'`. It only appeared to pass locally because a prior build had left `dist/` lying around. Adding `paths` to the shared `tsconfig.base.json` fixed resolution but broke the emit build: the build configs set `rootDir: ./src`, so pulling sibling source in via `paths` tripped `TS6059` ("not under rootDir").
 
 **Decision.** Split typecheck from build. Each downstream package's `typecheck` script runs `tsc -p tsconfig.typecheck.json`, a config that extends `tsconfig.typecheck.base.json` (root). That base sets `noEmit: true`, no `rootDir`/`outDir`, and `paths` mapping the three workspace specifiers to their `src/index.ts`. The per-package *build* configs (`tsconfig.json`, used by `tsc -b`) are untouched and still resolve deps from `dist/` in pnpm's topological order. `core` and `adapter-shared` keep plain `tsc --noEmit` — they have no workspace dependencies, so they already typecheck standalone.
 
@@ -562,17 +562,43 @@ defineConfig({
 
 **Status:** Accepted (2026-06-06).
 
-**Context.** The repo shipped three framework adapters (`@markbook/adapter-react`, `-vue`, `-wc`) plus two proof demos (`examples/vue-demo`, `examples/wc-demo`). In practice only the React adapter was carried to feature parity — `:::props` tables are React-only (`react-docgen-typescript`), interactive controls were React-only, and decorators were React/Vue-only. The Vue and WC packages were thin and under-exercised, and every doc that listed "three adapters" overstated what actually works. Maintaining (and documenting) three adapters while only one is first-class was a recurring source of drift.
+**Context.** The repo shipped three framework adapters (`@doidor/markbook-adapter-react`, `-vue`, `-wc`) plus two proof demos (`examples/vue-demo`, `examples/wc-demo`). In practice only the React adapter was carried to feature parity — `:::props` tables are React-only (`react-docgen-typescript`), interactive controls were React-only, and decorators were React/Vue-only. The Vue and WC packages were thin and under-exercised, and every doc that listed "three adapters" overstated what actually works. Maintaining (and documenting) three adapters while only one is first-class was a recurring source of drift.
 
-**Decision.** Delete `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`. Keep `@markbook/adapter-react` and `@markbook/adapter-shared` (React still consumes the shared browser runtime). Document everywhere — root `README.md`, the docsite (`examples/markbook-site`), `ROADMAP.md`, and the agent harness (`AGENTS.md`, `.copilot/`) — that **React is the only implemented adapter** and that Vue + Web Components adapters are planned, not shipped. The CI matrix, root `package.json` scripts, and `scripts/examples-dev.mjs` drop the Vue/WC builds.
+**Decision.** Delete `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`. Keep `@doidor/markbook-adapter-react` and `@doidor/markbook-adapter-shared` (React still consumes the shared browser runtime). Document everywhere — root `README.md`, the docsite (`examples/markbook-site`), `ROADMAP.md`, and the agent harness (`AGENTS.md`, `.copilot/`) — that **React is the only implemented adapter** and that Vue + Web Components adapters are planned, not shipped. The CI matrix, root `package.json` scripts, and `scripts/examples-dev.mjs` drop the Vue/WC builds.
 
 **Alternatives considered.**
 - **Keep the packages as "experimental".** Rejected — they still appeared in install docs and the adapter table as if production-ready, which is the exact dishonesty this change removes.
 - **Keep the demos, delete only the packages.** Rejected — the demos can't build without their adapters, so they'd be dead weight and a broken CI step.
-- **Fold `@markbook/adapter-shared` back into `@markbook/adapter-react`.** Deferred — `adapter-shared` is the seam the future Vue/WC adapters will reuse (ADR-0026), so keeping it avoids re-extracting it later. It's now a single-consumer package, which is acceptable.
+- **Fold `@doidor/markbook-adapter-shared` back into `@doidor/markbook-adapter-react`.** Deferred — `adapter-shared` is the seam the future Vue/WC adapters will reuse (ADR-0026), so keeping it avoids re-extracting it later. It's now a single-consumer package, which is acceptable.
 
 **Consequences.**
 - The framework-adapter surface is honest: one package, one demo path, one set of docs.
-- Vue + Web Components adapters move to `ROADMAP.md` as a single deferred item to be rebuilt against the unchanged `MarkbookAdapter` contract (each consuming `@markbook/adapter-shared`).
+- Vue + Web Components adapters move to `ROADMAP.md` as a single deferred item to be rebuilt against the unchanged `MarkbookAdapter` contract (each consuming `@doidor/markbook-adapter-shared`).
 - The `MarkbookAdapter` contract, `staticAdapter()`, and the core engine are unchanged — re-adding an adapter later is purely additive and needs no core changes.
 - The published `markbook` CLI skills (`init`, `bulk-generate`, …) now scaffold/detect React only; a future adapter re-adds its branch.
+
+---
+
+## ADR-0029 — Publish under the `@doidor` npm scope (`@doidor/markbook*`)
+
+**Status:** Accepted (2026-06-08).
+
+**Context.** The packages were unpublished workspace packages: `markbook` (CLI), `@markbook/core`, `@markbook/adapter-react`, `@markbook/adapter-shared`, all at `0.0.0` with `workspace:*` cross-refs. To publish, every package in the dependency chain must be published — a scoped package can't depend on unpublished ones. Two blockers: the bare name `markbook` is already taken on npm (an unrelated package at `0.0.3`), and the `@markbook` scope isn't owned. The maintainer owns the `@doidor` user scope (matches the GitHub org).
+
+**Decision.** Re-scope all four packages under `@doidor/`:
+- `markbook` → `@doidor/markbook` (CLI; `bin: { markbook }` is unchanged, so the `markbook` command and all `markbook <cmd>` invocations stay identical)
+- `@markbook/core` → `@doidor/markbook-core`
+- `@markbook/adapter-react` → `@doidor/markbook-adapter-react`
+- `@markbook/adapter-shared` → `@doidor/markbook-adapter-shared`
+
+Each package gains `publishConfig.access: "public"`, `license: "MIT"` + a bundled `LICENSE`, `repository.directory`, `homepage`, `bugs`, and `keywords`. Versions bump `0.0.0 → 0.1.0` in lockstep. The private example/site workspace packages keep their `@markbook/*` names — they're never published, so renaming them would be churn with no payoff. Historical `@markbook/*` mentions in `DECISIONS.md`/`PROGRESS.md` are left intact (append-only record of the names as they were).
+
+**Alternatives considered.**
+- **Publish the CLI as `@doidor/markbook` but keep deps under `@markbook`.** Rejected — requires owning/creating the `@markbook` org, and splits the package identity across two scopes.
+- **Publish `markbook` unscoped.** Impossible — the name is taken.
+- **A single bundled package.** Rejected — the adapter contract (ADR-0003/0005) and the core/adapter split are intentional; consumers pick the adapter they need.
+
+**Consequences.**
+- `pnpm publish` rewrites `workspace:*` → `0.1.0`, so the published tarballs depend on the concrete versions. Publish order must respect the graph: `adapter-shared` → `core` → `adapter-react` → CLI.
+- All install docs, the `init`/bundle CLI skills, `reactAdapter().packageName` (baked into generated boot scripts), and the `tsconfig.typecheck` path maps now reference `@doidor/markbook-*`.
+- Future Vue/WC adapters (ROADMAP) will be `@doidor/markbook-adapter-vue` / `-wc`.

@@ -1,7 +1,27 @@
 {
-  "name": "markbook",
-  "version": "0.0.0",
+  "name": "@doidor/markbook",
+  "version": "0.1.0",
   "description": "Markbook CLI — build static documentation sites from markdown + component stories",
+  "keywords": [
+    "markbook",
+    "cli",
+    "documentation",
+    "markdown",
+    "storybook-alternative",
+    "static-site-generator",
+    "stories"
+  ],
+  "license": "MIT",
+  "author": "doidor",
+  "homepage": "https://doidor.github.io/markbook",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doidor/markbook.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/doidor/markbook/issues"
+  },
   "type": "module",
   "bin": {
     "markbook": "./bin/markbook.js"
@@ -18,7 +38,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@markbook/core": "workspace:*",
+    "@doidor/markbook-core": "workspace:*",
     "cac": "^6.7.14",
     "jiti": "^2.4.0"
   },
@@ -26,5 +46,8 @@
     "@types/node": "^22.7.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

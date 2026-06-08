@@ -71,18 +71,18 @@ embeds of any of your stories.
 
 ```bash
 # Core + CLI (markdown-only sites need nothing else)
-npm install -D markbook @markbook/core
-pnpm add -D markbook @markbook/core
-yarn add -D markbook @markbook/core
+npm install -D @doidor/markbook @doidor/markbook-core
+pnpm add -D @doidor/markbook @doidor/markbook-core
+yarn add -D @doidor/markbook @doidor/markbook-core
 ```
 
 For live **component stories**, add the React adapter and its runtime:
 
 ```bash
 # React — adapter (dev) + react/react-dom runtime
-npm install -D @markbook/adapter-react && npm install react react-dom
-pnpm add -D @markbook/adapter-react && pnpm add react react-dom
-yarn add -D @markbook/adapter-react && yarn add react react-dom
+npm install -D @doidor/markbook-adapter-react && npm install react react-dom
+pnpm add -D @doidor/markbook-adapter-react && pnpm add react react-dom
+yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
 ```
 
 > **React is the only adapter implemented today.** Vue and Web Components
@@ -111,7 +111,7 @@ my-site/
 `markbook.config.ts`:
 
 ```ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   title: 'My Project',
@@ -150,8 +150,8 @@ Add an adapter to the config and reference a story file from markdown:
 
 ```ts
 // markbook.config.ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   title: 'My Components',
@@ -216,7 +216,7 @@ overridden):
 **User directives** — register your own from `markbook.config.ts`:
 
 ```ts
-import { defineConfig, escapeAttribute } from '@markbook/core';
+import { defineConfig, escapeAttribute } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {
@@ -244,7 +244,7 @@ touching it.
 
 | Adapter | Mounts | Runtime |
 | --- | --- | --- |
-| `@markbook/adapter-react` | React components | `react`, `react-dom` (peer) |
+| `@doidor/markbook-adapter-react` | React components | `react`, `react-dom` (peer) |
 
 > Vue and Web Components adapters are [planned](ROADMAP.md) but not yet
 > implemented — React is the only adapter available today.
@@ -349,8 +349,8 @@ Common flags: `-c, --config <path>` and `--root <path>`. Full details in the
 `markbook.config.{ts,mts,js,mjs}` exports a `MarkbookConfig` via `defineConfig`:
 
 ```ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   // Layout
@@ -403,9 +403,9 @@ in [`packages/core/README.md`](packages/core/README.md).
 | Package | Purpose |
 | --- | --- |
 | [`markbook`](packages/cli) | The `markbook` CLI (`build`, `dev`, `preview`, `bundle`, `skills`). |
-| [`@markbook/core`](packages/core) | Markdown parser, builder, dev server, embed bundler, directive registry. |
-| [`@markbook/adapter-react`](packages/adapter-react) | Mount React stories (+ controls + decorators). |
-| [`@markbook/adapter-shared`](packages/adapter-shared) | Shared browser runtime for adapters (internal; see [ADR-0026](DECISIONS.md)). |
+| [`@doidor/markbook-core`](packages/core) | Markdown parser, builder, dev server, embed bundler, directive registry. |
+| [`@doidor/markbook-adapter-react`](packages/adapter-react) | Mount React stories (+ controls + decorators). |
+| [`@doidor/markbook-adapter-shared`](packages/adapter-shared) | Shared browser runtime for adapters (internal; see [ADR-0026](DECISIONS.md)). |
 
 > Vue and Web Components adapters are [planned](ROADMAP.md), not yet shipped.
 
@@ -429,8 +429,8 @@ examples/
 
 ```bash
 pnpm install      # bootstrap the workspace
-pnpm build        # compile every @markbook/* package (tsc -b, topological)
-pnpm test         # @markbook/core + CLI Vitest suites
+pnpm build        # compile every @doidor/markbook-* package (tsc -b, topological)
+pnpm test         # @doidor/markbook-core + CLI Vitest suites
 pnpm typecheck    # tsc --noEmit across packages (resolves from source — no prior build needed)
 pnpm lint         # biome check
 

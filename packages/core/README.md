@@ -1,10 +1,10 @@
-# `@markbook/core`
+# `@doidor/markbook-core`
 
 The framework-agnostic engine behind [Markbook](../../README.md): markdown
 parsing, directive expansion, multi-page Vite orchestration, Pagefind
 indexing, `llms.txt` emission, and the embed/package bundler.
 
-Most users only touch `@markbook/core` through their `markbook.config.ts`.
+Most users only touch `@doidor/markbook-core` through their `markbook.config.ts`.
 This README documents the public API surface — directives, frontmatter,
 config, adapter contract, story-file conventions, and theme tokens.
 
@@ -21,11 +21,11 @@ import {
   type BundleEmbedOptions,
   type BundleMode,
   type BundleIsolation,
-} from '@markbook/core';
+} from '@doidor/markbook-core';
 ```
 
 For advanced use (custom CLIs, tooling around Markbook), the internal
-surface is reachable via `@markbook/core/internal` — but signatures there
+surface is reachable via `@doidor/markbook-core/internal` — but signatures there
 may change between minor releases.
 
 ## Directives
@@ -37,7 +37,7 @@ Markdown directive blocks (`:::name{attr=value}\nbody\n:::` or `::name{attr=valu
 **Arbitrary user directives** can be registered from `markbook.config.ts`:
 
 ```ts
-import { defineConfig, escapeAttribute } from '@markbook/core';
+import { defineConfig, escapeAttribute } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {
@@ -278,7 +278,7 @@ See `examples/marketing-demo/` for a worked example.
 Build a new adapter for any component runtime:
 
 ```ts
-import type { MarkbookAdapter } from '@markbook/core';
+import type { MarkbookAdapter } from '@doidor/markbook-core';
 
 export function myAdapter(): MarkbookAdapter {
   return {

@@ -29,8 +29,8 @@ scaffolds a React project.
 ### `markbook.config.ts`
 
 ```ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   title: '<project name from package.json, title-cased>',
@@ -97,7 +97,7 @@ overwriting.
 Print and offer to install:
 
 ```bash
-npm install --save-dev markbook @markbook/core @markbook/adapter-react
+npm install --save-dev @doidor/markbook @doidor/markbook-core @doidor/markbook-adapter-react
 # plus the React runtime, if the project doesn't already have it:
 npm install react react-dom
 ```
@@ -112,7 +112,7 @@ After files land, tell the user:
 
 ## Prevention tests
 
-- `markbook.config.ts` uses `reactAdapter()` from `@markbook/adapter-react/config`.
+- `markbook.config.ts` uses `reactAdapter()` from `@doidor/markbook-adapter-react/config`.
 - The generated story file uses the `.tsx` extension (React).
 - Frontmatter on every generated page has a `title:` and no other fields the user didn't ask for.
 - No existing files were overwritten without explicit confirmation.

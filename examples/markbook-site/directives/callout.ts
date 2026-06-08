@@ -1,4 +1,4 @@
-import { escapeAttribute, htmlTemplate, type DirectiveHandler } from '@markbook/core';
+import { escapeAttribute, htmlTemplate, type DirectiveHandler } from '@doidor/markbook-core';
 
 /**
  * `:::callout{type=info|tip|warning|danger}` user directive.

@@ -11,7 +11,7 @@ import { getDotPath, protectHtmlComments, stringify } from './placeholder.js';
  *
  * ```ts
  * // directives/callout.ts
- * import { htmlTemplate, escapeAttribute, type DirectiveHandler } from '@markbook/core';
+ * import { htmlTemplate, escapeAttribute, type DirectiveHandler } from '@doidor/markbook-core';
  *
  * const render = htmlTemplate(new URL('./callout.html', import.meta.url));
  *

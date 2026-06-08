@@ -19,7 +19,7 @@ describe('staticAdapter', () => {
   });
 
   it('packageName is a stable sentinel', () => {
-    expect(staticAdapter().packageName).toBe('@markbook/core');
+    expect(staticAdapter().packageName).toBe('@doidor/markbook-core');
   });
 
   it('two calls produce equivalent shapes (no shared mutable state)', () => {
@@ -119,7 +119,7 @@ describe('createContext — content + layouts wiring', () => {
   it('uses staticAdapter() implicitly when no adapter is configured', async () => {
     const ctx = await createContext({ root: tmp });
     expect(ctx.adapter.isStatic).toBe(true);
-    expect(ctx.adapterPackageName).toBe('@markbook/core');
+    expect(ctx.adapterPackageName).toBe('@doidor/markbook-core');
   });
 
   it('publicDir defaults to <root>/public when unset', async () => {

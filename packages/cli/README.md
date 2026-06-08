@@ -2,17 +2,17 @@
 
 The command-line entry point for [Markbook](../../README.md). Loads
 `markbook.config.{ts,mts,js,mjs}` from the project root and orchestrates
-`@markbook/core` to build, serve, or bundle your docs.
+`@doidor/markbook-core` to build, serve, or bundle your docs.
 
 ## Install
 
 ```bash
-npm install -D markbook @markbook/core
-pnpm add -D markbook @markbook/core
-yarn add -D markbook @markbook/core
+npm install -D @doidor/markbook @doidor/markbook-core
+pnpm add -D @doidor/markbook @doidor/markbook-core
+yarn add -D @doidor/markbook @doidor/markbook-core
 ```
 
-Pair with the React adapter (`@markbook/adapter-react`). Vue and Web
+Pair with the React adapter (`@doidor/markbook-adapter-react`). Vue and Web
 Components adapters are [planned](../../ROADMAP.md) but not yet available.
 
 ## Commands

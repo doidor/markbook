@@ -1,11 +1,11 @@
 /**
- * Internal API surface for `@markbook/core`.
+ * Internal API surface for `@doidor/markbook-core`.
  *
  * Everything re-exported here is reachable through
- * `@markbook/core/internal`. It exists for power users (custom build
+ * `@doidor/markbook-core/internal`. It exists for power users (custom build
  * pipelines, alternative CLIs, advanced tooling), tests, and downstream
  * Markbook packages. Signatures here may change at any minor release —
- * stick to the main entry (`@markbook/core`) for stability.
+ * stick to the main entry (`@doidor/markbook-core`) for stability.
  */
 
 // Markdown + directive parsing

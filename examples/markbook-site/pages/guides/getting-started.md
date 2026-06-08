@@ -11,9 +11,9 @@ Five minutes from zero to a running site.
 ## 1. Install
 
 ```bash
-npm install -D markbook @markbook/core
-pnpm add -D markbook @markbook/core
-yarn add -D markbook @markbook/core
+npm install -D @doidor/markbook @doidor/markbook-core
+pnpm add -D @doidor/markbook @doidor/markbook-core
+yarn add -D @doidor/markbook @doidor/markbook-core
 ```
 
 Markbook works with any package manager — each install block below lists the npm / pnpm / yarn form of the same command.
@@ -22,9 +22,9 @@ If you want React component stories in your pages, also add the React adapter an
 
 ```bash
 # React — adapter (dev) + react/react-dom runtime
-npm install -D @markbook/adapter-react && npm install react react-dom
-pnpm add -D @markbook/adapter-react && pnpm add react react-dom
-yarn add -D @markbook/adapter-react && yarn add react react-dom
+npm install -D @doidor/markbook-adapter-react && npm install react react-dom
+pnpm add -D @doidor/markbook-adapter-react && pnpm add react react-dom
+yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
 ```
 
 > React is the only adapter available today. Vue and Web Components adapters are [planned](https://github.com/doidor/markbook/blob/main/ROADMAP.md).
@@ -36,7 +36,7 @@ If you only need a markdown-driven site (no component stories), skip the adapter
 At the root of your project:
 
 ```ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   title: 'My Project',

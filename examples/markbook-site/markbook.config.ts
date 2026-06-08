@@ -1,4 +1,4 @@
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 import { callout } from './directives/callout.js';
 
 /**

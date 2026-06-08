@@ -40,7 +40,7 @@ export interface MarkbookAdapter {
  */
 export function staticAdapter(): MarkbookAdapter {
   return {
-    packageName: '@markbook/core',
+    packageName: '@doidor/markbook-core',
     isStatic: true,
   };
 }

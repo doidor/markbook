@@ -1,4 +1,4 @@
-# `@markbook/adapter-react`
+# `@doidor/markbook-adapter-react`
 
 React mount adapter for [Markbook](../../README.md). Renders any React
 component (or function returning JSX) into a story placeholder.
@@ -6,9 +6,9 @@ component (or function returning JSX) into a story placeholder.
 ## Install
 
 ```bash
-npm install -D @markbook/adapter-react react react-dom
-pnpm add -D @markbook/adapter-react react react-dom
-yarn add -D @markbook/adapter-react react react-dom
+npm install -D @doidor/markbook-adapter-react react react-dom
+pnpm add -D @doidor/markbook-adapter-react react react-dom
+yarn add -D @doidor/markbook-adapter-react react react-dom
 ```
 
 `react` and `react-dom` are peer dependencies (and stay external in
@@ -18,8 +18,8 @@ yarn add -D @markbook/adapter-react react react-dom
 
 ```ts
 // markbook.config.ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   adapter: reactAdapter({
@@ -66,7 +66,7 @@ host-page CSS doesn't leak in.
 The default browser entry exports:
 
 ```ts
-import { mount, setupControls } from '@markbook/adapter-react';
+import { mount, setupControls } from '@doidor/markbook-adapter-react';
 
 mount(el, StoryComponent, {
   decorators?: React.ComponentType<{ children: React.ReactNode }>[];

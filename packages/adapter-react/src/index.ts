@@ -5,7 +5,7 @@ import {
   injectCss,
   resolveMountTarget,
   type BaseMountOptions,
-} from '@markbook/adapter-shared';
+} from '@doidor/markbook-adapter-shared';
 
 const roots = new WeakMap<Element, Root>();
 
@@ -52,6 +52,6 @@ export function mount(el: Element | null, story: unknown, opts?: MountOptions): 
 }
 
 export type { MountOptions };
-export type { StoryParameters } from '@markbook/adapter-shared';
+export type { StoryParameters } from '@doidor/markbook-adapter-shared';
 export { setupControls } from './controls.js';
 export type { ArgType } from './controls.js';

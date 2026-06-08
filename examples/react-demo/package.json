@@ -15,11 +15,11 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@markbook/adapter-react": "workspace:*",
-    "@markbook/core": "workspace:*",
+    "@doidor/markbook-adapter-react": "workspace:*",
+    "@doidor/markbook-core": "workspace:*",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "markbook": "workspace:*",
+    "@doidor/markbook": "workspace:*",
     "typescript": "^5.6.3"
   }
 }

@@ -7,7 +7,7 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 
 ## 2026-05-05 — repo bootstrap
 
-**What changed:** Initialised the pnpm monorepo, created the agent harness (this file, `DECISIONS.md`, `CLAUDE.md`, `.claude/` hooks + the `/markbook-log` slash command), and scaffolded empty `@markbook/core`, `markbook` (cli), `@markbook/adapter-react` packages plus an `examples/react-demo` workspace.
+**What changed:** Initialised the pnpm monorepo, created the agent harness (this file, `DECISIONS.md`, `CLAUDE.md`, `.claude/` hooks + the `/markbook-log` slash command), and scaffolded empty `@doidor/markbook-core`, `markbook` (cli), `@doidor/markbook-adapter-react` packages plus an `examples/react-demo` workspace.
 
 **Why:** Establish the project structure and the tracking discipline before any code lands so every subsequent change has a place to be recorded. Hooks are in place so the harness — not Claude — enforces journal updates.
 
@@ -17,7 +17,7 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 
 ## 2026-05-05 — v0.1 smoke milestone working end-to-end
 
-**What changed:** Implemented `@markbook/core` (`parse.ts` for markdown + `:::story` directive extraction, `build.ts` for Vite MPA orchestration + `llms.txt` emission, `config.ts` for `defineConfig` and adapter typing), the `markbook` CLI (`cac` + `jiti` config loader), and `@markbook/adapter-react` — split into a default browser entry (`mount`) and a `/config` Node entry (`reactAdapter`) per **ADR-0005**. `pnpm example:build` now produces `examples/react-demo/dist/{Button,index}.html`, an `assets/*.js` React bundle (~142 KB), and a `llms.txt`, all served correctly over a static HTTP server.
+**What changed:** Implemented `@doidor/markbook-core` (`parse.ts` for markdown + `:::story` directive extraction, `build.ts` for Vite MPA orchestration + `llms.txt` emission, `config.ts` for `defineConfig` and adapter typing), the `markbook` CLI (`cac` + `jiti` config loader), and `@doidor/markbook-adapter-react` — split into a default browser entry (`mount`) and a `/config` Node entry (`reactAdapter`) per **ADR-0005**. `pnpm example:build` now produces `examples/react-demo/dist/{Button,index}.html`, an `assets/*.js` React bundle (~142 KB), and a `llms.txt`, all served correctly over a static HTTP server.
 
 **Why:** Prove the architectural spine — markdown + `:::story` → Vite-bundled MPA with framework-agnostic mount adapter — works before layering on dev server, search, or more adapters. Validates ADR-0001 (directives), ADR-0002 (Vite), and ADR-0003 (adapter pattern).
 
@@ -27,7 +27,7 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 
 ## 2026-05-05 — llms.txt to spec, Fluent v9 showcase, story portability planned
 
-**What changed:** Three things in one pass. (1) `dist/llms.txt` now follows the llmstxt.org / Fluent format — H1 + blockquote + intro paragraph + flat bullet list of `[Hierarchical/Path](url): description` links pointing at per-page `dist/llms/<path>.txt` files (which contain the source markdown minus story directives). Pages now also mirror their source-tree path under `dist/` (e.g. `dist/components/Button.html`). (2) Added a global wrapper hook to `@markbook/adapter-react` (`reactAdapter({ wrapper: './preview.tsx' })`) and threaded it through `MarkbookAdapter.wrapperModule` + the entry generator so every story is wrapped in the user's chosen provider before mount. (3) Replaced the toy demo with a Fluent UI React v9 showcase covering Button, Input, Switch, Spinner, Avatar, Card, and Tabs, all auto-wrapped in `FluentProvider` via `examples/react-demo/preview.tsx`. Story portability is planned as v0.5 — see new `ROADMAP.md` and **ADR-0006**.
+**What changed:** Three things in one pass. (1) `dist/llms.txt` now follows the llmstxt.org / Fluent format — H1 + blockquote + intro paragraph + flat bullet list of `[Hierarchical/Path](url): description` links pointing at per-page `dist/llms/<path>.txt` files (which contain the source markdown minus story directives). Pages now also mirror their source-tree path under `dist/` (e.g. `dist/components/Button.html`). (2) Added a global wrapper hook to `@doidor/markbook-adapter-react` (`reactAdapter({ wrapper: './preview.tsx' })`) and threaded it through `MarkbookAdapter.wrapperModule` + the entry generator so every story is wrapped in the user's chosen provider before mount. (3) Replaced the toy demo with a Fluent UI React v9 showcase covering Button, Input, Switch, Spinner, Avatar, Card, and Tabs, all auto-wrapped in `FluentProvider` via `examples/react-demo/preview.tsx`. Story portability is planned as v0.5 — see new `ROADMAP.md` and **ADR-0006**.
 
 **Why:** llms.txt was emitting a flat plain-text dump, which contradicted the format the user pointed to. The wrapper hook is what makes "easy on user land" actually work for any real provider-driven library (Fluent, Material, Chakra, theme-ui, …) — without it, every story would have to inline-wrap its provider. Story portability needed an architecture before any code lands; ADR-0006 captures the embed-vs-package split and pins down what becomes user-visible (story IDs, `mount` API).
 
@@ -67,7 +67,7 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 
 ## 2026-05-05 — v0.2 Pagefind search
 
-**What changed:** Added Pagefind to `@markbook/core` deps and a `runPagefind(outDir)` step in `build.ts` that runs after Vite + llms emission. Uses the Node API (`pagefind.createIndex` → `addDirectory` → `writeFiles`) — no shell-out. The HTML template now (a) links `pagefind-ui.css` from the head, (b) replaces the old disabled search input with `<div id="markbook-search-ui">` in the header, (c) adds a `<script src="pagefind/pagefind-ui.js">` + an inline init that calls `new PagefindUI({ element: '#markbook-search-ui', showSubResults: true, resetStyles: false })`, and (d) marks `<article data-pagefind-body>` so only page content is indexed (nav and TOC are excluded). All paths are relative so subdir pages (`components/Button.html`) correctly point at `../pagefind/`. CSS overrides the `--pagefind-ui-*` variables to map Pagefind's UI onto the existing `--mb-*` theme tokens. **ADR-0009** captures the choices.
+**What changed:** Added Pagefind to `@doidor/markbook-core` deps and a `runPagefind(outDir)` step in `build.ts` that runs after Vite + llms emission. Uses the Node API (`pagefind.createIndex` → `addDirectory` → `writeFiles`) — no shell-out. The HTML template now (a) links `pagefind-ui.css` from the head, (b) replaces the old disabled search input with `<div id="markbook-search-ui">` in the header, (c) adds a `<script src="pagefind/pagefind-ui.js">` + an inline init that calls `new PagefindUI({ element: '#markbook-search-ui', showSubResults: true, resetStyles: false })`, and (d) marks `<article data-pagefind-body>` so only page content is indexed (nav and TOC are excluded). All paths are relative so subdir pages (`components/Button.html`) correctly point at `../pagefind/`. CSS overrides the `--pagefind-ui-*` variables to map Pagefind's UI onto the existing `--mb-*` theme tokens. **ADR-0009** captures the choices.
 
 **Why:** Search is the single biggest UX gap in a multi-page docs site. Doing it now (rather than later) means every subsequent demo / component-library experiment is searchable for free. Picking Pagefind's bundled UI over `@pagefind/default-ui` saves a dep and one moving part — the UI files come out of `writeFiles` automatically.
 
@@ -97,7 +97,7 @@ Format: see `CLAUDE.md` for the entry template, or use the `/markbook-log` slash
 
 ## 2026-05-05 — v0.5 story portability (embed mode)
 
-**What changed:** New `markbook bundle [storyId]` CLI command → new `bundleEmbed(config, opts)` in `@markbook/core` (`packages/core/src/embed.ts`). Discovers stories by re-running `parseMarkdown` over every `.md` (with templates correctly applied via the new exported `makeLoadTemplate`), derives a stable kebab-case slug from each story's path relative to `docsDir` (`components/Button/Variants.stories.tsx` → `components-button-variants`), generates a self-mounting Vite library entry per story, and runs `viteBuild` once per slug into `dist/embed/<slug>.js`. The entry script ends with `document.querySelectorAll('[data-markbook-embed="<slug>"]')` and mounts the story (with the configured `wrapper`, if any) into every match. **No externals** (`rollupOptions.external = () => false`) so each bundle is fully self-contained — framework runtime, adapter `mount`, wrapper, story, and transitive deps are all inlined. `define: { 'process.env.NODE_ENV': '"production"' }` + explicit `minify: 'esbuild'` keep React's prod build and strip it down (744 KB → 202 KB per Pixie story; Vue ~100 KB; WC 1.5–1.7 KB). `dist/embed/index.html` is auto-generated as a sandbox listing every bundled story with its `<script type="module">` + `<div data-markbook-embed>` placeholder pair — copy-pasteable into any host page. Refactor: `createContext` and `makeLoadTemplate` are now exported from `build.ts` (internal use, not from `core/index.ts`) so `embed.ts` can reuse them. New root scripts: `example:bundle`, `example:vue:bundle`, `example:wc:bundle`. **ADR-0012** captures the design.
+**What changed:** New `markbook bundle [storyId]` CLI command → new `bundleEmbed(config, opts)` in `@doidor/markbook-core` (`packages/core/src/embed.ts`). Discovers stories by re-running `parseMarkdown` over every `.md` (with templates correctly applied via the new exported `makeLoadTemplate`), derives a stable kebab-case slug from each story's path relative to `docsDir` (`components/Button/Variants.stories.tsx` → `components-button-variants`), generates a self-mounting Vite library entry per story, and runs `viteBuild` once per slug into `dist/embed/<slug>.js`. The entry script ends with `document.querySelectorAll('[data-markbook-embed="<slug>"]')` and mounts the story (with the configured `wrapper`, if any) into every match. **No externals** (`rollupOptions.external = () => false`) so each bundle is fully self-contained — framework runtime, adapter `mount`, wrapper, story, and transitive deps are all inlined. `define: { 'process.env.NODE_ENV': '"production"' }` + explicit `minify: 'esbuild'` keep React's prod build and strip it down (744 KB → 202 KB per Pixie story; Vue ~100 KB; WC 1.5–1.7 KB). `dist/embed/index.html` is auto-generated as a sandbox listing every bundled story with its `<script type="module">` + `<div data-markbook-embed>` placeholder pair — copy-pasteable into any host page. Refactor: `createContext` and `makeLoadTemplate` are now exported from `build.ts` (internal use, not from `core/index.ts`) so `embed.ts` can reuse them. New root scripts: `example:bundle`, `example:vue:bundle`, `example:wc:bundle`. **ADR-0012** captures the design.
 
 **Why:** This is the most novel feature on the roadmap and the one the user flagged earliest. Embedding component stories on external pages (marketing sites, blog posts, partner docs) without an iframe means the story renders inline, inherits page typography, accepts shadow-host theming, and weighs whatever the framework requires — *no more*. The fact that the WC bundle is 1.5 KB while the Pixie/React bundle is 200 KB is the architecture working as intended: each adapter's runtime cost is paid only when used. Doing this through Vite's library mode (rather than rolling our own bundler) means we get tree-shaking, ESM output, CSS extraction, and source maps with one config object.
 
@@ -137,7 +137,7 @@ Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 
 
 **What changed:** Two pieces of validation infrastructure that were missing.
 
-**Tests.** Added Vitest as a devDep to `@markbook/core`, wrote 37 tests across 5 files co-located with the modules they cover: `template.test.ts` (substitution, dot paths, missing keys, non-string values), `parse.test.ts` (frontmatter, story directives, `id=` slug override, `export=` default, headings + slugs, template-application, plainMarkdown stripping, props placeholder, title fallback to first H1), `code.test.ts` (missing-file null, full-source + Shiki output, `.ts` vs `.tsx` lang), `build.test.ts` (`capitalize`, `isIndexHref`, `sortIndexFirst` including nested-index handling and non-mutation), `embed.test.ts` (`slugify` — slashes, special chars, dash collapsing, Windows backslashes). Internals needed for tests are now exported (`sortIndexFirst`, `isIndexHref`, `capitalize`, `NavItem`, `NavGroup`, `slugify`). `tsconfig.json` excludes `*.test.ts` from `tsc -b` output. Root script `pnpm test` runs the suite — completes in ~1 s.
+**Tests.** Added Vitest as a devDep to `@doidor/markbook-core`, wrote 37 tests across 5 files co-located with the modules they cover: `template.test.ts` (substitution, dot paths, missing keys, non-string values), `parse.test.ts` (frontmatter, story directives, `id=` slug override, `export=` default, headings + slugs, template-application, plainMarkdown stripping, props placeholder, title fallback to first H1), `code.test.ts` (missing-file null, full-source + Shiki output, `.ts` vs `.tsx` lang), `build.test.ts` (`capitalize`, `isIndexHref`, `sortIndexFirst` including nested-index handling and non-mutation), `embed.test.ts` (`slugify` — slashes, special chars, dash collapsing, Windows backslashes). Internals needed for tests are now exported (`sortIndexFirst`, `isIndexHref`, `capitalize`, `NavItem`, `NavGroup`, `slugify`). `tsconfig.json` excludes `*.test.ts` from `tsc -b` output. Root script `pnpm test` runs the suite — completes in ~1 s.
 
 **Embed-host example.** New `examples/embed-host/` workspace with three static HTML pages — `index.html` (landing with workflow docs), `embed.html` (`<script type="module">` + placeholder div consuming the React demo's embed bundle), `package.html` (importmap + `import { mount }` + manual call consuming the package bundle, with React/ReactDOM pulled from esm.sh). Served via `pnpm example:embed-host:serve` (Python http.server rooted at `examples/` so the host pages can resolve `../react-demo/dist/{embed,packages}/...` paths). README walks the user through the workflow.
 
@@ -153,7 +153,7 @@ Bundle math after the v0.5.1 changes: package-mode React story = **3.5 KB** (vs 
 
 1. **`parameters`** (all 3 adapters). A story can export `parameters: { layout?: 'centered' | 'fullscreen' | 'padded'; background?: string }`. Each adapter's `mount` applies them to the placeholder element before mounting (toggles a `markbook-story--<layout>` class, sets `style.background`). New CSS rules cover the three layout presets.
 2. **`args`** (React + Vue). A story can export `args: object` (initial prop values) and write its default export as a render function `(args) => …`. The adapter passes args to the renderer (`createElement(story, args)` for React, `createApp(story, args)` for Vue). Re-mounting with mutated args triggers React reconciliation / Vue re-render — props update without unmounting, so component state is preserved.
-3. **Interactive controls** (React only for v0.7). New `setupControls(controlsEl, args, argTypes, onChange)` exported from `@markbook/adapter-react`. Builds DOM controls (text / number / checkbox / select) into a placeholder `<div data-markbook-controls="<id>">` that's now emitted next to every story. The entry generator wires up the controls when a story exports `args`. Optional `argTypes` controls input type per key; otherwise the type is inferred from the runtime arg value.
+3. **Interactive controls** (React only for v0.7). New `setupControls(controlsEl, args, argTypes, onChange)` exported from `@doidor/markbook-adapter-react`. Builds DOM controls (text / number / checkbox / select) into a placeholder `<div data-markbook-controls="<id>">` that's now emitted next to every story. The entry generator wires up the controls when a story exports `args`. Optional `argTypes` controls input type per key; otherwise the type is inferred from the runtime arg value.
 
 The entry generator switched to `import * as story_<i>_mod` so `args` / `argTypes` / `parameters` can be read at runtime without TS-AST work. Rollup's `MISSING_EXPORT` warning is silenced via `onwarn` in build / embed / package — namespace imports of optional exports are intentional. `MarkbookAdapter.hasControls?: boolean` (React `true`, Vue / WC `false`) determines whether the entry generator imports `setupControls` and emits the wiring. **ADR-0015** captures the design.
 
@@ -251,7 +251,7 @@ Tests: 14 new exports.test.ts cases (PascalCase / kebab / humanize, type-only fi
 
 **Why:** "Auto-list every story export from a `.stories.tsx`" had been pinned as a future enhancement in the v0.1 templates entry. The CSF idiom is what every Storybook user reaches for first; the existing one-story-per-file convention works but multiplies file count for a component library with many small variants. `:::stories` keeps the markdown-first architecture (the directive is the source of truth, exports just fan out) while collapsing N tiny story files into one — a four-export Avatar dropped from four `.stories.tsx` files plus four singleton directives in the markdown to one file plus one directive. The conservative CSF detection (requires metadata, not just `render`) was the rubber-duck-flagged blind spot that would have broken every Vue defineComponent story; the slug-always-promote rule (rather than promote-when-ambiguous) was the second flagged footgun. Both were caught before any code landed.
 
-**Next:** API surface audit of `@markbook/core` (which exports are public vs. test-only) → user-facing READMEs → CI workflow. v1.0 freeze still deferred per the user — more features may land first.
+**Next:** API surface audit of `@doidor/markbook-core` (which exports are public vs. test-only) → user-facing READMEs → CI workflow. v1.0 freeze still deferred per the user — more features may land first.
 
 ---
 
@@ -259,7 +259,7 @@ Tests: 14 new exports.test.ts cases (PascalCase / kebab / humanize, type-only fi
 
 **What changed:** Three smaller pieces shipped together as the "make Markbook discoverable" pass before any v1.0 freeze.
 
-1. **`@markbook/core` public API audit.** Pruned `packages/core/src/index.ts` to the five things actually needed by consumers (`defineConfig`, `build`, `dev`, `bundleEmbed` and the matching types `MarkbookConfig`, `MarkbookAdapter`, `BundleEmbedOptions`, `BundleMode`, `BundleIsolation`). Everything else moved behind a new `@markbook/core/internal` subpath (`packages/core/src/internal.ts` re-exports parser, code/props extractors, template, exports discovery, nav/build helpers, slugify). `package.json` `exports` map adds the `./internal` entry, and `tsc -b` emits `dist/internal.d.ts` + `dist/internal.js`. Tests already imported directly from source modules so nothing in the suite needed updating. The split is documented by header comments in both files: `index.ts` is the stable contract; `/internal` may change in any minor release.
+1. **`@doidor/markbook-core` public API audit.** Pruned `packages/core/src/index.ts` to the five things actually needed by consumers (`defineConfig`, `build`, `dev`, `bundleEmbed` and the matching types `MarkbookConfig`, `MarkbookAdapter`, `BundleEmbedOptions`, `BundleMode`, `BundleIsolation`). Everything else moved behind a new `@doidor/markbook-core/internal` subpath (`packages/core/src/internal.ts` re-exports parser, code/props extractors, template, exports discovery, nav/build helpers, slugify). `package.json` `exports` map adds the `./internal` entry, and `tsc -b` emits `dist/internal.d.ts` + `dist/internal.js`. Tests already imported directly from source modules so nothing in the suite needed updating. The split is documented by header comments in both files: `index.ts` is the stable contract; `/internal` may change in any minor release.
 
 2. **READMEs.** Authored six READMEs that didn't exist before: repo root (overview, hello-world, workspace layout, scripts), `packages/cli` (the three commands with flags and exit codes), `packages/core` (directives — including the new `:::stories`, frontmatter reference, full `MarkbookConfig` shape, adapter contract, story-file conventions, `--mb-*` theme token table, DOM contract for `disableBaseCss`), `packages/adapter-react` (decorators, controls, shadow isolation, direct mount API), `packages/adapter-vue` (Vue decorator slot model, CSF object support, caveats vs. React), `packages/adapter-wc` (string/Node/function story forms, tiny bundle sizes, args-not-passed caveat). Each README was double-checked against the actual source (`mount` signatures, adapter options) and corrected where my memory of the code didn't match (adapter-vue *does* support decorators; adapter-wc does *not* pass args into function stories — both initially miscaptured).
 
@@ -385,7 +385,7 @@ Tests: 7 new in `playground.test.ts` covering descriptor count per provider conf
 
 **What changed:** The CodeSandbox playground button shipped in the earlier playground commit was producing `"Unable to process params for /define"` for every story. Root cause: I'd used the legacy `?json=1` query mode (plain URL-encoded JSON), which is deprecated and no longer accepted by the live `/api/v1/sandboxes/define` endpoint. Verified by curl that even an absolute-minimal payload (single `index.js` file) returns the error with `?json=1`, while the same payload LZ-string-compressed and base64-url-encoded returns a 302 redirect to a real sandbox URL.
 
-Fix: added `lz-string` (1.5.0, ~10 KB minified) as a dependency of `@markbook/core`; `buildCodeSandboxDescriptor` in `packages/core/src/playground.ts` now compresses the JSON payload with `LZString.compressToBase64`, then URL-safe-transforms it (`+ → -`, `/ → _`, strip `=`). The form `action` reverts to `https://codesandbox.io/api/v1/sandboxes/define` (no query mode). Updated the corresponding tests in `playground.test.ts` to decode-and-assert via `LZString.decompressFromBase64`.
+Fix: added `lz-string` (1.5.0, ~10 KB minified) as a dependency of `@doidor/markbook-core`; `buildCodeSandboxDescriptor` in `packages/core/src/playground.ts` now compresses the JSON payload with `LZString.compressToBase64`, then URL-safe-transforms it (`+ → -`, `/ → _`, strip `=`). The form `action` reverts to `https://codesandbox.io/api/v1/sandboxes/define` (no query mode). Updated the corresponding tests in `playground.test.ts` to decode-and-assert via `LZString.decompressFromBase64`.
 
 Verified end-to-end: rebuilt the React demo and curl'd the first button's payload against the live endpoint — `302 → https://codesandbox.io/s/gq2v2x` (a working sandbox). All 76 unit tests still pass. The StackBlitz provider was unaffected (POST form fields aren't compressed).
 
@@ -709,7 +709,7 @@ To make integration testable, `writePages` was promoted from private to `export`
 - The shipped skills directory contains exactly the canonical set (`add-component-page`, `bulk-generate`, `bundle-story`, `init`, `layout`, `style`). Adding/removing a shipped skill now requires updating the test, preventing accidental removals.
 - Every shipped `SKILL.md` has the required frontmatter (`name`, `description`, `trigger`, `allowed-tools`). Catches malformed skills before they ship.
 
-**Totals:** 158 in `@markbook/core` (was 113) + 21 in `markbook` CLI (was 19) = **179 tests**, all passing. The four-layer customization story (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) is now exercised at the unit, integration, and CLI-distribution levels.
+**Totals:** 158 in `@doidor/markbook-core` (was 113) + 21 in `markbook` CLI (was 19) = **179 tests**, all passing. The four-layer customization story (`css` / `disableBaseCss` / `layoutsDir` / `transformHtml`) is now exercised at the unit, integration, and CLI-distribution levels.
 
 ### 2. New user-facing skill: `markbook-layout`
 
@@ -813,7 +813,7 @@ After:
 
 Per-regeneration cost on the marketing demo (5 pages): ~80ms total for emitLlms + runPagefind on top of writePages. Console output unchanged (Pagefind is silent).
 
-Both `emitLlms` and `runPagefind` are now exported (also via `@markbook/core/internal`) for advanced consumers building their own pipelines, with TSDoc notes that they're called automatically by `build()`/`dev()`.
+Both `emitLlms` and `runPagefind` are now exported (also via `@doidor/markbook-core/internal`) for advanced consumers building their own pipelines, with TSDoc notes that they're called automatically by `build()`/`dev()`.
 
 ### 2. Marketing demo: `llmsButtons: false` removed; page actions styled
 
@@ -830,7 +830,7 @@ The layout's `{{ pageActions }}` placeholder is in the same position it was befo
 - `config.title` populates the H1 of `llms.txt`.
 - `writePages` alone emits per-page mirrors (used by both build and dev), but does NOT emit the top-level index (only `emitLlms` does that).
 
-Total: 161 tests in `@markbook/core` (was 158) + 21 in `markbook` CLI = **182 tests**. All green.
+Total: 161 tests in `@doidor/markbook-core` (was 158) + 21 in `markbook` CLI = **182 tests**. All green.
 
 ### Documentation
 
@@ -905,7 +905,7 @@ Verified: search input, results dropdown, highlighting, and clear button all sit
 
 ### Tests + lint
 
-- 162 tests in `@markbook/core` (was 161, +1 for the heading-anchor markup) + 21 in `markbook` CLI = 183 total. All green.
+- 162 tests in `@doidor/markbook-core` (was 161, +1 for the heading-anchor markup) + 21 in `markbook` CLI = 183 total. All green.
 - Lint clean (2 pre-existing `noImportantStyles` warnings on `examples/embed-host/shadow.html`).
 - All 5 example demos still build.
 
@@ -950,7 +950,7 @@ Fixes in `cumulus.css`:
 
 - `pnpm example:marketing:build` produces a fresh Pagefind index; decompressing fragments confirms `Containers#` is absent everywhere (only `Containers` indexed).
 - `<input>` and `.pagefind-ui__drawer` both carry `border-radius: 12px` in the generated CSS.
-- Lint clean (no `!important`); 162 tests in `@markbook/core` (unchanged); all 5 example demos build.
+- Lint clean (no `!important`); 162 tests in `@doidor/markbook-core` (unchanged); all 5 example demos build.
 
 **Why:** Search is the most-touched UI element on a docs/marketing site after the page content itself. Subtle misalignments (mismatched radii, weak hierarchy, polluted snippets) accumulate into "this site feels janky." Fixing them is high-leverage polish.
 
@@ -1087,7 +1087,7 @@ Sitemap: https://example.com/sitemap.xml
 
 `index.html` collapses to its directory URL (`https://example.com/` instead of `.../index.html`) for cleaner canonical form. All URLs go through `escapeXml()` to handle edge characters safely. Skipped entirely when `siteUrl` is unset (sitemap spec requires absolute URLs).
 
-`emitSitemapAndRobots`, `emitLlms`, `runPagefind`, and `normalizeSiteUrl` are all exported (also via `@markbook/core/internal`) for advanced consumers.
+`emitSitemapAndRobots`, `emitLlms`, `runPagefind`, and `normalizeSiteUrl` are all exported (also via `@doidor/markbook-core/internal`) for advanced consumers.
 
 #### Marketing-demo: opt-in SEO
 
@@ -1454,7 +1454,7 @@ Six worked examples now (react, vue, wc, static, marketing, markbook-site) cover
 ### Public API
 
 ```ts
-import { defineConfig, escapeAttribute } from '@markbook/core';
+import { defineConfig, escapeAttribute } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {
@@ -1577,7 +1577,7 @@ Markbook's CLI loads `markbook.config.ts` through [jiti](https://github.com/unjs
 
 ```ts
 // markbook.config.ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 import { callout } from './directives/callout.js';
 import { youtube } from './directives/youtube.js';
 
@@ -1588,7 +1588,7 @@ export default defineConfig({
 
 ```ts
 // directives/callout.ts
-import { escapeAttribute, type DirectiveHandler } from '@markbook/core';
+import { escapeAttribute, type DirectiveHandler } from '@doidor/markbook-core';
 
 const VALID_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
 
@@ -1648,7 +1648,7 @@ Plus a bottom-of-page "References" link in the custom-directives guide pointing 
 
 ## 2026-05-09 — htmlTemplate helper: directive output from HTML files
 
-**What changed:** Added `htmlTemplate(source)` to `@markbook/core`. Returns a `(vars) => string` renderer that loads an `.html` file once (cached, lazy-sync), then does `{{ key }}` / `{{ key.dot.path }}` substitution from a vars map. Missing keys render empty; values insert raw (no auto-escape — call `escapeHtml`/`escapeAttribute` yourself, matching Markbook's layout-placeholder contract); HTML comments are preserved so `{{ }}` inside them stays literal. 12 tests cover substitution, dot-path drilldown, missing-key handling, comment protection, file-not-found error, cache sharing, URL + absolute-string source forms, and whitespace tolerance. Demoed in `examples/markbook-site/directives/callout.{ts,html}` — the callout handler now `htmlTemplate(new URL('./callout.html', import.meta.url))` and just calls `render({ type, content })`. Custom-directives guide gets a "Templates in HTML files" section; reference doc + core README reference it.
+**What changed:** Added `htmlTemplate(source)` to `@doidor/markbook-core`. Returns a `(vars) => string` renderer that loads an `.html` file once (cached, lazy-sync), then does `{{ key }}` / `{{ key.dot.path }}` substitution from a vars map. Missing keys render empty; values insert raw (no auto-escape — call `escapeHtml`/`escapeAttribute` yourself, matching Markbook's layout-placeholder contract); HTML comments are preserved so `{{ }}` inside them stays literal. 12 tests cover substitution, dot-path drilldown, missing-key handling, comment protection, file-not-found error, cache sharing, URL + absolute-string source forms, and whitespace tolerance. Demoed in `examples/markbook-site/directives/callout.{ts,html}` — the callout handler now `htmlTemplate(new URL('./callout.html', import.meta.url))` and just calls `render({ type, content })`. Custom-directives guide gets a "Templates in HTML files" section; reference doc + core README reference it.
 
 **Why:** Closes a real pain point with `config.directives`: even moderately structured output (multi-line markup with classes/aria attributes) is awkward inside JS template literals — no syntax highlighting, no formatter, mixed JSX-vs-HTML mental model. With `htmlTemplate`, the markup goes in a `.html` file (editor highlights it; designers can edit without touching handler logic) and the handler just maps validated values to placeholders. Sync-load-once-cached is cheaper than async-per-call given handlers fire many times per build, and the cache is module-keyed-by-absolute-path so two `htmlTemplate(samePath)` calls share one read.
 
@@ -1704,9 +1704,9 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 
 ---
 
-## 2026-06-05 — DRY/KISS pass across `packages/` + `build.ts` split + `@markbook/adapter-shared`
+## 2026-06-05 — DRY/KISS pass across `packages/` + `build.ts` split + `@doidor/markbook-adapter-shared`
 
-**What changed:** Consolidated ~9 duplicated HTML-escapers onto `directive-utils`' canonical `escapeHtml`/`escapeAttribute`; extracted shared internals in `@markbook/core` (`ts-utils.ts` for `pickScriptKind`/`hasExportModifier`/a new AST `extractModuleSpecifiers`, `placeholder.ts` for `stringify`/`getDotPath`/comment-protection, `code-block.ts` for the Shiki config + copy button, `entry-runtime.ts` for the CSF helper string); reused `resolve.ts`'s `isPathLikeSpec`; split the 2255-line `build.ts` into focused modules (`assets.ts`, `pagefind.ts`, `nav.ts`, `llms.ts`, `sitemap.ts`, `render.ts`) with `build.ts` (now 908 lines) kept as a re-export façade so `internal.ts` stays stable; de-duplicated the three adapters' browser runtime into a new pure-DOM `@markbook/adapter-shared` package. 256 core + 21 CLI tests green (added an apostrophe-escaping test); all seven example builds + embed/package bundles pass.
+**What changed:** Consolidated ~9 duplicated HTML-escapers onto `directive-utils`' canonical `escapeHtml`/`escapeAttribute`; extracted shared internals in `@doidor/markbook-core` (`ts-utils.ts` for `pickScriptKind`/`hasExportModifier`/a new AST `extractModuleSpecifiers`, `placeholder.ts` for `stringify`/`getDotPath`/comment-protection, `code-block.ts` for the Shiki config + copy button, `entry-runtime.ts` for the CSF helper string); reused `resolve.ts`'s `isPathLikeSpec`; split the 2255-line `build.ts` into focused modules (`assets.ts`, `pagefind.ts`, `nav.ts`, `llms.ts`, `sitemap.ts`, `render.ts`) with `build.ts` (now 908 lines) kept as a re-export façade so `internal.ts` stays stable; de-duplicated the three adapters' browser runtime into a new pure-DOM `@doidor/markbook-adapter-shared` package. 256 core + 21 CLI tests green (added an apostrophe-escaping test); all seven example builds + embed/package bundles pass.
 
 **Why:** The adapters' mount plumbing had already drifted between copies, `build.ts` mixed ~8 concerns plus ~600 lines of inline CSS/JS, and escaping/AST/template helpers were copy-pasted across the engine — all maintenance traps. See ADR-0026 for the shared-adapter-package rationale.
 
@@ -1716,7 +1716,7 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 
 ## 2026-06-05 — clean lint + build-independent typecheck
 
-**What changed:** Suppressed the intentional `!important` host-page reset in `examples/embed-host/shadow.html` with a scoped `biome-ignore` (it demonstrates shadow-DOM isolation, so it must stay) and removed two now-ineffective `noExplicitAny` suppression comments in `fenced-code.ts` — `pnpm lint` is now fully clean (0 errors, 0 warnings). Separately, gave the four downstream packages a `tsconfig.typecheck.json` (extending a new root `tsconfig.typecheck.base.json`) that maps `@markbook/core` / `@markbook/adapter-shared` to source with `noEmit` and no `rootDir`, so `pnpm typecheck` now passes from a clean checkout with no `dist/` present. The emit build (`tsc -b`) configs are untouched.
+**What changed:** Suppressed the intentional `!important` host-page reset in `examples/embed-host/shadow.html` with a scoped `biome-ignore` (it demonstrates shadow-DOM isolation, so it must stay) and removed two now-ineffective `noExplicitAny` suppression comments in `fenced-code.ts` — `pnpm lint` is now fully clean (0 errors, 0 warnings). Separately, gave the four downstream packages a `tsconfig.typecheck.json` (extending a new root `tsconfig.typecheck.base.json`) that maps `@doidor/markbook-core` / `@doidor/markbook-adapter-shared` to source with `noEmit` and no `rootDir`, so `pnpm typecheck` now passes from a clean checkout with no `dist/` present. The emit build (`tsc -b`) configs are untouched.
 
 **Why:** `pnpm lint` was red on a pre-existing example, and `pnpm typecheck` silently depended on a prior build (it only passed because stale `dist/` lingered) — CI runs typecheck before build, so a truly clean run would have failed. See ADR-0027.
 
@@ -1726,8 +1726,18 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 
 ## 2026-06-06 — remove Vue + WC adapters; React is the only shipped adapter
 
-**What changed:** Deleted `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`, and refreshed the lockfile (−13 packages). Kept `@markbook/adapter-react` + `@markbook/adapter-shared`. Dropped the Vue/WC steps from `.github/workflows/ci.yml`, the `example:vue:*`/`example:wc:*` scripts from root `package.json`, and the two entries from `scripts/examples-dev.mjs`. Rewrote every "three adapters" claim to "React-only, Vue/WC planned" across the root `README.md`, the docsite (`examples/markbook-site` index + getting-started + adding-stories + config description), the agent harness (`AGENTS.md`, `.copilot/skills/verify-build`, `.copilot/skills/bundle-story`, `.copilot/rules/core-no-framework`, `.copilot/skills/add-stories`), `ROADMAP.md`, the published CLI skills (`init`, `bulk-generate`, `add-component-page`), and in-source comments (`core/src/{config,build,entry-runtime}.ts`, `adapter-shared`). Added ADR-0028.
+**What changed:** Deleted `packages/adapter-vue`, `packages/adapter-wc`, `examples/vue-demo`, and `examples/wc-demo`, and refreshed the lockfile (−13 packages). Kept `@doidor/markbook-adapter-react` + `@doidor/markbook-adapter-shared`. Dropped the Vue/WC steps from `.github/workflows/ci.yml`, the `example:vue:*`/`example:wc:*` scripts from root `package.json`, and the two entries from `scripts/examples-dev.mjs`. Rewrote every "three adapters" claim to "React-only, Vue/WC planned" across the root `README.md`, the docsite (`examples/markbook-site` index + getting-started + adding-stories + config description), the agent harness (`AGENTS.md`, `.copilot/skills/verify-build`, `.copilot/skills/bundle-story`, `.copilot/rules/core-no-framework`, `.copilot/skills/add-stories`), `ROADMAP.md`, the published CLI skills (`init`, `bulk-generate`, `add-component-page`), and in-source comments (`core/src/{config,build,entry-runtime}.ts`, `adapter-shared`). Added ADR-0028.
 
 **Why:** Only the React adapter was ever first-class (props tables, controls, decorators were React-centric); listing three adapters as if production-ready overstated reality and was a recurring documentation-drift trap. See ADR-0028. User requested the removal with the React-only status surfaced in the harness, the README, and the docsite.
 
-**Next:** Rebuild the Vue + Web Components adapters against the unchanged `MarkbookAdapter` contract (each consuming `@markbook/adapter-shared`) when prioritized — tracked as a single deferred item in `ROADMAP.md`.
+**Next:** Rebuild the Vue + Web Components adapters against the unchanged `MarkbookAdapter` contract (each consuming `@doidor/markbook-adapter-shared`) when prioritized — tracked as a single deferred item in `ROADMAP.md`.
+
+---
+
+## 2026-06-08 — re-scope packages to `@doidor/markbook*` for npm publishing
+
+**What changed:** Renamed all four packages for publishing — `markbook` → `@doidor/markbook`, `@markbook/core` → `@doidor/markbook-core`, `@markbook/adapter-react` → `@doidor/markbook-adapter-react`, `@markbook/adapter-shared` → `@doidor/markbook-adapter-shared` (51 files: package manifests, all `@markbook/*` source imports incl. `reactAdapter().packageName`, `tsconfig.typecheck.base.json` path maps, example deps, CI, and docs/skills). Added publish metadata to each manifest (`publishConfig.access: public`, `license`, `repository.directory`, `homepage`, `bugs`, `keywords`), a bundled `LICENSE` (MIT) per package + repo root, and bumped `0.0.0 → 0.1.0`. The CLI `bin` stays `markbook`; private example/site packages keep their `@markbook/*` names. Verified: lint, typecheck, 256+21 tests, all package builds, the React demo build + embed bundle, static/marketing/site builds, and `pnpm pack` (confirms `workspace:*` rewrites to `0.1.0` and LICENSE/README/dist are included).
+
+**Why:** To publish Markbook on npm. The bare `markbook` name is taken and the `@markbook` scope isn't owned, so everything moves under the maintainer's `@doidor` scope. See ADR-0029.
+
+**Next:** Maintainer runs `npm login`, then `pnpm --filter <pkg> publish --access public` in dependency order (adapter-shared → core → adapter-react → CLI). Consider adding Changesets for future version management.
