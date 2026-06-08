@@ -61,24 +61,31 @@ provenance requires a public source repo).
 
 ## Cutting a release
 
-1. Bump all four package versions in lockstep (no git tag yet):
+> **Order matters: bump → commit → *then* create the Release.** The Git tag must
+> point at the commit that already contains the bumped versions. The workflow
+> fails fast if the tag (`v0.2.0`) and the package versions (`0.2.0`) disagree.
+
+1. Bump all four packages in lockstep (edits `package.json` only — no commit, no
+   tag):
 
    ```bash
-   pnpm --filter "./packages/*" exec npm version <new-version> --no-git-tag-version
-   # e.g. ... npm version 0.2.0 --no-git-tag-version
+   pnpm release:version <new-version>
+   # e.g. pnpm release:version 0.2.0
    ```
 
-2. Commit the version bump and open/merge a PR to `main`:
+2. Commit the version bump and get it onto `main` (directly or via a merged PR):
 
    ```bash
    git commit -am "chore(release): v<new-version>"
+   git push
    ```
 
-3. Create a **GitHub Release** whose tag is `v<new-version>` (e.g. `v0.2.0`),
-   targeting `main`. Publishing the Release triggers the workflow.
+3. **Only now** create a **GitHub Release** whose tag is `v<new-version>` (e.g.
+   `v0.2.0`), targeting `main` — so the tag lands on the bump commit. Publishing
+   the Release triggers the workflow.
 
    ```bash
-   gh release create v<new-version> --generate-notes
+   gh release create v<new-version> --generate-notes --target main
    ```
 
 The workflow verifies the tag matches the package version, runs
@@ -87,6 +94,19 @@ lint → typecheck → build → test, then `pnpm -r publish --access public
 `workspace:*` to the concrete version, skips private packages (the repo root and
 the `examples/*`), and skips any version already on the registry — so re-running a
 release is safe.
+
+## Recovering from a "tag does not match version" failure
+
+If you tagged/released **before** bumping (so `v0.2.0` points at a `0.1.x`
+commit), the tag-check fails. Re-running won't help until the tag points at a
+bumped commit. Fix it by bumping, then re-pointing the release:
+
+```bash
+pnpm release:version 0.2.0
+git commit -am "chore(release): v0.2.0" && git push
+gh release delete v0.2.0 --yes --cleanup-tag   # drops the stale tag
+gh release create v0.2.0 --generate-notes --target main
+```
 
 ## Testing the workflow without publishing
 
