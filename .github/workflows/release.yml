@@ -1,15 +1,19 @@
 name: Release
 
-# Publishes the @doidor/markbook* packages to npm.
+# Publishes the @doidor/markbook* packages to npm via OIDC trusted publishing.
 #
 # Trigger: publish a GitHub Release whose tag is `v<version>` (e.g. v0.1.0).
 # The tag must match the version in the package manifests (bump + commit the
 # versions first, then tag/release). `workflow_dispatch` is available for a
 # manual run, with an optional dry-run that packs without publishing.
 #
-# Auth: a classic-or-granular npm **automation** token stored as the repo
-# secret `NPM_TOKEN`. Provenance attestations are emitted (`--provenance`),
-# which requires this public repo + the `id-token: write` permission below.
+# Auth: npm **trusted publishing** (OIDC) — no stored token. Each package must
+# have a trusted publisher configured on npmjs.com pointing at this repo and
+# this workflow file (release.yml). See RELEASING.md. Note: the FIRST publish of
+# a brand-new package can't use OIDC (npm blocks it) — bootstrap it once with a
+# token, then every release after that flows through here. Provenance
+# attestations are emitted (`--provenance`); the public repo + `id-token: write`
+# below make that work.
 
 on:
   release:
@@ -30,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # OIDC token for npm trusted publishing + provenance
     steps:
       - uses: actions/checkout@v6
 
@@ -43,6 +47,12 @@ jobs:
           node-version: 20
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing requires npm CLI >= 11.5.1, but Node 20 bundles an
+      # older npm. `pnpm publish` delegates the actual upload to the npm on
+      # PATH, so upgrading npm here is what enables the OIDC token exchange.
+      - name: Upgrade npm (>= 11.5.1 for trusted publishing)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -75,10 +85,10 @@ jobs:
       # `pnpm -r publish` walks the workspace in dependency order, rewrites
       # `workspace:*` to the concrete version, skips private packages (root +
       # examples), and skips any version already on the registry — so re-running
-      # a release is safe/idempotent.
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # a release is safe/idempotent. Auth is OIDC (trusted publishing): no
+      # token is set, npm exchanges the GitHub OIDC token for a short-lived
+      # publish credential.
+      - name: Publish to npm (OIDC trusted publishing)
         run: |
           EXTRA=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry-run }}" = "true" ]; then
