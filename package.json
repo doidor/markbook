@@ -15,6 +15,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format . --write",
+    "release:version": "node scripts/bump-version.mjs",
     "prepare": "husky",
     "example:build": "pnpm --filter @markbook/example-react-demo build",
     "example:dev": "pnpm --filter @markbook/example-react-demo dev",
