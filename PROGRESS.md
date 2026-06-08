@@ -1741,3 +1741,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** To publish Markbook on npm. The bare `markbook` name is taken and the `@markbook` scope isn't owned, so everything moves under the maintainer's `@doidor` scope. See ADR-0029.
 
 **Next:** Maintainer runs `npm login`, then `pnpm --filter <pkg> publish --access public` in dependency order (adapter-shared → core → adapter-react → CLI). Consider adding Changesets for future version management.
+
+---
+
+## 2026-06-08 — CI npm publishing on GitHub Release
+
+**What changed:** Added `.github/workflows/release.yml` — publishes the four `@doidor/markbook*` packages to npm when a GitHub Release (tag `v<version>`) is published (plus a `workflow_dispatch` with a dry-run toggle). The job installs with `--frozen-lockfile`, verifies the release tag matches the package version, runs lint → typecheck → build → test, then `pnpm -r publish --access public --no-git-checks --provenance` (topological order, rewrites `workspace:*`, skips private + already-published versions). Auth is an `NPM_TOKEN` automation secret; provenance attestations use `id-token: write` (repo is public). Added `RELEASING.md` runbook and wired it into `AGENTS.md` (directory map + "Where to look first").
+
+**Why:** The user wants releases published through GitHub Actions rather than a manual `npm publish`. See ADR-0029 for the `@doidor` scope decision.
+
+**Next:** Maintainer adds the `NPM_TOKEN` repo secret, then cuts the first release (`v0.1.0`). A `pnpm pack` dry-run confirmed `--provenance` is accepted by the pinned pnpm@8.15.9 and that the tarballs are clean. Optional later: Changesets for automated version PRs + changelogs.
