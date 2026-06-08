@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": ["@changesets/changelog-github", { "repo": "doidor/markbook" }],
+  "commit": false,
+  "fixed": [
+    [
+      "@doidor/markbook",
+      "@doidor/markbook-core",
+      "@doidor/markbook-adapter-react",
+      "@doidor/markbook-adapter-shared"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

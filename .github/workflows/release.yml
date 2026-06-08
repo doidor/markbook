@@ -1,44 +1,42 @@
 name: Release
 
-# Publishes the @doidor/markbook* packages to npm via OIDC trusted publishing.
+# Automatic version bumping + npm publish via Changesets, using TOKENLESS OIDC
+# (npm Trusted Publishing) — no NPM_TOKEN secret required.
 #
-# Trigger: publish a GitHub Release whose tag is `v<version>` (e.g. v0.1.0).
-# The tag must match the version in the package manifests (bump + commit the
-# versions first, then tag/release). `workflow_dispatch` is available for a
-# manual run, with an optional dry-run that packs without publishing.
+# On push to main, Changesets opens/updates a "Version Packages" PR that bumps
+# the four @doidor/markbook* packages in lockstep (`fixed` group in
+# .changeset/config.json) and updates each package's CHANGELOG.md. Merging that
+# PR publishes them to npm via OIDC, with automatic provenance.
 #
-# Auth: npm **trusted publishing** (OIDC) — no stored token. Each package must
-# have a trusted publisher configured on npmjs.com pointing at this repo and
-# this workflow file (release.yml). See RELEASING.md. Note: the FIRST publish of
-# a brand-new package can't use OIDC (npm blocks it) — bootstrap it once with a
-# token, then every release after that flows through here. Provenance
-# attestations are emitted (`--provenance`); the public repo + `id-token: write`
-# below make that work.
-
+# One-time setup (see RELEASING.md):
+#   1. Configure a Trusted Publisher for EACH of the four packages on npmjs.com
+#      → Package → Settings → Trusted Publisher → GitHub Actions:
+#      owner `doidor`, repo `markbook`, workflow `release.yml`.
+#   2. Settings → Actions → General → Workflow permissions → enable
+#      "Allow GitHub Actions to create and approve pull requests".
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      dry-run:
-        description: 'Pack everything but do not actually publish'
-        type: boolean
-        default: false
 
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: write # push the version PR branch + release tags
+  pull-requests: write # open/update the "Version Packages" PR
+  id-token: write # tokenless npm publish via OIDC (trusted publishing) + automatic provenance
+
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # OIDC token for npm trusted publishing + provenance
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      # pnpm version is read from the root package.json "packageManager" field;
+      # pnpm version comes from the root package.json "packageManager" field;
       # don't also pin it here (pnpm/action-setup errors on a double pin).
       - uses: pnpm/action-setup@v6
 
@@ -46,53 +44,25 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
-      # Trusted publishing requires npm CLI >= 11.5.1, but Node 20 bundles an
-      # older npm. `pnpm publish` delegates the actual upload to the npm on
-      # PATH, so upgrading npm here is what enables the OIDC token exchange.
-      - name: Upgrade npm (>= 11.5.1 for trusted publishing)
+      # Trusted publishing requires npm CLI >= 11.5.1; Node 20 bundles an older
+      # one. pnpm publish delegates the actual upload to the npm on PATH.
+      - name: Use an npm that supports trusted publishing
         run: npm install -g npm@latest
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
 
-      - name: Verify the release tag matches the package version
-        if: github.event_name == 'release'
-        run: |
-          PKG_VERSION="$(node -p "require('./packages/cli/package.json').version")"
-          TAG="${GITHUB_REF_NAME#v}"
-          echo "Release tag: ${GITHUB_REF_NAME} (version part: ${TAG})"
-          echo "@doidor/markbook version: ${PKG_VERSION}"
-          if [ "${TAG}" != "${PKG_VERSION}" ]; then
-            echo "::error::Release tag v${TAG} does not match @doidor/markbook version ${PKG_VERSION}. Bump and commit the package versions before tagging."
-            exit 1
-          fi
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      # Built from a fresh checkout, so dist/ is always clean (no stale outputs).
-      - name: Build packages
-        run: pnpm build
-
-      - name: Unit tests
-        run: pnpm test
-
-      # `pnpm -r publish` walks the workspace in dependency order, rewrites
-      # `workspace:*` to the concrete version, skips private packages (root +
-      # examples), and skips any version already on the registry — so re-running
-      # a release is safe/idempotent. Auth is OIDC (trusted publishing): no
-      # token is set, npm exchanges the GitHub OIDC token for a short-lived
-      # publish credential.
-      - name: Publish to npm (OIDC trusted publishing)
-        run: |
-          EXTRA=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry-run }}" = "true" ]; then
-            EXTRA="--dry-run"
-            echo "Running in dry-run mode — nothing will be published."
-          fi
-          pnpm -r publish --access public --no-git-checks --provenance ${EXTRA}
+      - name: Create Version PR or publish to npm (OIDC — no token)
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version-packages
+          publish: pnpm run release
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -15,7 +15,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format . --write",
-    "release:version": "node scripts/bump-version.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish",
     "prepare": "husky",
     "example:build": "pnpm --filter @markbook/example-react-demo build",
     "example:dev": "pnpm --filter @markbook/example-react-demo dev",
@@ -36,6 +38,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
+    "@changesets/changelog-github": "0.7.0",
+    "@changesets/cli": "2.31.0",
     "concurrently": "^9.0.0",
     "husky": "^9.1.7",
     "typescript": "^5.6.3"

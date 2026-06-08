@@ -29,7 +29,7 @@ constitution for the repo.
 | "Why was this designed this way?" | `DECISIONS.md` (ADRs) |
 | "What changed and when?" | `PROGRESS.md` (append-only journal) |
 | "What's planned next?" | `ROADMAP.md` |
-| "How do I publish / cut a release?" | `RELEASING.md` — CI publishes the `@doidor/markbook*` packages on a GitHub Release via `.github/workflows/release.yml` (ADR-0029). |
+| "How do I publish / cut a release?" | `RELEASING.md` — Changesets-driven (add a changeset → push → merge the auto-opened "Version Packages" PR), then `.github/workflows/release.yml` publishes the `@doidor/markbook*` packages in lockstep tokenlessly via npm OIDC trusted publishing (ADR-0029). |
 | "What's the package's public API?" | `packages/<name>/README.md` |
 | "Which framework adapters exist?" | **Only `@doidor/markbook-adapter-react` is implemented.** Vue + Web Components adapters are planned, not yet built — see `ROADMAP.md` and ADR-0028. Don't reference `@doidor/markbook-adapter-vue` / `-wc` as if they exist. |
 | "How is the repo structured?" | `README.md` (directory map at the bottom) |
