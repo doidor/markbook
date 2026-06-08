@@ -1761,3 +1761,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** The maintainer wants tokenless, short-lived OIDC credentials (post-Shai-Hulud npm guidance) rather than a long-lived automation token. `package.json` `repository.url` already matches the repo, which OIDC validation checks.
 
 **Next:** Bootstrap-publish v0.1.0 once with a token, configure the four trusted publishers, then all subsequent releases run tokenless through this workflow; then lock down tokens + revoke the bootstrap token.
+
+---
+
+## 2026-06-08 — release version-bump helper + clearer ordering docs
+
+**What changed:** Added `scripts/bump-version.mjs` + a `pnpm release:version <v>` root script that sets all four `@doidor/markbook*` packages to the same version in lockstep (validates semver, edits only the published packages, no commit/tag). Tightened `RELEASING.md`: a prominent "bump → commit → then create the Release" callout (the tag must point at the bump commit), the new one-liner in the steps, and a "Recovering from a tag/version mismatch" section for when a release was tagged before bumping.
+
+**Why:** The Release workflow's tag-vs-version guard fired when a `v0.1.1` release was cut while the manifests still said `0.1.0`. The guard is correct; the ergonomic fix is a one-command bump and explicit ordering docs so the mismatch is harder to hit.
+
+**Next:** None outstanding for release tooling.
