@@ -23,21 +23,21 @@ importers:
 
   examples/markbook-site:
     devDependencies:
-      '@markbook/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      markbook:
+      '@doidor/markbook':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@doidor/markbook-core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
   examples/marketing-demo:
     devDependencies:
-      '@markbook/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      markbook:
+      '@doidor/markbook':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@doidor/markbook-core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
   examples/react-demo:
     dependencies:
@@ -48,10 +48,13 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
-      '@markbook/adapter-react':
+      '@doidor/markbook':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@doidor/markbook-adapter-react':
         specifier: workspace:*
         version: link:../../packages/adapter-react
-      '@markbook/core':
+      '@doidor/markbook-core':
         specifier: workspace:*
         version: link:../../packages/core
       '@types/react':
@@ -60,28 +63,25 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
-      markbook:
-        specifier: workspace:*
-        version: link:../../packages/cli
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
 
   examples/static-demo:
     devDependencies:
-      '@markbook/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      markbook:
+      '@doidor/markbook':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@doidor/markbook-core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
   packages/adapter-react:
     dependencies:
-      '@markbook/adapter-shared':
+      '@doidor/markbook-adapter-shared':
         specifier: workspace:*
         version: link:../adapter-shared
-      '@markbook/core':
+      '@doidor/markbook-core':
         specifier: workspace:*
         version: link:../core
       '@vitejs/plugin-react':
@@ -112,7 +112,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@markbook/core':
+      '@doidor/markbook-core':
         specifier: workspace:*
         version: link:../core
       cac:

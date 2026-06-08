@@ -1,5 +1,5 @@
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   title: 'Pixie',

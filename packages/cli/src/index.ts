@@ -2,7 +2,7 @@ import { cac } from 'cac';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createJiti } from 'jiti';
-import { build, bundleEmbed, dev, preview, type MarkbookConfig } from '@markbook/core';
+import { build, bundleEmbed, dev, preview, type MarkbookConfig } from '@doidor/markbook-core';
 import { formatInstallResults, installAll, listInstalled } from './skills.js';
 
 const CONFIG_NAMES = [

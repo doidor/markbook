@@ -8,7 +8,7 @@ description: Every field of MarkbookConfig, with defaults and examples.
 `markbook.config.{ts,mts,js,mjs}` lives at your project root and exports a `MarkbookConfig` object via `defineConfig` (for type inference).
 
 ```ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   // ...
@@ -49,7 +49,7 @@ export default defineConfig({
 
 | Field | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `adapter` | `MarkbookAdapter` | `staticAdapter()` | Framework adapter for `:::story` directives. Provided by `@markbook/adapter-react` (Vue + Web Components adapters are planned). Omit for markdown-only sites. |
+| `adapter` | `MarkbookAdapter` | `staticAdapter()` | Framework adapter for `:::story` directives. Provided by `@doidor/markbook-adapter-react` (Vue + Web Components adapters are planned). Omit for markdown-only sites. |
 
 The default `staticAdapter` errors clearly if any page tries to use a story directive without an explicit adapter.
 
@@ -88,8 +88,8 @@ Search (Pagefind) is always on; turn it off in a custom layout by not including 
 ## Full example
 
 ```ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   // Layout

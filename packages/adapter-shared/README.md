@@ -1,7 +1,7 @@
-# `@markbook/adapter-shared`
+# `@doidor/markbook-adapter-shared`
 
 Browser-side runtime helpers used by the Markbook React adapter
-([`@markbook/adapter-react`](../adapter-react/README.md)). The Vue and Web
+([`@doidor/markbook-adapter-react`](../adapter-react/README.md)). The Vue and Web
 Components adapters are [planned](../../ROADMAP.md) (see ADR-0028) and will
 reuse this package once built.
 

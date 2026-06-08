@@ -13,9 +13,9 @@
     "declarationMap": false,
     "sourceMap": false,
     "paths": {
-      "@markbook/core": ["./packages/core/src/index.ts"],
-      "@markbook/core/internal": ["./packages/core/src/internal.ts"],
-      "@markbook/adapter-shared": ["./packages/adapter-shared/src/index.ts"]
+      "@doidor/markbook-core": ["./packages/core/src/index.ts"],
+      "@doidor/markbook-core/internal": ["./packages/core/src/internal.ts"],
+      "@doidor/markbook-adapter-shared": ["./packages/adapter-shared/src/index.ts"]
     }
   }
 }

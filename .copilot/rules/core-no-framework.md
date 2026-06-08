@@ -1,13 +1,13 @@
 ---
 name: core-no-framework
-description: Forbid React / Vue / framework-runtime imports inside @markbook/core
+description: Forbid React / Vue / framework-runtime imports inside @doidor/markbook-core
 glob: packages/core/**/*.{ts,tsx}
 priority: 100
 ---
 
 # core-no-framework
 
-`@markbook/core` is the framework-agnostic engine. **Never** import from a UI
+`@doidor/markbook-core` is the framework-agnostic engine. **Never** import from a UI
 framework runtime in any file under `packages/core/src/`.
 
 ## Forbidden imports
@@ -28,11 +28,11 @@ Framework concerns live in the corresponding adapter packages:
 
 | Concern | Belongs in |
 | --- | --- |
-| `mount(el, story, opts)` for React | `@markbook/adapter-react` |
-| `setupControls(...)` for React | `@markbook/adapter-react` |
-| Vue / custom-element mount logic | the planned `@markbook/adapter-vue` / `-wc` (not yet built — see `ROADMAP.md` / ADR-0028) |
+| `mount(el, story, opts)` for React | `@doidor/markbook-adapter-react` |
+| `setupControls(...)` for React | `@doidor/markbook-adapter-react` |
+| Vue / custom-element mount logic | the planned `@doidor/markbook-adapter-vue` / `-wc` (not yet built — see `ROADMAP.md` / ADR-0028) |
 
-> Only `@markbook/adapter-react` exists today. The Vue imports above stay on
+> Only `@doidor/markbook-adapter-react` exists today. The Vue imports above stay on
 > the forbidden list regardless — core must never depend on a framework, even
 > a future one's runtime.
 

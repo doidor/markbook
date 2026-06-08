@@ -1,5 +1,5 @@
 /**
- * Public API surface for `@markbook/core`.
+ * Public API surface for `@doidor/markbook-core`.
  *
  * What ships here is the contract Markbook keeps stable across patch
  * releases: the config function + types, the three orchestration entry
@@ -8,7 +8,7 @@
  *
  * Internal helpers (`parseMarkdown`, `extractStoryCode`, slug helpers,
  * nav/AST utilities, cache invalidators, etc.) are reachable via the
- * `@markbook/core/internal` subpath. They're public enough to write tools
+ * `@doidor/markbook-core/internal` subpath. They're public enough to write tools
  * against, but their signatures may change at any minor release.
  */
 

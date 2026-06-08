@@ -22,7 +22,7 @@ This callout — and every other one in this site's guides — is rendered by a 
 In `markbook.config.ts`:
 
 ```ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {
@@ -63,7 +63,7 @@ Each file just exports a `DirectiveHandler`:
 
 ```ts
 // directives/callout.ts
-import { escapeAttribute, type DirectiveHandler } from '@markbook/core';
+import { escapeAttribute, type DirectiveHandler } from '@doidor/markbook-core';
 
 const VALID_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
 
@@ -78,7 +78,7 @@ Then import and register:
 
 ```ts
 // markbook.config.ts
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 import { callout } from './directives/callout.js';
 import { youtube } from './directives/youtube.js';
 import { csvTable } from './directives/csv-table.js';
@@ -136,7 +136,7 @@ my-site/
 
 ```ts
 // directives/callout.ts
-import { escapeAttribute, htmlTemplate, type DirectiveHandler } from '@markbook/core';
+import { escapeAttribute, htmlTemplate, type DirectiveHandler } from '@doidor/markbook-core';
 
 const VALID_TYPES = new Set(['info', 'tip', 'warning', 'danger']);
 const render = htmlTemplate(new URL('./callout.html', import.meta.url));
@@ -231,7 +231,7 @@ Handlers can be async. For handlers that read files, report them as dependencies
 ```ts
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { DirectiveHandler } from '@markbook/core';
+import type { DirectiveHandler } from '@doidor/markbook-core';
 
 export const csvTable: DirectiveHandler = async ({ attributes, pageFile }) => {
   const abs = path.resolve(path.dirname(pageFile), attributes.src ?? '');
@@ -263,7 +263,7 @@ Names that collide with `story`, `stories`, or `props` throw at config load. The
 Markbook re-exports two tiny helpers for safe interpolation:
 
 ```ts
-import { escapeHtml, escapeAttribute, defineConfig } from '@markbook/core';
+import { escapeHtml, escapeAttribute, defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {
@@ -411,7 +411,7 @@ Names that collide with `story`, `stories`, or `props` throw at config load. The
 Markbook re-exports two tiny helpers for safe interpolation:
 
 ```ts
-import { escapeHtml, escapeAttribute, defineConfig } from '@markbook/core';
+import { escapeHtml, escapeAttribute, defineConfig } from '@doidor/markbook-core';
 
 export default defineConfig({
   directives: {

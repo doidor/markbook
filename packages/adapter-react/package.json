@@ -1,7 +1,25 @@
 {
-  "name": "@markbook/adapter-react",
-  "version": "0.0.0",
+  "name": "@doidor/markbook-adapter-react",
+  "version": "0.1.0",
   "description": "React mount adapter for Markbook",
+  "keywords": [
+    "markbook",
+    "react",
+    "storybook-alternative",
+    "stories",
+    "adapter"
+  ],
+  "license": "MIT",
+  "author": "doidor",
+  "homepage": "https://doidor.github.io/markbook",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doidor/markbook.git",
+    "directory": "packages/adapter-react"
+  },
+  "bugs": {
+    "url": "https://github.com/doidor/markbook/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,8 +46,8 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@markbook/adapter-shared": "workspace:*",
-    "@markbook/core": "workspace:*",
+    "@doidor/markbook-adapter-shared": "workspace:*",
+    "@doidor/markbook-core": "workspace:*",
     "@vitejs/plugin-react": "^4.3.3"
   },
   "devDependencies": {
@@ -38,5 +56,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

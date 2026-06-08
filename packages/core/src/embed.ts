@@ -282,7 +282,7 @@ import { mount } from '${pkgName}';
 mount(document.getElementById('here'));
 \`\`\`
 
-The default export is the story's component / factory. Re-export from \`@markbook/core\` is not bundled — only the story, the user-configured \`wrapper\`, and the adapter \`mount\` are. Framework runtimes (e.g. \`react\`, \`react-dom\`) are declared as peer dependencies — bring your own.
+The default export is the story's component / factory. Re-export from \`@doidor/markbook-core\` is not bundled — only the story, the user-configured \`wrapper\`, and the adapter \`mount\` are. Framework runtimes (e.g. \`react\`, \`react-dom\`) are declared as peer dependencies — bring your own.
 `;
 }
 

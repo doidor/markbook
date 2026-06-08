@@ -16,10 +16,10 @@ priority: 60
    import { parseMarkdown } from './parse.js';
 
    // ❌ — would silently couple tests to the public API surface
-   import { parseMarkdown } from '@markbook/core';
+   import { parseMarkdown } from '@doidor/markbook-core';
    ```
    This is what lets `internal.ts` exist without test churn.
-3. **Vitest only.** `pnpm --filter @markbook/core test` runs the suite. Tests must run cleanly with no external network, no real-fs writes outside `os.tmpdir()`, and no leaked timers.
+3. **Vitest only.** `pnpm --filter @doidor/markbook-core test` runs the suite. Tests must run cleanly with no external network, no real-fs writes outside `os.tmpdir()`, and no leaked timers.
 4. **Wrap fs writes in `try/finally`.** Always clean up:
    ```ts
    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'mb-x-'));

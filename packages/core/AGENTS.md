@@ -1,4 +1,4 @@
-# `@markbook/core` — AGENTS.md
+# `@doidor/markbook-core` — AGENTS.md
 
 Package-specific rules for the engine. See [`/AGENTS.md`](../../AGENTS.md) for repo-wide Critical Rules and [`README.md`](README.md) for the public API.
 

@@ -1,4 +1,4 @@
-import { defineConfig } from '@markbook/core';
+import { defineConfig } from '@doidor/markbook-core';
 
 /**
  * Markdown-only demo: no adapter, no framework peer deps. Every page

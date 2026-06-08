@@ -1,6 +1,6 @@
 /**
  * Browser-side runtime helpers used by the Markbook React adapter
- * (`@markbook/adapter-react`). Vue + Web Components adapters are planned and
+ * (`@doidor/markbook-adapter-react`). Vue + Web Components adapters are planned and
  * will reuse this package too (see ROADMAP.md / ADR-0028). Pure DOM — NO Node
  * and NO framework imports — so it bundles cleanly into an adapter's default
  * browser entry without violating the two-entry split (ADR-0005).

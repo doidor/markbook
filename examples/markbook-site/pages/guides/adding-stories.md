@@ -13,23 +13,23 @@ Markbook ships one adapter today:
 
 | Package | Mounts | Runtime |
 | --- | --- | --- |
-| `@markbook/adapter-react` | React components | `react`, `react-dom` (peer) |
+| `@doidor/markbook-adapter-react` | React components | `react`, `react-dom` (peer) |
 
 > **React is the only adapter implemented right now.** Vue and Web Components adapters are on the [roadmap](https://github.com/doidor/markbook/blob/main/ROADMAP.md) — the core engine is framework-agnostic, so they're purely additive.
 
 Install it + its runtime (npm / pnpm / yarn):
 
 ```bash
-npm install -D @markbook/adapter-react && npm install react react-dom
-pnpm add -D @markbook/adapter-react && pnpm add react react-dom
-yarn add -D @markbook/adapter-react && yarn add react react-dom
+npm install -D @doidor/markbook-adapter-react && npm install react react-dom
+pnpm add -D @doidor/markbook-adapter-react && pnpm add react react-dom
+yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
 ```
 
 Then wire it into `markbook.config.ts`:
 
 ```ts
-import { defineConfig } from '@markbook/core';
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { defineConfig } from '@doidor/markbook-core';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   title: 'My Components',
@@ -117,7 +117,7 @@ Wrap every story in shared providers (theme, i18n, router, ...):
 
 ```ts
 // markbook.config.ts
-import { reactAdapter } from '@markbook/adapter-react/config';
+import { reactAdapter } from '@doidor/markbook-adapter-react/config';
 
 export default defineConfig({
   adapter: reactAdapter({

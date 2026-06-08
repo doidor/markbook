@@ -15,7 +15,7 @@ Run in order. Stop on first failure, fix, re-run from the start:
 ```bash
 pnpm lint            # biome (use pnpm lint:fix for auto-fixes)
 pnpm typecheck       # tsc --noEmit across every package
-pnpm test            # @markbook/core Vitest suite
+pnpm test            # @doidor/markbook-core Vitest suite
 pnpm build           # tsc -b across packages
 pnpm example:build           # React demo (most code-path coverage)
 pnpm example:bundle          # React demo embed bundles (catches embed-path regressions)
@@ -34,8 +34,8 @@ Total ~60–120 seconds depending on cache state.
 For tight inner loops on a single package:
 
 ```bash
-pnpm --filter @markbook/<package> typecheck
-pnpm --filter @markbook/<package> test   # if applicable
+pnpm --filter @doidor/markbook-<package> typecheck
+pnpm --filter @doidor/markbook-<package> test   # if applicable
 pnpm lint                                 # always — fast
 ```
 

@@ -12,7 +12,7 @@ Scaffolds an HTML layout for a Markbook site. Layouts REPLACE Markbook's
 default `<html>...</html>` shell — they're Layer 3 of the four-layer
 customization model (Layer 1: `css`; Layer 2: `disableBaseCss`; Layer 3:
 `layoutsDir`; Layer 4: `transformHtml`). See the customization section of
-`@markbook/core`'s README for the full ladder.
+`@doidor/markbook-core`'s README for the full ladder.
 
 Each generated layout includes:
 
@@ -265,7 +265,7 @@ ADR-0024.)
 
 ## Reference
 
-- `@markbook/core/README.md` — full placeholder table + config docs.
+- `@doidor/markbook-core/README.md` — full placeholder table + config docs.
 - `DECISIONS.md` ADR-0024 — why layouts exist, what was considered, why the
   v1 placeholder set looks the way it does.
 - `examples/marketing-demo/layouts/` — production-quality reference layouts

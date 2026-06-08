@@ -11,7 +11,7 @@ constitution for the repo.
 ## Critical Rules
 
 1. **Markdown is the source of truth.** HTML and `llms.txt` are two views of one AST. Never add features that put authoring content outside `.md` (no MDX, no JSON sidecars).
-2. **No framework code in `@markbook/core`.** React (and the planned Vue / web-components) runtime concerns live in their adapter packages. **Only `@markbook/adapter-react` is implemented today** — Vue + Web Components adapters are on `ROADMAP.md` (see ADR-0028). Core knows about markdown, directives, Vite orchestration, embed bundling — nothing else. Enforced by `.copilot/rules/core-no-framework.md`.
+2. **No framework code in `@doidor/markbook-core`.** React (and the planned Vue / web-components) runtime concerns live in their adapter packages. **Only `@doidor/markbook-adapter-react` is implemented today** — Vue + Web Components adapters are on `ROADMAP.md` (see ADR-0028). Core knows about markdown, directives, Vite orchestration, embed bundling — nothing else. Enforced by `.copilot/rules/core-no-framework.md`.
 3. **Public API surface is `index.ts` only.** Anything reachable solely via `internal.ts` (or by deep import from a `.test.ts`) may change in any minor release. Tests import from sibling source modules, not the barrel — keep it that way.
 4. **Verify before handoff.** Before claiming a change is done, run the [`/verify-build`](.copilot/skills/verify-build/SKILL.md) cycle. Iteration cap N=3 on the same failure — beyond that, self-park rather than churn.
 5. **Every user-facing or architectural change updates `PROGRESS.md`.** Use the [`/progress-log`](.copilot/skills/progress-log/SKILL.md) skill. For non-obvious decisions also add an ADR in `DECISIONS.md`. Update affected READMEs in the SAME commit.
@@ -29,12 +29,13 @@ constitution for the repo.
 | "Why was this designed this way?" | `DECISIONS.md` (ADRs) |
 | "What changed and when?" | `PROGRESS.md` (append-only journal) |
 | "What's planned next?" | `ROADMAP.md` |
+| "How do I publish / cut a release?" | `RELEASING.md` — CI publishes the `@doidor/markbook*` packages on a GitHub Release via `.github/workflows/release.yml` (ADR-0029). |
 | "What's the package's public API?" | `packages/<name>/README.md` |
-| "Which framework adapters exist?" | **Only `@markbook/adapter-react` is implemented.** Vue + Web Components adapters are planned, not yet built — see `ROADMAP.md` and ADR-0028. Don't reference `@markbook/adapter-vue` / `-wc` as if they exist. |
+| "Which framework adapters exist?" | **Only `@doidor/markbook-adapter-react` is implemented.** Vue + Web Components adapters are planned, not yet built — see `ROADMAP.md` and ADR-0028. Don't reference `@doidor/markbook-adapter-vue` / `-wc` as if they exist. |
 | "How is the repo structured?" | `README.md` (directory map at the bottom) |
 | "How do I customize a Markbook site's chrome?" | Four layers in `packages/core/README.md`: `css` → `disableBaseCss` → `layoutsDir` → `transformHtml`. Worked example in `examples/marketing-demo/`. |
 | "How do I register a custom directive?" | `config.directives` from `markbook.config.ts`. See `examples/markbook-site/pages/guides/custom-directives.md` for the public guide, ADR-0025 for the design rationale, and `examples/markbook-site/directives/callout.{ts,html}` for the canonical pattern (handler in `.ts`, output markup in a `.html` template loaded by `htmlTemplate(new URL('./x.html', import.meta.url))`). |
-| "How do I emit HTML markup from a directive handler without inline template literals?" | `htmlTemplate(source)` in `@markbook/core`. Sync-load-once-cached `{{ key }}` + `{{ key.dot.path }}` substitution from a vars map; raw insertion (no auto-escape — matches the layout-placeholder contract); HTML comments preserved. Demoed in `examples/markbook-site/directives/callout.{ts,html}`. |
+| "How do I emit HTML markup from a directive handler without inline template literals?" | `htmlTemplate(source)` in `@doidor/markbook-core`. Sync-load-once-cached `{{ key }}` + `{{ key.dot.path }}` substitution from a vars map; raw insertion (no auto-escape — matches the layout-placeholder contract); HTML comments preserved. Demoed in `examples/markbook-site/directives/callout.{ts,html}`. |
 | "How do I control sidebar order?" | Frontmatter `order: <number>` on the page (lower = earlier). Ordered pages appear before unordered; same-order pages preserve file-discovery order; the index page is always first regardless. See `examples/markbook-site/pages/guides/getting-started.md` for the canonical use. |
 | "Where does syntax highlighting / the copy button on fenced code blocks come from?" | `packages/core/src/fenced-code.ts` — an async rehype transformer wired into the main pipeline + `renderChildrenToHtml`. Reuses the same Shiki dual-theme config as story disclosures (`themes: { light: 'github-light', dark: 'github-dark' }`, `defaultColor: false`) so `[data-theme]` swap re-paints colors. Wraps every `<pre><code>` with `<div class="markbook-code-pre-wrap markbook-fenced-code">` + the shared `[data-markbook-copy]` button (boot script in `build.ts:COPY_BOOT_SCRIPT`). |
 
@@ -47,6 +48,7 @@ README.md            ← repo entry for humans
 PROGRESS.md          ← append-only journal (use /progress-log)
 DECISIONS.md         ← ADRs for non-obvious choices
 ROADMAP.md           ← forward-looking work
+RELEASING.md         ← how to publish @doidor/markbook* to npm (CI release flow)
 packages/
   core/      AGENTS.md README.md   ← engine (markdown + directives + Vite + embed)
   cli/                  README.md   ← markbook binary (thin wrapper around core)

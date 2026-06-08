@@ -15,7 +15,7 @@
 | - | --- |
 | 1 | Layout omits `{{ head }}` (theme boot lives there) or `{{ bodyEnd }}` (Pagefind init + story entry script live there). Both are required for any layout that wants those features. |
 | 2 | Layout file isn't under one of the configured `layoutsDir` paths — `createContext` resolves `layoutsDir` to absolute paths and `chokidar` watches those paths exactly. Drop the file in the right dir, not just somewhere convenient. |
-| 3 | A `{{ content }}` mention appears inside HTML comments (`<!-- ... -->`) AND in the body. Pre-`f598173` the protect-and-restore for comments didn't exist; now it does. Update `@markbook/core`. |
+| 3 | A `{{ content }}` mention appears inside HTML comments (`<!-- ... -->`) AND in the body. Pre-`f598173` the protect-and-restore for comments didn't exist; now it does. Update `@doidor/markbook-core`. |
 | 4 | Typo'd placeholder name. The strict validator throws on unknown placeholders specifically to catch this. Check the spelling against `HTML_LAYOUT_RAW_TOKENS` + `HTML_LAYOUT_TEXT_TOKENS`. |
 | 5 | Layout omits `{{ search }}` — the Pagefind input slot is opt-in per-layout. Drop `{{ search }}` somewhere visible in the layout (typically the header). |
 | 6 | NOT a typo silently swallowed: as of `f598173` Markbook throws `HTML layout 'landng' not found in: <searched dirs>`. If you see the built-in shell instead of your layout, your config didn't set `layout:` (or the page's frontmatter set `layout: false`). |
