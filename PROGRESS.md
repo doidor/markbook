@@ -1751,3 +1751,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** The user wants releases published through GitHub Actions rather than a manual `npm publish`. See ADR-0029 for the `@doidor` scope decision.
 
 **Next:** Maintainer adds the `NPM_TOKEN` repo secret, then cuts the first release (`v0.1.0`). A `pnpm pack` dry-run confirmed `--provenance` is accepted by the pinned pnpm@8.15.9 and that the tarballs are clean. Optional later: Changesets for automated version PRs + changelogs.
+
+---
+
+## 2026-06-08 — switch release workflow to npm trusted publishing (OIDC)
+
+**What changed:** Reworked `.github/workflows/release.yml` to publish via npm **trusted publishing** (OIDC) instead of an `NPM_TOKEN` secret: dropped the `NODE_AUTH_TOKEN` env, kept `id-token: write`, and added a `npm install -g npm@latest` step (trusted publishing needs npm ≥ 11.5.1, and `pnpm publish` delegates the upload to the npm on PATH). `--provenance` stays (still required in practice). Updated `RELEASING.md`: per-package trusted-publisher config on npmjs.com (`doidor`/`markbook`/`release.yml`), the one-time token **bootstrap** each brand-new package needs (npm blocks first-publish-over-OIDC), and the recommended token lockdown afterwards.
+
+**Why:** The maintainer wants tokenless, short-lived OIDC credentials (post-Shai-Hulud npm guidance) rather than a long-lived automation token. `package.json` `repository.url` already matches the repo, which OIDC validation checks.
+
+**Next:** Bootstrap-publish v0.1.0 once with a token, configure the four trusted publishers, then all subsequent releases run tokenless through this workflow; then lock down tokens + revoke the bootstrap token.

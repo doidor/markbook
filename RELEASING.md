@@ -9,19 +9,54 @@ in lockstep:
 - [`@doidor/markbook-adapter-shared`](packages/adapter-shared)
 
 Publishing runs in CI via [`.github/workflows/release.yml`](.github/workflows/release.yml)
-— there is no manual `npm publish` step.
+using npm **trusted publishing** (OIDC) — there is no `NPM_TOKEN` secret and no
+manual `npm publish` step.
 
 ## One-time setup
 
-1. Create an npm **automation** access token (npmjs.com → *Access Tokens* →
-   *Generate New Token* → *Automation*). It must be able to publish to the
-   `@doidor` scope.
-2. Add it to the repo as a secret named **`NPM_TOKEN`**
-   (*Settings → Secrets and variables → Actions → New repository secret*).
+### 1. Bootstrap the first publish (token, once per package)
 
-Provenance attestations are emitted on every publish (`--provenance`). That works
-because this repository is **public** and the workflow has `id-token: write`. If
-the repo is ever made private, drop `--provenance` from the publish step (npm
+npm does **not** allow the very first publish of a brand-new package over OIDC,
+so each package's `0.x` debut has to be published once with a token. Easiest:
+create an npm **Automation** token (npmjs.com → *Access Tokens* → *Generate New
+Token* → *Classic Token* → **Automation** — it bypasses 2FA), then from a clean
+checkout of `main`:
+
+```bash
+pnpm install --frozen-lockfile && pnpm build
+echo "//registry.npmjs.org/:_authToken=<AUTOMATION_TOKEN>" > ~/.npmrc
+pnpm -r publish --access public --no-git-checks
+```
+
+This creates all four packages on npm. (You can instead do this via a temporary
+token-based CI run — but the four packages only need bootstrapping once, ever.)
+
+### 2. Configure a trusted publisher for each package
+
+For **each** of the four packages, open
+`https://www.npmjs.com/package/<name>/access` → **Trusted Publisher** → select
+**GitHub Actions** and fill in:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `doidor` |
+| Repository | `markbook` |
+| Workflow filename | `release.yml` |
+| Environment | *(leave blank)* |
+
+The package's `repository.url` in `package.json` already points at
+`github.com/doidor/markbook`, which OIDC validation also checks.
+
+### 3. (Recommended) Lock down tokens
+
+Once trusted publishing works, on each package's **Settings → Publishing access**
+choose **"Require two-factor authentication and disallow tokens"**, then revoke
+the bootstrap automation token. Trusted publishing keeps working (it uses OIDC,
+not tokens).
+
+Provenance attestations are emitted on every publish (`--provenance`), which
+works because this repository is **public** and the workflow has
+`id-token: write`. If the repo is ever made private, drop `--provenance` (npm
 provenance requires a public source repo).
 
 ## Cutting a release
