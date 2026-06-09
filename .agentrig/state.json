@@ -1,0 +1,69 @@
+{
+  "agentrigVersion": "0.9.0",
+  "knowledgeVersion": "0.3.3",
+  "provider": "copilot",
+  "createdAt": "2026-06-08T19:14:50.976Z",
+  "updatedAt": "2026-06-08T19:45:42.953Z",
+  "installed": [
+    {
+      "id": "skill-self-verify",
+      "dest": ".agents/skills/self-verify",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "skill-fix-ci",
+      "dest": ".agents/skills/fix-ci",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "skill-skill-improver",
+      "dest": ".agents/skills/skill-improver",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "skill-harness-eval",
+      "dest": ".agents/skills/harness-eval",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "skill-verify-loop",
+      "dest": ".agents/skills/verify-loop",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "skill-authoring",
+      "dest": ".agents/skills/skill-authoring",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "rules",
+      "dest": ".agents/rules",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "wiki",
+      "dest": ".agents/wiki",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "eval-scenarios",
+      "dest": ".agentrig/eval/scenarios",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    },
+    {
+      "id": "eval-sandbox",
+      "dest": ".agentrig/eval/sandbox",
+      "knowledgeVersion": "0.3.3",
+      "installedAt": "2026-06-08T19:42:25.769Z"
+    }
+  ]
+}
