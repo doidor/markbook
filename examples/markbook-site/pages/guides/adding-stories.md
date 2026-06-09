@@ -9,20 +9,13 @@ This is what makes Markbook a Storybook alternative when you need one — the sa
 
 ## Pick an adapter
 
-Markbook ships one adapter today:
+Markbook ships one adapter today: `@doidor/markbook-adapter-react` (mounts React components; `react` + `react-dom` as peer deps). Vue and Web Components adapters are on the [roadmap](https://github.com/doidor/markbook/blob/main/ROADMAP.md) — the core engine is framework-agnostic, so they're purely additive.
 
-| Package | Mounts | Runtime |
-| --- | --- | --- |
-| `@doidor/markbook-adapter-react` | React components | `react`, `react-dom` (peer) |
-
-> **React is the only adapter implemented right now.** Vue and Web Components adapters are on the [roadmap](https://github.com/doidor/markbook/blob/main/ROADMAP.md) — the core engine is framework-agnostic, so they're purely additive.
-
-Install it + its runtime (npm / pnpm / yarn):
+Install it + its runtime:
 
 ```bash
-npm install -D @doidor/markbook-adapter-react && npm install react react-dom
-pnpm add -D @doidor/markbook-adapter-react && pnpm add react react-dom
-yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
+pnpm add -D @doidor/markbook-adapter-react
+pnpm add react react-dom
 ```
 
 Then wire it into `markbook.config.ts`:
@@ -137,19 +130,7 @@ Decorators apply outer-to-inner: `['A', 'B']` produces `<A><B><Story /></B></A>`
 
 ## Bundling stories for use outside the docs site
 
-`markbook bundle` packages each story as a portable artifact. Two modes:
-
-```bash
-# Default — self-mounting ESM embeds.
-# Each story becomes dist/embed/<slug>.js that auto-mounts on
-# any <div data-markbook-embed="<slug>"> placeholder.
-markbook bundle
-
-# Publishable npm package directory, framework as peer dep.
-markbook bundle --mode package
-```
-
-Use this when you want to drop a story into a marketing landing page, a third-party docs site, or a customer portal — anywhere your component should appear without dragging your docs site along.
+`markbook bundle` packages each story as a portable artifact — `embed` mode produces a self-mounting ESM script you drop on any HTML page; `package` mode produces a publishable npm package directory with the framework as a peer dep. See the [`markbook bundle` CLI reference →](../reference/cli.html#markbook-bundle-storyid) for the full flag set and worked examples.
 
 ## Next steps
 
