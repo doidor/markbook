@@ -3,7 +3,7 @@ name: markbook-style
 description: Apply a pre-baked visual preset (minimal / vibrant / corporate / github / nord) to a Markbook site. Writes a CSS file of --mb-* token overrides and wires it into markbook.config.ts.
 trigger: When the user wants to restyle Markbook, apply a theme, or change the look — without writing custom CSS from scratch.
 allowed-tools: Bash Read Grep Glob Edit Create
-argument-hint: [preset] [--accent <hex>] [--font <family>] [--dest <path>]
+argument-hint: '[preset] [--accent <hex>] [--font <family>] [--dest <path>]'
 ---
 
 # markbook-style

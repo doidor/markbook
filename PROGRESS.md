@@ -1811,3 +1811,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** First version shipped a layout bug that the visual smoke check (taken before the new mobile-nav-open state was added) missed. User caught it immediately. The wider design lesson — `align-self` from desktop rules silently breaks the `top:0; bottom:0` fixed-positioning trick — is worth a wiki note (next).
 
 **Next:** Add a wiki entry (`.copilot/wiki/align-self-on-fixed-children.md`) so the next contributor doesn't trip on the same `align-self`-cascading-into-position:fixed gotcha. Re-cut the changeset summary (the slide-out description in `.changeset/agent-first-and-mobile-nav.md` no longer matches the shipped behaviour).
+
+---
+
+## 2026-06-09 — fix YAML frontmatter in markbook-layout / markbook-style skills
+
+**What changed:** Two shipped SKILL.md files had `argument-hint:` values starting with `[` (`[preset] [--accent <hex>] ...` and `[layout-name] [--style ...] ...`) — YAML parsers interpret a leading `[` as the start of a flow sequence, then choke when the next `[` arrives after the closing `]`, throwing `did not find expected key`. The CLI's own `markbook skills install` doesn't parse YAML (it just copies bytes + tracks hashes), so the bug shipped in v0.1.3 unnoticed; it only surfaced when a consumer agent CLI (Claude Code, Codex, OpenCode) tried to discover the skill. Quoted both values with single quotes (`argument-hint: '[preset] [--accent <hex>] [--font <family>] [--dest <path>]'`). Added a prevention test in `packages/cli/src/skills.test.ts` that loads every shipped SKILL.md frontmatter through `js-yaml` and asserts (a) it parses without error, (b) `argument-hint` round-trips as a string (not a parsed-as-array sequence). Test fails on the un-quoted form, passes on the quoted form — verified by temporarily reverting one of the fixes. Added `js-yaml` + `@types/js-yaml` as devDeps to the CLI package. Wiki entry `.copilot/wiki/yaml-frontmatter-bracket-values.md` captures the gotcha.
+
+**Why:** User installed the skills into a different repo and hit the parse failure from their agent at discovery time. The bug is silent-on-publish: every existing test (regex-based field presence, `markbook skills list`, bytes-hash verification) passed because nothing actually parsed the YAML. Without the new prevention test this would happen again the next time someone adds a skill with a similar `argument-hint`.
+
+**Next:** Cut a patch release (0.1.3 → 0.1.4 or whatever Changesets bumps to). Consumers who installed the broken skills via `markbook skills install` will pick up the fixed files via `markbook skills install --update` after upgrading.
