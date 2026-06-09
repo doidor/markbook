@@ -8,28 +8,23 @@ order: 1
 
 Five minutes from zero to a running site.
 
+> Snippets below use `pnpm`. Substitute `npm install` / `yarn add` / `bun add`
+> as needed — Markbook is package-manager-agnostic.
+
 ## 1. Install
 
 ```bash
-npm install -D @doidor/markbook @doidor/markbook-core
 pnpm add -D @doidor/markbook @doidor/markbook-core
-yarn add -D @doidor/markbook @doidor/markbook-core
 ```
 
-Markbook works with any package manager — each install block below lists the npm / pnpm / yarn form of the same command.
-
-If you want React component stories in your pages, also add the React adapter and the framework runtime:
+If you only need a markdown-driven site (no component stories), skip the adapter — Markbook's default `staticAdapter` handles markdown-only sites out of the box. To add React component stories in your pages, also install the adapter and the framework runtime:
 
 ```bash
-# React — adapter (dev) + react/react-dom runtime
-npm install -D @doidor/markbook-adapter-react && npm install react react-dom
-pnpm add -D @doidor/markbook-adapter-react && pnpm add react react-dom
-yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
+pnpm add -D @doidor/markbook-adapter-react
+pnpm add react react-dom
 ```
 
 > React is the only adapter available today. Vue and Web Components adapters are [planned](https://github.com/doidor/markbook/blob/main/ROADMAP.md).
-
-If you only need a markdown-driven site (no component stories), skip the adapter — Markbook's default `staticAdapter` handles markdown-only sites out of the box.
 
 ## 2. Create `markbook.config.ts`
 
@@ -96,19 +91,10 @@ Don't open `dist/*.html` directly in the browser via `file://` — Pagefind UI l
 
 ## What you get out of the box
 
-With just the four steps above:
-
-- Multiple markdown pages with auto-generated left-nav grouping (subdirectories become groups)
-- On-this-page TOC built from your H2/H3 headings
-- Heading-permalink copy-to-clipboard on hover
-- Dark-mode toggle, persisted via `localStorage`
-- Full-text search via Pagefind (Cmd/Ctrl+K to focus)
-- `/llms.txt` index + per-page `.txt` mirrors at `/llms/<page>.txt`
-- "View as Markdown" / "Copy as Markdown" buttons on every page
+With just the four steps above: auto-generated left-nav (subdirectories become groups), on-this-page TOC from your headings, dark-mode toggle persisted to `localStorage`, full-text search via Pagefind (`Cmd/Ctrl+K`), heading-permalink copy-to-clipboard, `/llms.txt` index + per-page `.txt` mirrors, and "View / Copy as Markdown" buttons on every page.
 
 ## Next steps
 
-- [Adding component stories →](./adding-stories.html) — wire up the React adapter and start mounting component examples.
+- [Adding component stories →](./adding-stories.html) — wire up the React adapter and mount component examples.
 - [Customization →](./customization.html) — change colors, swap the HTML shell, or post-process pages.
-- [Search & SEO →](./search-and-seo.html) — turn on canonical URLs, sitemap.xml, and OG tags.
 - [Config reference →](../reference/config.html) — every field of `MarkbookConfig`.
