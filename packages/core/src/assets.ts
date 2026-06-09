@@ -2,8 +2,8 @@ import { minifyCss, minifyJs } from './minify.js';
 
 /**
  * Static inline assets injected into every generated page: the built-in
- * chrome stylesheet (`BASE_CSS`) and the seven boot-script IIFEs (theme,
- * tabs, playground, copy, permalink, search-kbd, copy-md).
+ * chrome stylesheet (`BASE_CSS`) and the eight boot-script IIFEs (theme,
+ * tabs, playground, copy, permalink, search-kbd, copy-md, nav-toggle).
  *
  * They never change between builds, so `ensureInlineAssetsMinified()`
  * minifies them once (lazily, process-wide) and the module-private bindings
@@ -61,6 +61,26 @@ let SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.qu
  * instead of silently failing.
  */
 let COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=document.querySelectorAll('[data-markbook-copy-md]');for(var i=0;i<btns.length;i++){var b=btns[i];b.disabled=true;b.title='Serve this site over http(s) to copy markdown.';b.style.opacity='0.5';b.style.cursor='not-allowed';}return;}document.addEventListener('click',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-markbook-copy-md]');if(!b)return;e.preventDefault();if(!navigator.clipboard){return;}var url=b.getAttribute('data-url')||'';var lbl=b.querySelector('.markbook-copy-md-label');var prev=lbl?lbl.textContent:'';fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.text();}).then(function(text){return navigator.clipboard.writeText(text);}).then(function(){if(!lbl)return;lbl.textContent='Copied!';b.classList.add('is-copied');setTimeout(function(){lbl.textContent=prev;b.classList.remove('is-copied');},1200);}).catch(function(err){console.error('markbook: copy-as-markdown failed',err);if(!lbl)return;lbl.textContent='Copy failed';setTimeout(function(){lbl.textContent=prev;},1500);});});})();`;
+
+/**
+ * Mobile nav toggle. The hamburger button + slide-out sidebar on small
+ * viewports — the sidebar is permanently in DOM (display-grid on desktop),
+ * and on mobile CSS positions it off-canvas via translateX(-100%) by
+ * default. This handler flips the `data-markbook-nav-open` attribute on
+ * `<body>` (CSS scope for the open state) and `aria-expanded` on every
+ * toggle button. Closes on:
+ *   - second click of the toggle
+ *   - click on the backdrop overlay ([data-markbook-nav-backdrop])
+ *   - click on any link inside .markbook-sidebar (so the user lands on
+ *     the new page with the menu already closed)
+ *   - Escape key (restores focus to the first toggle button)
+ *
+ * Desktop behaviour is unaffected — the CSS slide-out rules are scoped
+ * under `@media (max-width: 700px)`, so on wider viewports the body
+ * attribute does nothing visible and the sidebar stays inline in the
+ * grid layout.
+ */
+let NAV_TOGGLE_BOOT_SCRIPT = `(function(){function setOpen(o){var b=document.body;var btns=document.querySelectorAll('[data-markbook-nav-toggle]');if(o){b.dataset.markbookNavOpen='true';}else{delete b.dataset.markbookNavOpen;}for(var i=0;i<btns.length;i++){btns[i].setAttribute('aria-expanded',o?'true':'false');}}document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;var btn=t.closest('[data-markbook-nav-toggle]');if(btn){e.preventDefault();setOpen(document.body.dataset.markbookNavOpen!=='true');return;}var bd=t.closest('[data-markbook-nav-backdrop]');if(bd){setOpen(false);return;}var link=t.closest('.markbook-sidebar a');if(link){setOpen(false);}});document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(document.body.dataset.markbookNavOpen!=='true')return;setOpen(false);var btn=document.querySelector('[data-markbook-nav-toggle]');if(btn&&btn.focus)btn.focus();});})();`;
 
 let BASE_CSS = `
 :root {
@@ -155,6 +175,43 @@ a:hover { text-decoration: underline; }
 .markbook-theme-toggle .markbook-icon-moon { display: none; }
 [data-theme="dark"] .markbook-theme-toggle .markbook-icon-sun { display: inline; }
 :root:not([data-theme="dark"]) .markbook-theme-toggle .markbook-icon-moon { display: inline; }
+.markbook-nav-toggle {
+  display: none;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  color: var(--mb-fg-muted);
+  font-size: 1.1rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+.markbook-nav-toggle:hover {
+  color: var(--mb-fg);
+  background: var(--mb-bg-elev);
+}
+.markbook-nav-toggle:focus-visible {
+  outline: 2px solid var(--mb-accent);
+  outline-offset: 2px;
+}
+.markbook-nav-toggle .markbook-icon-close { display: none; }
+body[data-markbook-nav-open] .markbook-nav-toggle .markbook-icon-menu { display: none; }
+body[data-markbook-nav-open] .markbook-nav-toggle .markbook-icon-close { display: inline; }
+.markbook-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9;
+  cursor: pointer;
+}
 .markbook-content .shiki,
 .markbook-content .shiki span {
   color: var(--shiki-light);
@@ -686,7 +743,62 @@ a:hover { text-decoration: underline; }
 }
 @media (max-width: 700px) {
   .markbook-shell { grid-template-columns: 1fr; padding: 1rem; }
-  .markbook-sidebar { display: none; }
+  .markbook-header { padding: 0 0.75rem; gap: 0.5rem; }
+  .markbook-search-ui { flex: 1 1 0; min-width: 0; width: auto; max-width: none; margin-left: 0; }
+  .markbook-search-ui .pagefind-ui__drawer {
+    width: calc(100vw - 1.5rem);
+    max-width: none;
+    right: 0;
+    left: auto;
+  }
+  .markbook-nav-toggle { display: inline-flex; }
+  /* Mobile sidebar: full viewport width below the header (Starlight pattern).
+     Covers the page entirely so no backdrop is needed; the toggle button +
+     ESC + nav-link clicks are the dismiss affordances. Slides in from left
+     via translateX so reduced-motion users see no animation.
+     align-self: stretch overrides the desktop rule's align-self: start —
+     without this, browsers size the fixed-position sidebar to its intrinsic
+     content height (so the bottom inset is ignored). */
+  .markbook-sidebar {
+    position: fixed;
+    top: var(--mb-header-height);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 11;
+    align-self: stretch;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    padding: 1.25rem 1.5rem 2rem;
+    background: var(--mb-bg);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  body[data-markbook-nav-open] .markbook-sidebar {
+    transform: translateX(0);
+  }
+  body[data-markbook-nav-open] { overflow: hidden; }
+  /* The backdrop is unused on mobile (sidebar covers the page) but stays
+     in the DOM so layout authors can opt into a half-screen drawer pattern
+     by un-hiding it from their own stylesheet. */
+  body[data-markbook-nav-open] .markbook-nav-backdrop { display: none; }
+  /* Bigger, more tappable nav rows on mobile. */
+  .markbook-nav-group li a {
+    padding: 0.6rem 0.85rem;
+    font-size: 1rem;
+  }
+  .markbook-nav-group h2 {
+    font-size: 0.75rem;
+    padding-left: 0.85rem;
+    margin-bottom: 0.65rem;
+  }
+  .markbook-nav-group + .markbook-nav-group { margin-top: 1.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .markbook-sidebar { transition: none; }
 }
 `;
 
@@ -698,6 +810,7 @@ export interface InlineAssets {
   permalinkBoot: string;
   searchKbdBoot: string;
   copyMdBoot: string;
+  navToggleBoot: string;
   baseCss: string;
 }
 
@@ -722,6 +835,7 @@ async function doMinify(): Promise<void> {
     permalinkMin,
     searchKbdMin,
     copyMdMin,
+    navToggleMin,
     baseCssMin,
   ] = await Promise.all([
     minifyJs(THEME_BOOT_SCRIPT),
@@ -731,6 +845,7 @@ async function doMinify(): Promise<void> {
     minifyJs(PERMALINK_BOOT_SCRIPT),
     minifyJs(SEARCH_KBD_BOOT_SCRIPT),
     minifyJs(COPY_MD_BOOT_SCRIPT),
+    minifyJs(NAV_TOGGLE_BOOT_SCRIPT),
     minifyCss(BASE_CSS),
   ]);
   THEME_BOOT_SCRIPT = themeMin;
@@ -740,6 +855,7 @@ async function doMinify(): Promise<void> {
   PERMALINK_BOOT_SCRIPT = permalinkMin;
   SEARCH_KBD_BOOT_SCRIPT = searchKbdMin;
   COPY_MD_BOOT_SCRIPT = copyMdMin;
+  NAV_TOGGLE_BOOT_SCRIPT = navToggleMin;
   BASE_CSS = baseCssMin;
 }
 
@@ -753,6 +869,7 @@ export function getInlineAssets(): InlineAssets {
     permalinkBoot: PERMALINK_BOOT_SCRIPT,
     searchKbdBoot: SEARCH_KBD_BOOT_SCRIPT,
     copyMdBoot: COPY_MD_BOOT_SCRIPT,
+    navToggleBoot: NAV_TOGGLE_BOOT_SCRIPT,
     baseCss: BASE_CSS,
   };
 }

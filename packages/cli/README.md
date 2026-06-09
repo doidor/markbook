@@ -110,12 +110,17 @@ Shipped skills (v1):
 
 | Skill | Purpose |
 | --- | --- |
-| `markbook-init` | Scaffold a new Markbook docs site (config + first page + sample story) |
-| `markbook-add-component-page` | Generate one docs page for one component |
-| `markbook-bulk-generate` | Bulk-generate docs pages for every component under a directory (dry-run default) |
-| `markbook-style` | Apply a visual preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) + optional `--accent` / `--font` overrides |
-| `markbook-layout` | Scaffold a custom HTML layout (`docs` / `marketing` / `blog` / `minimal` template) with all required `{{ }}` placeholders pre-wired, and register it in `markbook.config.ts` |
-| `markbook-bundle-story` | Walk through `markbook bundle` for embedding stories externally |
+| [`markbook-init`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-init--scaffold-a-new-site) | Scaffold a new Markbook docs site (config + first page + sample story) |
+| [`markbook-add-component-page`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-add-component-page--one-page-for-one-component) | Generate one docs page for one component |
+| [`markbook-bulk-generate`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-bulk-generate--pages-for-a-whole-directory) | Bulk-generate docs pages for every component under a directory (dry-run default) |
+| [`markbook-style`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-style--apply-a-visual-preset) | Apply a visual preset (`minimal` / `vibrant` / `corporate` / `github` / `nord`) + optional `--accent` / `--font` overrides |
+| [`markbook-layout`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-layout--scaffold-a-custom-html-layout) | Scaffold a custom HTML layout (`docs` / `marketing` / `blog` / `minimal` template) with all required `{{ }}` placeholders pre-wired, and register it in `markbook.config.ts` |
+| [`markbook-bundle-story`](https://doidor.github.io/markbook/guides/agent-skills.html#markbook-bundle-story--embed-a-story-externally) | Walk through `markbook bundle` for embedding stories externally |
+
+> Per-skill walkthrough with examples is in the
+> [agent skills guide](https://doidor.github.io/markbook/guides/agent-skills.html);
+> every flag of every skill is in the
+> [skills reference](https://doidor.github.io/markbook/reference/skills.html).
 
 After running `markbook skills install`, agents that auto-discover skills from those vendor directories will pick them up. Invocation syntax depends on the agent — `/markbook-init`, `@markbook-init`, etc.
 

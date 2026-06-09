@@ -55,7 +55,7 @@ describe('writePages — built-in shell (no layout)', () => {
     await writePages(ctx, { clean: true, searchEnabled: false });
     const html = await fx.read('index.html');
     expect(html).toContain('<header class="markbook-header">');
-    expect(html).toContain('<aside class="markbook-sidebar">');
+    expect(html).toContain('<aside class="markbook-sidebar" id="markbook-sidebar">');
     expect(html).toContain('<article class="markbook-content" data-pagefind-body>');
     expect(html).toContain('<title>Home — My Site</title>');
     expect(html).toContain('class="markbook-brand"');
@@ -139,6 +139,33 @@ describe('writePages — built-in shell (no layout)', () => {
     expect(html).not.toContain('Copy as Markdown');
     // And the click-handler boot script is omitted.
     expect(html).not.toContain('data-markbook-copy-md');
+  });
+
+  it('emits a mobile nav-toggle button + sidebar id + backdrop for the hamburger menu', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n\n# Home\n',
+      'docs/about.md': '---\ntitle: About\n---\n\n# About\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Hamburger button — emitted inside the header, controls the sidebar.
+    expect(html).toContain('data-markbook-nav-toggle');
+    expect(html).toContain('aria-controls="markbook-sidebar"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('class="markbook-nav-toggle"');
+    // Sidebar carries the matching id so aria-controls resolves.
+    expect(html).toContain('id="markbook-sidebar"');
+    // Backdrop element is still emitted (display:none on mobile because the
+    // sidebar covers the page full-width; layouts can opt into a side-drawer
+    // pattern by un-hiding it).
+    expect(html).toContain('class="markbook-nav-backdrop"');
+    expect(html).toContain('data-markbook-nav-backdrop');
+    // The boot script that wires the click handler is in the head.
+    expect(html).toMatch(/<script>.*data-markbook-nav-toggle.*<\/script>/);
+    // CSS includes the mobile media query that scopes the slide-out.
+    expect(html).toMatch(/@media[^{]*max-width:\s*700px/);
+    expect(html).toContain('data-markbook-nav-open');
   });
 });
 
