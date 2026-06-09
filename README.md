@@ -44,6 +44,13 @@ embeds of any of your stories.
 
 ## Why Markbook
 
+- **🤖 Agent-first by default.** Markbook ships six built-in
+  [agent skills](https://doidor.github.io/markbook/guides/agent-skills.html) —
+  `markbook-init`, `markbook-add-component-page`, `markbook-bulk-generate`,
+  `markbook-style`, `markbook-layout`, `markbook-bundle-story` — installable into
+  Claude Code, Codex, OpenCode, Cursor, or any agent CLI that auto-discovers
+  skills. One `npx markbook skills install` and your agent already knows the
+  conventions: setting up docs is a one-line conversation, not a config safari.
 - **📄 Markdown is the source of truth.** Every page is a `.md` file; the HTML
   site and the `llms.txt` mirror are two views of one AST. No MDX, no JSX in
   your prose, no JSON sidecars, no JS templates to learn.
@@ -69,6 +76,17 @@ embeds of any of your stories.
 
 ## Install
 
+> **Agent-first by default — try the skills before you write any config.**
+> Install the CLI, then run `npx markbook skills install` to drop six
+> procedural skills (`markbook-init`, `markbook-add-component-page`,
+> `markbook-bulk-generate`, `markbook-style`, `markbook-layout`,
+> `markbook-bundle-story`) into `.claude/` / `.codex/` / `.opencode/` /
+> `.agents/`. Then ask your agent _"Set up Markbook in this project"_ and it
+> knows what to do. Full per-skill walkthrough in the
+> [agent skills guide](https://doidor.github.io/markbook/guides/agent-skills.html);
+> deep-dive flags in the
+> [skills reference](https://doidor.github.io/markbook/reference/skills.html).
+
 ```bash
 # Core + CLI (markdown-only sites need nothing else)
 npm install -D @doidor/markbook @doidor/markbook-core
@@ -90,12 +108,6 @@ yarn add -D @doidor/markbook-adapter-react && yarn add react react-dom
 
 Each block lists the npm / pnpm / yarn form of the same command — use whichever
 package manager your project uses.
-
-> **Using an AI coding agent?** Run `markbook skills install` to drop
-> Markbook-specific skills (`markbook-init`, `markbook-add-component-page`,
-> `markbook-bulk-generate`, `markbook-style`, `markbook-bundle-story`) into
-> `.claude/` / `.codex/` / `.opencode/` / `.agents/` so your agent can scaffold
-> pages and generate stories. See the [CLI README](packages/cli/README.md).
 
 ## Quick start
 

@@ -602,3 +602,48 @@ Each package gains `publishConfig.access: "public"`, `license: "MIT"` + a bundle
 - `pnpm publish` rewrites `workspace:*` → `0.1.0`, so the published tarballs depend on the concrete versions. Publish order must respect the graph: `adapter-shared` → `core` → `adapter-react` → CLI.
 - All install docs, the `init`/bundle CLI skills, `reactAdapter().packageName` (baked into generated boot scripts), and the `tsconfig.typecheck` path maps now reference `@doidor/markbook-*`.
 - Future Vue/WC adapters (ROADMAP) will be `@doidor/markbook-adapter-vue` / `-wc`.
+
+## ADR-0030 — Agent-first positioning + Starlight-style mobile nav
+
+**Status:** Accepted (2026-06-09).
+
+**Context.** Two pre-v1.0 quality gaps surfaced in user feedback:
+1. The six skills shipped via `markbook skills install` (`markbook-init`, `markbook-add-component-page`, `markbook-bulk-generate`, `markbook-style`, `markbook-layout`, `markbook-bundle-story`) were only documented in `packages/cli/README.md`'s `markbook skills install` subsection — not surfaced anywhere on the docs site or the top-level README. This buried Markbook's biggest differentiator vs Storybook / Starlight / Docusaurus, none of which ship installable agent skills as part of their npm package.
+2. The default chrome's mobile responsive breakpoint hid the entire sidebar (`@media (max-width: 700px) { .markbook-sidebar { display: none; } }`) with no toggle, leaving mobile users with no way to navigate. This directly contradicted the README's claim of a "Starlight-style HTML site" — Starlight's first mobile UX rule is a working hamburger menu.
+
+**Decision.**
+
+*Agent-first positioning.* Promote the shipped skills to a first-class concept across the docs:
+- New guide page `pages/guides/agent-skills.md` — opens with the agent-first design rationale (skills as a first-class output of the build, not a docs page somewhere) + per-skill blurb cards. `order: 2` so it sits right under Getting started.
+- New reference page `pages/reference/skills.md` — every flag of every skill, the deep-dive for writing an AGENTS.md / pinning a procedure.
+- Home page (`pages/index.md`) gets an "Agent-first by default" hero spotlight section, an "🤖 Agent-first by default" feature card (now the first card), and guide-grid cards for both the new guide and reference.
+- Landing top-nav (`layouts/landing.html`) gains a "Skills" link.
+- This codifies the framing established by ADR-0022 (skills distribution mechanism): skills are a product surface, not docs scaffolding.
+
+*Mobile nav contract.* Add a hamburger toggle to the built-in chrome with these DOM hooks (part of the v1.0-stable surface alongside `[data-markbook-copy]`, `[data-markbook-permalink]`, etc.):
+- `<button data-markbook-nav-toggle aria-controls="markbook-sidebar" aria-expanded="false">` — emitted as the first child of `.markbook-header`. Visible only via CSS at `@media (max-width: 700px)`.
+- `<div data-markbook-nav-backdrop>` — emitted as a sibling of `.markbook-shell`. Fixed-position, dim overlay, dismiss-on-click.
+- `body[data-markbook-nav-open]` — the open-state scope. Sidebar slides from `transform: translateX(-100%)` to `translateX(0)`, backdrop becomes visible, body scroll locks.
+- `#markbook-sidebar` on `<aside class="markbook-sidebar">` — so `aria-controls` resolves.
+
+The CSS slide-in is `@media`-scoped under `max-width: 700px` — on desktop, the body attribute and backdrop do nothing visible. A `prefers-reduced-motion: reduce` block disables the transition. The boot script (`NAV_TOGGLE_BOOT_SCRIPT` in `assets.ts`, alongside the seven existing IIFEs) handles delegated click on the toggle, Escape-to-close (restores focus to the toggle), click-on-sidebar-link to auto-close (so the user lands on the destination page without a stale open menu), and click-on-backdrop to dismiss. The toggle is always emitted in the built-in shell; layout authors using `layoutsDir` opt in by adding the same data attributes to their own markup (the boot script is delivered via `{{ head }}` for free).
+
+**Alternatives considered.**
+
+*For the skills surfacing:*
+- **Single combined "Agent skills" section on the home page only.** Rejected — a dedicated guide + reference is the same shape as every other Markbook concept (config, CLI, directives, frontmatter), and the per-flag depth needs a reference page.
+- **Move the skills out of the npm package into a separate `@doidor/markbook-skills` plugin.** Rejected — keeps the skills out of every project that already installed `markbook` and re-introduces the discoverability problem we're trying to solve. ADR-0022 settled this in the other direction.
+
+*For the mobile nav:*
+- **Keep `.markbook-sidebar { display: none }` and add a CSS-only `:target`-based toggle.** Rejected — no way to restore focus on Escape, no body-scroll lock, no `aria-expanded` sync, and CSS-only toggles don't survive page navigation cleanly.
+- **Use the `inert` attribute on the sidebar when closed.** Considered, then deferred — `inert` is supported in modern browsers but adds JS complexity (toggle inert based on viewport + open state), and the `transform: translateX(-100%)` + `aria-hidden` approach is enough for v1.0. Revisit if focus-trap leakage becomes a real complaint.
+- **Top-drawer (slides down from header) instead of left-slide-out.** Rejected — Starlight + GitBook + Mintlify all use left-slide-out, matches user mental model.
+
+**Consequences.**
+
+- The four new DOM hooks join the v1.0-stable contract in `ROADMAP.md` (the list of frozen items). Anyone with a custom layout (`layoutsDir`) gets the nav toggle free if they add `data-markbook-nav-toggle` + `data-markbook-nav-backdrop` to their own markup — no rendering changes required from us.
+- `InlineAssets.navToggleBoot` is a new field; downstream consumers of `getInlineAssets()` (internal) get the script automatically via `buildHeadInjections`.
+- `build-integration.test.ts` gains a test asserting the toggle button, sidebar id, backdrop, ARIA wiring, mobile media query, and boot script are all emitted. The existing "renders the default Markbook chrome" test updates its sidebar assertion to include the new `id="markbook-sidebar"` attribute.
+- The agent-skills guide + reference become part of the canonical site under `dist/guides/agent-skills.html` and `dist/reference/skills.html`. The home page restructure adds two new feature/guide cards.
+
+**Update (2026-06-09, post-shipping):** First version of the mobile nav used a 320px-wide slide-out drawer with a dim backdrop overlay. User feedback flagged it as visually awkward (white sidebar on the left, dim page content on the right, with a visible seam) — compounded by a layout bug where `bottom: 0` on the fixed-position sidebar was silently overridden by an inherited `align-self: start` from the desktop rule, so the panel sized to intrinsic content (~340px) instead of filling the viewport (788px). Both issues fixed in one pass: explicit `align-self: stretch` on the mobile rule, and switched the panel to **full-viewport width** (`inset: var(--mb-header-height) 0 0 0`) — matches Starlight's actual behaviour, removes the half-and-half visual, eliminates the need for the backdrop on mobile. The backdrop element stays emitted (display:none on mobile) so layout authors who want the side-drawer pattern can opt back in from their own CSS. Wiki entry `.copilot/wiki/align-self-on-fixed-children.md` captures the `align-self`-on-fixed-children gotcha so the next contributor doesn't trip on it.

@@ -138,6 +138,7 @@ function buildHeadInjections(prc: PageRenderContext): string {
     `<script>${assets.playgroundBoot}</script>`,
     `<script>${assets.copyBoot}</script>`,
     `<script>${assets.permalinkBoot}</script>`,
+    `<script>${assets.navToggleBoot}</script>`,
   ];
   if (prc.llmsButtons) parts.push(`<script>${assets.copyMdBoot}</script>`);
   if (prc.searchEnabled) parts.push(`<script>${assets.searchKbdBoot}</script>`);
@@ -245,6 +246,16 @@ function buildThemeToggle(): string {
 }
 
 /**
+ * The mobile hamburger button. Visible via CSS only at narrow viewports
+ * (`@media (max-width: 700px)`). Clicking toggles the `data-markbook-nav-open`
+ * attribute on `<body>`, which makes the sidebar slide in. Wired to
+ * `aria-controls="markbook-sidebar"` so the sidebar id needs to match.
+ */
+function buildNavToggle(): string {
+  return `<button class="markbook-nav-toggle" type="button" data-markbook-nav-toggle aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="markbook-sidebar"><span class="markbook-icon-menu" aria-hidden>☰</span><span class="markbook-icon-close" aria-hidden>✕</span></button>`;
+}
+
+/**
  * Render a page using the built-in Markbook shell (header + sidebar + TOC).
  * Used when no HTML layout is configured for the page.
  */
@@ -280,6 +291,7 @@ export function renderBuiltinShell(prc: PageRenderContext): string {
   const bodyEndInjections = buildBodyEndInjections(prc);
   const searchSlot = buildSearchSlot(prc);
   const themeToggle = buildThemeToggle();
+  const navToggle = buildNavToggle();
   const pageActions = prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '';
 
   return `<!doctype html>
@@ -292,12 +304,13 @@ ${headInjections}
 </head>
 <body>
 <header class="markbook-header">
+  ${navToggle}
   <a class="markbook-brand" href="${homeHref}"><span class="markbook-logo" aria-hidden>📘</span> ${escapeHtml(prc.brandText)}</a>
   ${searchSlot}
   ${themeToggle}
 </header>
 <div class="${shellClass}">
-  <aside class="markbook-sidebar">
+  <aside class="markbook-sidebar" id="markbook-sidebar">
     <nav class="markbook-nav" aria-label="Site">${navHtml}</nav>
   </aside>
   <main class="markbook-main">
@@ -307,6 +320,7 @@ ${pageActions}${prc.page.parsed.html}
   </main>
   ${tocBlock}
 </div>
+<div class="markbook-nav-backdrop" data-markbook-nav-backdrop aria-hidden="true"></div>
 ${bodyEndInjections}
 </body>
 </html>

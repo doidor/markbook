@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
+import yaml from 'js-yaml';
 import { formatInstallResults, hashDirectory, installAll, listInstalled } from './skills.js';
 
 /**
@@ -334,6 +335,50 @@ describe('shipped skills (real package)', () => {
       expect(block, `${name} description field`).toMatch(/^description:\s+\S/m);
       expect(block, `${name} trigger field`).toMatch(/^trigger:\s+\S/m);
       expect(block, `${name} allowed-tools field`).toMatch(/^allowed-tools:\s+\S/m);
+    }
+  });
+
+  /**
+   * Prevention test for the YAML-frontmatter bug shipped in v0.1.3 — an
+   * `argument-hint:` value that started with `[name] [--flag]` was
+   * interpreted by YAML parsers as a flow sequence (`[name]`) followed by
+   * an invalid second flow sequence, breaking every consumer agent CLI
+   * that loads skills via YAML parsing (Claude Code, Codex, OpenCode, …).
+   * The string-presence test above missed it because regex doesn't care
+   * about YAML structure. Parse for real here so the failure surfaces
+   * pre-publish next time.
+   */
+  it('each shipped skill SKILL.md has a YAML-valid frontmatter block', async () => {
+    const shippedDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../skills');
+    const { listShippedSkills } = await import('./skills.js');
+    const found = await listShippedSkills(shippedDir);
+    for (const name of found) {
+      const skillMd = await fs.readFile(path.join(shippedDir, name, 'SKILL.md'), 'utf8');
+      const fmMatch = skillMd.match(/^---\n([\s\S]*?)\n---/);
+      expect(fmMatch).toBeTruthy();
+      let parsed: Record<string, unknown> | null = null;
+      let err: unknown = null;
+      try {
+        parsed = yaml.load(fmMatch![1]!) as Record<string, unknown>;
+      } catch (e) {
+        err = e;
+      }
+      expect(err, `${name}: YAML parse error (${err instanceof Error ? err.message : err})`).toBe(
+        null,
+      );
+      expect(parsed, `${name}: frontmatter parsed to a mapping`).toBeTypeOf('object');
+      // `name` must match the skill directory's `markbook-<dir>` id.
+      expect(parsed!.name, `${name}: name field`).toBe(`markbook-${name}`);
+      // `argument-hint`, when present, must round-trip as a string (not get
+      // accidentally parsed as a YAML flow sequence). This catches the
+      // exact bug that broke v0.1.3: `[a] [b]` parsed as `['a']` instead
+      // of the literal string.
+      if ('argument-hint' in parsed!) {
+        expect(
+          typeof parsed!['argument-hint'],
+          `${name}: argument-hint should be a string, got ${typeof parsed!['argument-hint']}`,
+        ).toBe('string');
+      }
     }
   });
 });

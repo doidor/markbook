@@ -3,7 +3,7 @@ name: markbook-layout
 description: Create or modify an HTML layout file for a Markbook site — gives you a known-good shell with all required `{{ }}` placeholders wired up, and registers it in markbook.config.ts.
 trigger: When the user wants a custom HTML shell for their Markbook site (top nav, footer, marketing landing, blog template, ...) or asks how to replace Markbook's default chrome.
 allowed-tools: Bash Read Grep Glob Edit Create
-argument-hint: [layout-name] [--style docs|marketing|blog|minimal] [--dest <layoutsDir>] [--set-default]
+argument-hint: '[layout-name] [--style docs|marketing|blog|minimal] [--dest <layoutsDir>] [--set-default]'
 ---
 
 # markbook-layout

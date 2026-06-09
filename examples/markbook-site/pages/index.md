@@ -1,8 +1,20 @@
 ---
 title: Markbook
-description: A library that renders markdown into HTML, with a React adapter (Vue and web components planned) — so it can also do component-library showcases like Storybook.
+description: Agent-first, markdown-first. A static-site engine that ships with first-class agent skills for setup, theming, and bundling — plus a React adapter for component stories when you need them.
 layout: landing
 ---
+
+<section class="site-section">
+  <h2>Agent-first by default</h2>
+  <p class="site-section-lede">
+    Markbook ships with six built-in <a href="./guides/agent-skills.html">agent skills</a> — installable into Claude Code, Codex, OpenCode, Cursor, or any agent CLI that auto-discovers skills. Setting up docs is a one-line conversation, not a config-file safari.
+  </p>
+
+  <div class="site-hero-spotlight">
+    <h3>Zero-friction setup</h3>
+    <p>One <code>npx markbook skills install</code> drops six procedural skills into your agent surface. Then: <em>"Set up Markbook in this project"</em> → <em>"Generate docs for everything under <code>src/components</code>"</em> → <em>"Apply the github preset, accent <code>#0969da</code>"</em> → done. <a href="./guides/agent-skills.html">See the skills →</a></p>
+  </div>
+</section>
 
 <section class="site-section">
   <h2>What it is</h2>
@@ -16,6 +28,11 @@ layout: landing
   </p>
 
   <div class="site-feature-grid">
+    <div class="site-feature">
+      <div class="site-feature-icon">🤖</div>
+      <h3>Agent-first by default</h3>
+      <p>Six built-in <a href="./guides/agent-skills.html">agent skills</a> for scaffolding, generating, theming, and bundling. Installable into <code>.claude/</code>, <code>.codex/</code>, <code>.opencode/</code>, <code>.agents/</code> with one command. <em>Conventions, encoded.</em></p>
+    </div>
     <div class="site-feature">
       <div class="site-feature-icon">📄</div>
       <h3>Markdown is the source of truth</h3>
@@ -69,6 +86,10 @@ layout: landing
       <strong>Getting started →</strong>
       <span>Install, scaffold a project, run the dev server. Five minutes from zero to your first page.</span>
     </a>
+    <a class="site-guide-card" href="./guides/agent-skills.html">
+      <strong>Agent skills →</strong>
+      <span>Markbook ships six agent skills for scaffolding, generating, theming, and bundling — installable into your agent CLI with one command.</span>
+    </a>
     <a class="site-guide-card" href="./guides/adding-stories.html">
       <strong>Adding component stories →</strong>
       <span>Wire up the React adapter, drop your first <code>:::story</code> directive, view it in the docs.</span>
@@ -85,10 +106,6 @@ layout: landing
       <strong>Search & SEO →</strong>
       <span>How Pagefind is hooked in, how sitemap/OG/Twitter tags are emitted, where to put your <code>siteUrl</code>.</span>
     </a>
-    <a class="site-guide-card" href="./demos/react-demo/">
-      <strong>React demo →</strong>
-      <span>Live demo of the React component library built with Markbook. Available at <code>/demos/react-demo/</code> on the published docs site.</span>
-    </a>
     <a class="site-guide-card" href="./reference/config.html">
       <strong>Config reference →</strong>
       <span>Every field of <code>MarkbookConfig</code>, with defaults and examples.</span>
@@ -96,6 +113,10 @@ layout: landing
     <a class="site-guide-card" href="./reference/cli.html">
       <strong>CLI reference →</strong>
       <span><code>build</code>, <code>dev</code>, <code>preview</code>, <code>bundle</code>, <code>skills install</code> — every command, every flag.</span>
+    </a>
+    <a class="site-guide-card" href="./reference/skills.html">
+      <strong>Skills reference →</strong>
+      <span>Every flag of every shipped skill — the deep-dive for writing an <code>AGENTS.md</code> or pinning a procedure.</span>
     </a>
   </div>
 </section>
