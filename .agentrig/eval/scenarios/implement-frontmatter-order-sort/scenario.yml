@@ -1,0 +1,28 @@
+---
+id: implement-frontmatter-order-sort
+type: run
+scope: feature
+principle_focus: [5, 10, 12]
+description: >-
+  Implement Markbook's actual sidebar-sort contract (`nav.ts` :: `sortNavItems`):
+  index page always first, then frontmatter-`order:` pages ascending, then
+  unordered pages preserving file-discovery order, with stable tie-breaks on
+  `order` and a no-mutation guarantee. Acceptance tests are planted as
+  `test.skip(...)`; the agent must un-skip every one AND make them pass.
+  Exercises this repo's idioms: co-located `*.test.js` next to source, ESM-first
+  `"type": "module"` packages, sibling-source imports (not a public-API barrel),
+  and `pnpm test` as the runner — all per Markbook's `packages/core/` conventions.
+
+# Deterministic axes scored by oracle.yml (no LLM needed):
+oracle_axes:
+  - correctness       # all 8 acceptance tests un-skipped and passing
+  - tests             # no test.skip remains on the acceptance file; SPEC unchanged
+  - scope             # diff bounded; no lockfile churn; stays inside src/
+
+# Soft axes scored by the LLM judge:
+judge_axes:
+  - self_verification
+  - gate_compliance
+  - clarity
+  - maintainability
+---

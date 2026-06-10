@@ -35,6 +35,10 @@ The convention is:
 
 | Rule | Scope | Reason |
 | --- | --- | --- |
+| [`security`](security.md) | `**/*` | No secrets in source, validate input, no injection, escape on output, least privilege |
+| [`code-review`](code-review.md) | `**/*` | Keep AI review high-signal — flag bugs / security / contract breaks, not formatting |
+| [`no-debug-logging`](no-debug-logging.md) | `**/*` | No stray `console.log` / `debugger;` left behind from investigation |
+| [`coding-standards`](coding-standards.md) | `**/*` | TS strict / Biome / Vitest / pnpm-workspace reflexes for the whole repo |
 | [`core-no-framework`](core-no-framework.md) | `packages/core/**/*.ts` | Keep the engine framework-agnostic |
 | [`tests-co-located`](tests-co-located.md) | `packages/**/*.test.ts` | Vitest convention + import-from-sibling rule |
 | [`progress-on-package-edit`](progress-on-package-edit.md) | `packages/**/*` | Don't forget the PROGRESS update |

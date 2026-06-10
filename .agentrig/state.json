@@ -1,69 +1,244 @@
 {
-  "agentrigVersion": "0.9.0",
-  "knowledgeVersion": "0.3.3",
+  "agentrigVersion": "0.11.0",
+  "knowledgeVersion": "0.6.0",
   "provider": "copilot",
   "createdAt": "2026-06-08T19:14:50.976Z",
-  "updatedAt": "2026-06-08T19:45:42.953Z",
+  "updatedAt": "2026-06-10T17:27:18.335Z",
   "installed": [
     {
       "id": "skill-self-verify",
       "dest": ".agents/skills/self-verify",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "skill-fix-ci",
       "dest": ".agents/skills/fix-ci",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "skill-skill-improver",
       "dest": ".agents/skills/skill-improver",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "skill-harness-eval",
       "dest": ".agents/skills/harness-eval",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "skill-verify-loop",
       "dest": ".agents/skills/verify-loop",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "skill-authoring",
       "dest": ".agents/skills/skill-authoring",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "rules",
       "dest": ".agents/rules",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "wiki",
       "dest": ".agents/wiki",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "eval-scenarios",
       "dest": ".agentrig/eval/scenarios",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
     },
     {
       "id": "eval-sandbox",
       "dest": ".agentrig/eval/sandbox",
-      "knowledgeVersion": "0.3.3",
-      "installedAt": "2026-06-08T19:42:25.769Z"
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "principles",
+      "dest": ".agentrig/PRINCIPLES.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "agents-package-example",
+      "dest": ".agentrig/AGENTS.package.example.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "state-machine",
+      "dest": ".agentrig/harness/state-machine.yml",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "orchestration",
+      "dest": ".agentrig/harness/ORCHESTRATION.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-developer-yml",
+      "dest": ".agentrig/agents/developer.yml",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-developer-md",
+      "dest": ".agentrig/agents/developer.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-reviewer-yml",
+      "dest": ".agentrig/agents/reviewer.yml",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-reviewer-md",
+      "dest": ".agentrig/agents/reviewer.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-judge-yml",
+      "dest": ".agentrig/agents/judge.yml",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-judge-md",
+      "dest": ".agentrig/agents/judge.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-triager-yml",
+      "dest": ".agentrig/agents/triager.yml",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "role-triager-md",
+      "dest": ".agentrig/agents/triager.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "roles-readme",
+      "dest": ".agentrig/agents/README.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "skill-log-gotcha",
+      "dest": ".agents/skills/log-gotcha",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "mcp",
+      "dest": ".mcp.json",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "worktree-script",
+      "dest": "scripts/repair-worktrees.sh",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-rubric",
+      "dest": ".agentrig/eval/RUBRIC.md",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-axes",
+      "dest": ".agentrig/eval/axes.json",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-checks",
+      "dest": ".agentrig/eval/checks.json",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-static-audit",
+      "dest": ".agentrig/eval/static-audit.mjs",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-score",
+      "dest": ".agentrig/eval/score.mjs",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "eval-calibration",
+      "dest": ".agentrig/eval/calibration",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "id": "dashboard",
+      "dest": ".agentrig/dashboard/dashboard.mjs",
+      "knowledgeVersion": "0.6.0",
+      "installedAt": "2026-06-10T17:27:18.335Z"
+    }
+  ],
+  "reconciled": [
+    {
+      "dest": ".agents/skills/self-verify/SKILL.md",
+      "knowledgeVersion": "0.6.0",
+      "decision": "kept-local",
+      "canonicalHash": "bd7202272a8e92249903269c1b5b2f6195fb56bc6c788464764aaf38fc9f50e0",
+      "decidedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "dest": ".agents/skills/harness-eval/SKILL.md",
+      "knowledgeVersion": "0.6.0",
+      "decision": "kept-local",
+      "canonicalHash": "0cad085c9d012cb480f4b26e72d9b7553e8b1c052c88126fa9c81fe05aba985f",
+      "decidedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "dest": ".agents/rules/README.md",
+      "knowledgeVersion": "0.6.0",
+      "decision": "kept-local",
+      "canonicalHash": "a1d12a0d8f8f9b7528a049e111c49353cfcb754cc29af9ac0d7a4e33590bd24d",
+      "decidedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "dest": ".agents/rules/coding-standards.md",
+      "knowledgeVersion": "0.6.0",
+      "decision": "kept-local",
+      "canonicalHash": "8710b35d00435d18e9e74d011700802507ad0181ae5409fba54dac9155ef7993",
+      "decidedAt": "2026-06-10T17:27:18.335Z"
+    },
+    {
+      "dest": ".agents/wiki/README.md",
+      "knowledgeVersion": "0.6.0",
+      "decision": "kept-local",
+      "canonicalHash": "31e146c239913e0d427b4f86fe0ded4833017f8fea94b927e895b5dd67ea8df0",
+      "decidedAt": "2026-06-10T17:27:18.335Z"
     }
   ]
 }

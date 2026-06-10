@@ -1,0 +1,63 @@
+checks:
+  # Suite is green: implementation is correct AND every acceptance test was un-skipped.
+  - id: tests-green
+    type: cmd
+    cmd: "pnpm test --silent"
+    expect: exit_zero
+    axis: correctness
+
+  # Eight acceptance tests + the sanity isIndexHref-export test must actually
+  # run. "# pass 9" (or higher, if the producer added their own smoke tests)
+  # means the producer un-skipped the 8 acceptance tests and they passed;
+  # "# pass 1" means they were left skipped. The regex matches 9 or any 2-3
+  # digit count, so trivial extras don't break the check.
+  - id: all-acceptance-tests-run
+    type: cmd
+    cmd: "pnpm test --silent 2>&1 | grep -qE '# pass (9|[1-9][0-9]+)'"
+    expect: exit_zero
+    axis: correctness
+
+  # No test.skip(...) / it.skip(...) function call left on the acceptance file.
+  # The acceptance tests are the contract; agents that "pass" by leaving them
+  # skipped fail this check. Regex requires the `(` of a call, so the literal
+  # `test.skip` mentioned in the comment header doesn't trigger a false positive.
+  - id: no-skipped-acceptance-tests
+    type: cmd
+    cmd: "! grep -qE '(test|it)\\.skip\\(' src/nav.test.js"
+    expect: exit_zero
+    axis: tests
+
+  # SPEC.md is the contract — agent must not edit it to weaken the requirements.
+  - id: spec-unchanged
+    type: diff_files
+    forbidden:
+      - "SPEC.md"
+    axis: tests
+
+  - id: diff-bounded
+    type: diff_stats
+    max_added_lines: 80
+    max_files: 3
+    axis: scope
+
+  - id: no-lockfile-churn
+    type: diff_files
+    forbidden:
+      - "package-lock.json"
+      - "yarn.lock"
+      - "pnpm-lock.yaml"
+    axis: scope
+
+  # No package.json edits — the fixture's test script is fixed; agent shouldn't
+  # need to add deps to satisfy a small pure-JS feature.
+  - id: no-manifest-churn
+    type: diff_files
+    forbidden:
+      - "package.json"
+    axis: scope
+
+  - id: only-src
+    type: diff_files
+    allowed:
+      - "src/**"
+    axis: scope
