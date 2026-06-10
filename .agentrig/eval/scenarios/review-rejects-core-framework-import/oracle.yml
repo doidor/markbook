@@ -1,0 +1,50 @@
+checks:
+  # Reviewer must produce a review.json — without it, all subsequent checks fail.
+  - id: review-json-exists
+    type: cmd
+    cmd: "test -f review.json"
+    expect: exit_zero
+    axis: finding_correctness
+
+  # The planted violation is in src/core/parse.js: a new `import ... from 'react'`
+  # at the top of the file and a corresponding `createElement(...)` call in
+  # parseMarkdown(). Reviewer wins this axis if any finding points at
+  # src/core/parse.js (any line — the whole file is the locus, since both the
+  # import line and the usage line are the same violation).
+  - id: identified-core-framework-import
+    type: cmd
+    cmd: "node -e \"const r=JSON.parse(require('fs').readFileSync('review.json','utf8')); const hits=(r.findings||[]).filter(f=>f.file && f.file.includes('core/parse')); process.exit(hits.length>0?0:1)\""
+    expect: exit_zero
+    axis: finding_correctness
+
+  # The finding on src/core/parse.js must be marked blocking — this is a
+  # documented rule violation, not a style nit.
+  - id: blocking-on-core-violation
+    type: cmd
+    cmd: "node -e \"const r=JSON.parse(require('fs').readFileSync('review.json','utf8')); const hits=(r.findings||[]).filter(f=>f.file && f.file.includes('core/parse') && f.severity==='blocking'); process.exit(hits.length>0?0:1)\""
+    expect: exit_zero
+    axis: blocking_decision
+
+  # Overall verdict must be 'block'.
+  - id: verdict-block
+    type: cmd
+    cmd: "node -e \"const r=JSON.parse(require('fs').readFileSync('review.json','utf8')); process.exit(r.verdict==='block'?0:1)\""
+    expect: exit_zero
+    axis: blocking_decision
+
+  # Reviewer must NOT block on the cosmetic refactor in src/core/template.js
+  # (extracting a regex literal into a named constant is not a bug).
+  - id: did-not-block-on-cosmetic
+    type: cmd
+    cmd: "node -e \"const r=JSON.parse(require('fs').readFileSync('review.json','utf8')); const noisy=(r.findings||[]).filter(f=>f.file && f.file.includes('core/template') && f.severity==='blocking'); process.exit(noisy.length===0?0:1)\""
+    expect: exit_zero
+    axis: false_positive_rate
+
+  # Reviewer must NOT block on the new react import inside src/adapter-react/**.
+  # Adapters are the architecturally-correct home for framework code; blocking
+  # here is cargo-cult application of the rule.
+  - id: did-not-block-on-allowed-adapter-import
+    type: cmd
+    cmd: "node -e \"const r=JSON.parse(require('fs').readFileSync('review.json','utf8')); const noisy=(r.findings||[]).filter(f=>f.file && f.file.includes('adapter-react') && f.severity==='blocking'); process.exit(noisy.length===0?0:1)\""
+    expect: exit_zero
+    axis: false_positive_rate

@@ -89,8 +89,18 @@ A **wiki entry** captures a gotcha: "we hit X, the cause was Y, the fix is Z, th
 
 ## Installed skills
 
-- **Markbook-specific (`.copilot/skills/`):** `add-stories`, `bundle-story`, `progress-log`, `style-markbook`, `verify-build`
-- **AgentRig canonical (`.copilot/skills/`, via `.agents/skills/` symlink):** `self-verify`, `verify-loop`, `fix-ci`, `skill-improver`, `skill-authoring`, `harness-eval`
+- `add-stories` — Scaffold a multi-export <Component>.stories.tsx (Storybook CSF v3 idiom) and wire it into the matching docs page with a :::stories directive.
+- `bundle-story` — Produce an embed bundle for a story and smoke-test that it renders in the embed-host workspace.
+- `fix-ci` — Diagnose and fix a failing CI run for the current branch, then re-verify.
+- `harness-eval` — Evaluate THIS repository's agent harness — a deterministic structure audit plus an independent, rubric-driven dynamic eval (run/spec/review) with A/B variant comparison.
+- `log-gotcha` — Record a newly-discovered gotcha to `.agents/wiki/` BEFORE handoff — the harness's feedback loop. The wiki is how the next agent doesn't repeat your discovery.
+- `progress-log` — Append a new entry to PROGRESS.md in the standard Markbook journal format. Replaces the legacy /markbook-log slash command.
+- `self-verify` — Run the project's own build/test/lint and converge before handing work to a reviewer.
+- `skill-authoring` — Admission bar and structure for writing a new skill, so the skill library stays lean and discoverable.
+- `skill-improver` — Turn a reviewer/judge failure into an instruction-surface change that passes a prevention test.
+- `style-markbook` — Apply a pre-baked visual preset to the Markbook docs site (contributor shim — same presets we ship as the user-facing `style` skill).
+- `verify-build` — Pre-handoff verification loop — lint, typecheck, test, build, plus the example demo builds. Iteration cap N=3.
+- `verify-loop` — General wait → inspect → fix (max 3) → self-park loop for any post-action verification (build, tests, CI, visual, lint).
 
 ## Existing tooling
 

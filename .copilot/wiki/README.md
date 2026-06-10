@@ -43,6 +43,8 @@ A new wiki entry must:
 | [`parallel-mkdir-then-create`](parallel-mkdir-then-create.md) | `mkdir` and `create` in the same tool batch can race; serialize directory creation |
 | [`html-layout-gotchas`](html-layout-gotchas.md) | HTML layout authoring — required placeholders, strict validation, escaping, comment preservation |
 | [`biome-jsx-expression-in-html-templates`](biome-jsx-expression-in-html-templates.md) | Biome's HTML linter treats `{{ }}` placeholders in `.html` files as JSX text expressions — exclude the templating directory in `biome.json` |
+| [`align-self-on-fixed-children`](align-self-on-fixed-children.md) | `align-self: start` cascades through `position: fixed`, collapsing the element to intrinsic height — explicitly reset `align-self: stretch` in the media-query rule |
+| [`yaml-frontmatter-bracket-values`](yaml-frontmatter-bracket-values.md) | SKILL.md `argument-hint:` values starting with `[` get parsed as YAML flow sequences — quote them as a string |
 
 ## Session-end discipline
 

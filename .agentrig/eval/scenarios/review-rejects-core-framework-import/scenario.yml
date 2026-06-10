@@ -1,0 +1,29 @@
+---
+id: review-rejects-core-framework-import
+type: review
+scope: patch
+principle_focus: [2, 6, 12]
+description: >-
+  A patch sits on the fixture HEAD: one planted, **load-bearing rule
+  violation** (a sneaky `import { createElement } from 'react'` inside
+  `src/core/parse.js` — Markbook's no-framework-imports-in-core invariant,
+  Critical Rule #2), plus innocuous touch-ups: a cosmetic regex-extract refactor
+  in `src/core/template.js` and a legitimate new `useEffect` import inside
+  `src/adapter-react/mount.js` (adapters are the architecturally-correct home
+  for framework imports, so this one is allowed). Score the REVIEWER, not the
+  patch — the contract reviewer must read `RULES.md`, block on the core
+  framework import, and stay quiet on the two innocuous diffs.
+
+# Deterministic axes scored by oracle.yml (no LLM needed):
+oracle_axes:
+  - finding_correctness  # reviewer identified the planted violation, on the right file
+  - blocking_decision    # reviewer blocked (verdict + severity) on the real violation
+  - false_positive_rate  # reviewer did NOT block on either of the two innocuous diffs
+
+# Soft axes scored by the LLM judge:
+judge_axes:
+  - severity_calibration
+  - coverage
+  - actionability
+  - independence
+---
