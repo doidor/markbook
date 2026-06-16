@@ -94,10 +94,10 @@ A **wiki entry** captures a gotcha: "we hit X, the cause was Y, the fix is Z, th
 - `add-stories` — Scaffold a multi-export <Component>.stories.tsx (Storybook CSF v3 idiom) and wire it into the matching docs page with a :::stories directive.
 - `bundle-story` — Produce an embed bundle for a story and smoke-test that it renders in the embed-host workspace.
 - `fix-ci` — Diagnose and fix a failing CI run for the current branch, then re-verify.
-- `harness-eval` — Evaluate THIS repository's agent harness — a deterministic structure audit plus an independent, rubric-driven dynamic eval (run/spec/review) with A/B variant comparison.
+- `harness-eval` — Evaluate THIS repository's agent harness — a deterministic structure audit (A1) plus content quality probes (A2), plus an isolated producer/judge dynamic eval (B) with paired sign-test A/B variant comparison.
 - `log-gotcha` — Record a newly-discovered gotcha to `.agents/wiki/` BEFORE handoff — the harness's feedback loop. The wiki is how the next agent doesn't repeat your discovery.
 - `progress-log` — Append a new entry to PROGRESS.md in the standard Markbook journal format. Replaces the legacy /markbook-log slash command.
-- `self-verify` — Run the project's own build/test/lint and converge before handing work to a reviewer.
+- `self-verify` — Run the project's own build/test/lint and converge before handing work to a reviewer. Requires explicit baseline → after evidence — the suite must be shown to change state, not just be "green at the end".
 - `skill-authoring` — Admission bar and structure for writing a new skill, so the skill library stays lean and discoverable.
 - `skill-improver` — Turn a reviewer/judge failure into an instruction-surface change that passes a prevention test.
 - `style-markbook` — Apply a pre-baked visual preset to the Markbook docs site (contributor shim — same presets we ship as the user-facing `style` skill).
