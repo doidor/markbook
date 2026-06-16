@@ -28,7 +28,7 @@ Drop these where you want the corresponding UI element.
 
 | Token | Substitutes | When empty |
 | --- | --- | --- |
-| `{{ search }}` | `<div id="markbook-search-ui">` — Pagefind UI mounts into it | Markbook always enables search; this is always populated. |
+| `{{ search }}` | `<div id="markbook-search-ui">` — Pagefind UI mounts into it | Empty when `search: false` in config (Pagefind skipped). Populated otherwise. |
 | `{{ themeToggle }}` | Dark/light toggle button | Always rendered. |
 | `{{ pageActions }}` | "View / Copy as Markdown" buttons | Empty when `llmsButtons: false`. |
 

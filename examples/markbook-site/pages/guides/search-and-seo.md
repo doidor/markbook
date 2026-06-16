@@ -72,6 +72,18 @@ For deeper changes, override `.pagefind-ui__*` classes directly.
 
 Cmd/Ctrl+K and `/` both focus the search input (when not already typing into another input). Wired up via a small boot script Markbook always inlines.
 
+### Disabling search
+
+Set `search: false` in `markbook.config.ts` to skip Pagefind entirely:
+
+```ts
+export default defineConfig({
+  search: false,
+});
+```
+
+With it off, neither `markbook build` nor `markbook dev` invokes Pagefind, so no `pagefind/` directory is written, `{{ search }}` renders empty, and the Pagefind UI script is omitted from `{{ bodyEnd }}` (the story entry script still loads). Reach for this on single-page or marketing sites that don't need search — or on platforms where Pagefind's native binary can't run, notably **ARM64 Linux with a 16K memory page size** (e.g. Raspberry Pi 5), where it aborts with `Unsupported system page size`.
+
 ## SEO meta block
 
 For every page, Markbook injects a complete SEO block into `<head>` — both via the built-in shell AND via the `{{ head }}` placeholder in custom layouts. Per-page values cascade: frontmatter > config defaults.

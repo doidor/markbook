@@ -166,6 +166,11 @@ export default defineConfig({
   // Dev server
   dev: { port: 5173, host: '0.0.0.0' },
 
+  // Feature toggles (all default ON)
+  search: true,                      // build the Pagefind search index
+                                     //   (set false to skip Pagefind entirely)
+  llmsButtons: true,                 // "View / Copy as Markdown" page buttons
+
   // Bundle (`markbook bundle`) options
   bundle: {
     packageScope: '@my-org',         // for --mode package outputs
@@ -202,7 +207,37 @@ Typical uses:
 
 Set `publicDir: false` to disable entirely. Default: `'public'`.
 
-### SEO + Open Graph (automatic)
+### Full-text search (Pagefind)
+
+By default Markbook builds a [Pagefind](https://pagefind.app) full-text
+index over the static output (`build`) — and over the dev server's working
+tree (`dev`) — and wires the search box into the chrome.
+
+Set `search: false` to turn it off:
+
+```ts
+export default defineConfig({
+  search: false, // skip Pagefind entirely
+});
+```
+
+With `search: false`:
+
+- `runPagefind()` is never called in `build` **or** `dev` — no `pagefind/`
+  directory is emitted.
+- The `{{ search }}` placeholder (and the built-in shell's search box)
+  renders empty.
+- `{{ bodyEnd }}` omits the Pagefind UI init script — but still emits the
+  story entry module script when an adapter is configured.
+
+Use this for sites that don't need search (single-page portfolios,
+marketing/landing pages), or on platforms where Pagefind's native binary
+can't run — notably **ARM64 Linux with a 16K memory page size** (e.g.
+Raspberry Pi 5), where the bundled binary aborts with `Unsupported system
+page size`. Disabling search lets `markbook build` / `markbook dev` run on
+those machines.
+
+
 
 Markbook always injects a complete SEO meta block into every page's `<head>`
 (both via the built-in shell AND via the `{{ head }}` placeholder in HTML

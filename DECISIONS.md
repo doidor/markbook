@@ -647,3 +647,33 @@ The CSS slide-in is `@media`-scoped under `max-width: 700px` — on desktop, the
 - The agent-skills guide + reference become part of the canonical site under `dist/guides/agent-skills.html` and `dist/reference/skills.html`. The home page restructure adds two new feature/guide cards.
 
 **Update (2026-06-09, post-shipping):** First version of the mobile nav used a 320px-wide slide-out drawer with a dim backdrop overlay. User feedback flagged it as visually awkward (white sidebar on the left, dim page content on the right, with a visible seam) — compounded by a layout bug where `bottom: 0` on the fixed-position sidebar was silently overridden by an inherited `align-self: start` from the desktop rule, so the panel sized to intrinsic content (~340px) instead of filling the viewport (788px). Both issues fixed in one pass: explicit `align-self: stretch` on the mobile rule, and switched the panel to **full-viewport width** (`inset: var(--mb-header-height) 0 0 0`) — matches Starlight's actual behaviour, removes the half-and-half visual, eliminates the need for the backdrop on mobile. The backdrop element stays emitted (display:none on mobile) so layout authors who want the side-drawer pattern can opt back in from their own CSS. Wiki entry `.copilot/wiki/align-self-on-fixed-children.md` captures the `align-self`-on-fixed-children gotcha so the next contributor doesn't trip on it.
+
+## ADR-0031 — `search` config option to disable Pagefind indexing
+
+**Status:** Accepted (2026-06-16).
+
+**Context.** Pagefind builds the static full-text search index and is wired on by default in both `build` and `dev`. Two problems with it always running (issue #16):
+
+1. **Platform crash.** Pagefind's native binary aborts on ARM64 Linux with a 16K memory page size — a known jemalloc incompatibility (`<jemalloc>: Unsupported system page size` → `memory allocation of 16 bytes failed`). On a Raspberry Pi 5 and similar boards this took down `markbook build` *and* `markbook dev` entirely, with no opt-out. The only workaround was to build on a different machine.
+2. **Needless cost.** Single-page portfolios, marketing sites, and landing pages that never render `{{ search }}` still paid for the index build and shipped the `pagefind/` directory + UI scripts.
+
+The rendering layer already carried a per-page `searchEnabled` boolean (threaded `buildPageRenderContext` → `buildHeadInjections` / `buildBodyEndInjections` / `buildSearchSlot`), but `build()` / `dev()` hard-coded it to `true` and always called `runPagefind()`.
+
+**Decision.** Add `search?: boolean` to `MarkbookConfig`, defaulting to `true`. `createContext` resolves it to `BuildContext.searchEnabled = config.search !== false`. `build()` and `dev()` pass `ctx.searchEnabled` into `writePages` and guard every `runPagefind()` call with `if (ctx.searchEnabled)`. When `false`:
+
+- `runPagefind()` is never called (in build *or* dev) — the native binary never loads, so incompatible platforms don't crash.
+- No `pagefind/` directory is emitted.
+- `{{ search }}` (and the built-in shell's search box) renders empty.
+- `{{ bodyEnd }}` omits the Pagefind UI init script but still emits the story entry module script when an adapter is configured.
+
+Default stays `true` (opt-out, not opt-in) so existing sites are unaffected.
+
+**Alternatives considered.**
+- **Auto-detect the incompatible platform and skip Pagefind silently.** Rejected — implicit, surprising (search vanishes with no config trace), and brittle to detect reliably. An explicit flag is honest and also serves the "don't need search" case.
+- **Catch the Pagefind crash and continue.** Rejected — the binary `abort()`s the process; there's nothing to catch. And it wouldn't address the "don't want search at all" case.
+- **A pluggable search-provider hook (`search: 'pagefind' | false | CustomProvider`).** Deferred — over-engineered for the reported need. The boolean is forward-compatible: a future provider object can widen the type without breaking `search: false`.
+
+**Consequences.**
+- New public-API field on `MarkbookConfig` — part of the documented config surface (`packages/core/README.md` config block + new "Full-text search (Pagefind)" subsection).
+- `BuildContext` gains a `searchEnabled` field. The integration tests (which call `writePages` directly, bypassing Vite) keep passing explicit `searchEnabled`; `build()`/`dev()` now source it from config.
+- The marketing-demo example is left search-ON deliberately — it exists to demonstrate the `{{ search }}` slot.
