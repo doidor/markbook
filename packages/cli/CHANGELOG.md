@@ -1,5 +1,12 @@
 # @doidor/markbook
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`d0b2752`](https://github.com/doidor/markbook/commit/d0b27526ccc138aafa3ec335f3db956b1a7c03b4)]:
+  - @doidor/markbook-core@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
