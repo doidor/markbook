@@ -116,6 +116,15 @@ describe('createContext — content + layouts wiring', () => {
     expect(offCtx.disableBaseCss).toBe(true);
   });
 
+  it('searchEnabled defaults to true; explicit search:false flips it', async () => {
+    const onCtx = await createContext({ root: tmp });
+    expect(onCtx.searchEnabled).toBe(true);
+    const explicitOn = await createContext({ root: tmp, search: true });
+    expect(explicitOn.searchEnabled).toBe(true);
+    const offCtx = await createContext({ root: tmp, search: false });
+    expect(offCtx.searchEnabled).toBe(false);
+  });
+
   it('uses staticAdapter() implicitly when no adapter is configured', async () => {
     const ctx = await createContext({ root: tmp });
     expect(ctx.adapter.isStatic).toBe(true);

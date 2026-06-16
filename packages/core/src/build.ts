@@ -106,6 +106,14 @@ export interface BuildContext {
   /** Whether to render "View as Markdown" / "Copy as Markdown" buttons on every page. */
   llmsButtons: boolean;
   /**
+   * Whether the Pagefind search index is built and the search chrome
+   * (input slot, CSS link, UI init script) is rendered. Resolved from
+   * `MarkbookConfig.search` (`!== false`, so the default is `true`). When
+   * `false`, `build()` / `dev()` skip `runPagefind()` and pass
+   * `searchEnabled: false` to `writePages`.
+   */
+  searchEnabled: boolean;
+  /**
    * Resolved user-directive registry, validated for built-in conflicts.
    * Keyed by directive name. Empty record means no user directives.
    */
@@ -267,6 +275,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     disableBaseCss: !!config.disableBaseCss,
     playground: config.playground === false || !config.playground ? undefined : config.playground,
     llmsButtons: config.llmsButtons !== false,
+    searchEnabled: config.search !== false,
     userDirectives,
   };
 }
@@ -457,7 +466,7 @@ export async function build(config: MarkbookConfig): Promise<void> {
   const ctx = await createContext(config);
   const { pages, htmlInputs } = await writePages(ctx, {
     clean: true,
-    searchEnabled: true,
+    searchEnabled: ctx.searchEnabled,
   });
 
   await viteBuild({
@@ -486,7 +495,7 @@ export async function build(config: MarkbookConfig): Promise<void> {
 
   await emitLlms(pages, ctx.outDir, ctx.siteTitle, ctx.siteDescription);
   await emitSitemapAndRobots(pages, ctx.outDir, ctx.siteUrl);
-  await runPagefind(ctx.outDir);
+  if (ctx.searchEnabled) await runPagefind(ctx.outDir);
 }
 
 /**
@@ -589,18 +598,18 @@ export async function preview(config: MarkbookConfig): Promise<void> {
 
 export async function dev(config: MarkbookConfig): Promise<void> {
   const ctx = await createContext(config);
-  // Search is now ON in dev too — the search slot, Pagefind CSS link, and
-  // body-end init script all render. `runPagefind(ctx.tmpDir)` below
-  // produces the index Vite serves under `/pagefind/`. Cost on a 5-page
-  // site is sub-200ms per regeneration; well worth getting search in the
-  // iteration loop.
-  const initial = await writePages(ctx, { clean: true, searchEnabled: true });
+  // Search is ON in dev too (unless `config.search: false`) — the search
+  // slot, Pagefind CSS link, and body-end init script all render.
+  // `runPagefind(ctx.tmpDir)` below produces the index Vite serves under
+  // `/pagefind/`. Cost on a 5-page site is sub-200ms per regeneration; well
+  // worth getting search in the iteration loop.
+  const initial = await writePages(ctx, { clean: true, searchEnabled: ctx.searchEnabled });
   // Also emit `llms.txt` + per-page mirrors so the layout's "All pages as
   // markdown" link (and any per-page `View as Markdown` button) work in
   // dev — not just in `markbook build`.
   await emitLlms(initial.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
   await emitSitemapAndRobots(initial.pages, ctx.tmpDir, ctx.siteUrl);
-  await runPagefind(ctx.tmpDir);
+  if (ctx.searchEnabled) await runPagefind(ctx.tmpDir);
 
   const server = await createServer({
     root: ctx.tmpDir,
@@ -674,10 +683,10 @@ export async function dev(config: MarkbookConfig): Promise<void> {
         invalidateExportsCache(abs);
         invalidateCodeCache(abs);
       }
-      const result = await writePages(ctx, { clean: false, searchEnabled: true });
+      const result = await writePages(ctx, { clean: false, searchEnabled: ctx.searchEnabled });
       await emitLlms(result.pages, ctx.tmpDir, ctx.siteTitle, ctx.siteDescription);
       await emitSitemapAndRobots(result.pages, ctx.tmpDir, ctx.siteUrl);
-      await runPagefind(ctx.tmpDir);
+      if (ctx.searchEnabled) await runPagefind(ctx.tmpDir);
 
       // Add newly-referenced story files + directive dependencies to the
       // watcher (e.g. a markdown page now points at a new `:::stories`

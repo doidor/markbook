@@ -327,6 +327,27 @@ describe('writePages — HTML layout dispatch', () => {
     expect(html).not.toContain('new PagefindUI(');
   });
 
+  it('config.search:false wires ctx.searchEnabled → no search chrome (built-in shell)', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '# Home\n',
+    });
+
+    // Mirror what build()/dev() do: pass ctx.searchEnabled (resolved from
+    // config.search) into writePages.
+    const ctx = await createContext({ root: fx.root, title: 'NoSearch', search: false });
+    expect(ctx.searchEnabled).toBe(false);
+    await writePages(ctx, { clean: true, searchEnabled: ctx.searchEnabled });
+    const html = await fx.read('index.html');
+
+    // The header search slot is absent.
+    expect(html).not.toContain('<div id="markbook-search-ui"');
+    // The Pagefind CSS link in <head> is omitted.
+    expect(html).not.toContain('pagefind-ui.css');
+    // The Pagefind UI init + script in body-end are omitted.
+    expect(html).not.toContain('pagefind-ui.js');
+    expect(html).not.toContain('new PagefindUI(');
+  });
+
   it('contentDir alias works end-to-end (pages/ instead of docs/)', async () => {
     fx = await setupFixture({
       'pages/index.md': '---\ntitle: PageDir\n---\n# Hi\n',

@@ -197,6 +197,22 @@ export interface MarkbookConfig {
    */
   llmsButtons?: boolean;
   /**
+   * Whether to build the Pagefind full-text search index. Default: `true`.
+   *
+   * Set to `false` to skip Pagefind entirely — `runPagefind()` is never
+   * called in `build` or `dev`, the `pagefind/` directory is never created,
+   * the `{{ search }}` placeholder renders empty, and `{{ bodyEnd }}` omits
+   * the Pagefind UI init script (it still emits the story entry script when
+   * an adapter is configured).
+   *
+   * Use this for sites that don't need search (single-page portfolios,
+   * marketing sites, landing pages) or on platforms where Pagefind's native
+   * binary can't run — notably ARM64 Linux with a 16K memory page size
+   * (e.g. Raspberry Pi 5), where jemalloc aborts with "Unsupported system
+   * page size".
+   */
+  search?: boolean;
+  /**
    * Markbook ships with an internal `staticAdapter()` (no framework, no
    * Vite plugins) for markdown-only sites. Supply an explicit adapter
    * (`reactAdapter`) when pages use `:::story` or `:::stories` directives —

@@ -57,9 +57,10 @@ The default `staticAdapter` errors clearly if any page tries to use a story dire
 
 | Field | Type | Default | Purpose |
 | --- | --- | --- | --- |
+| `search` | `boolean` | `true` | Build the Pagefind full-text index and render the search box. `false` skips Pagefind entirely (no `pagefind/` output, empty `{{ search }}`, no UI script in `{{ bodyEnd }}`). |
 | `llmsButtons` | `boolean` | `true` | "View as Markdown" / "Copy as Markdown" buttons above each article. |
 
-Search (Pagefind) is always on; turn it off in a custom layout by not including `{{ search }}` and `{{ bodyEnd }}`.
+Set `search: false` for sites that don't need search, or on platforms where Pagefind's native binary can't run — notably ARM64 Linux with a 16K memory page size (e.g. Raspberry Pi 5), where it aborts with `Unsupported system page size`.
 
 ## Dev server
 
