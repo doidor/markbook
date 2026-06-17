@@ -268,17 +268,26 @@ layouts). The block contains:
 
 - `<meta name="description">` — per-page frontmatter `description` wins,
   then `config.description`, then omitted entirely (Lighthouse prefers
-  absence over an empty value).
+  absence over an empty value). Skipped when your HTML layout already
+  hand-writes its own `<meta name="description">` (no duplicate tag).
 - `<meta name="theme-color">` — from `config.themeColor` (default
   `'#0a1228'`).
 - `<meta name="color-scheme" content="light dark">` — always.
 - `<link rel="canonical">` — emitted when `config.siteUrl` is set.
+  `index.html` collapses to its directory URL (the homepage canonical is
+  `https://site.com/`, a section index is `https://site.com/guides/`),
+  matching `sitemap.xml`.
 - `<meta property="og:type|title|description|site_name|url|image">` —
   always emitted; `og:url` and `og:site_name` are conditional on
   `siteUrl` / `title`. `og:image` cascades per-page frontmatter
   `ogImage` → `config.ogImage` → omitted.
 - `<meta name="twitter:card|title|description|image">` — always emitted;
   the card type bumps to `summary_large_image` when an image is set.
+
+The `<title>` / `og:title` / `twitter:title` string is
+`<page title> — <site title>`, collapsed to a single value when the page
+title already equals `config.title` (so the homepage isn't
+`My Site — My Site`).
 
 When `siteUrl` is set, both `markbook build` and `markbook dev` generate
 `sitemap.xml` (listing every page with `<lastmod>`) and `robots.txt`

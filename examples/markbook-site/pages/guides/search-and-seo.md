@@ -90,12 +90,14 @@ For every page, Markbook injects a complete SEO block into `<head>` — both via
 
 | Tag | Source | When emitted |
 | --- | --- | --- |
-| `<meta name="description">` | frontmatter `description` → `config.description` | When non-empty (skipped to avoid Lighthouse warning) |
+| `<meta name="description">` | frontmatter `description` → `config.description` | When non-empty (skipped to avoid a Lighthouse warning, or when your layout already provides its own `<meta name="description">`) |
 | `<meta name="theme-color">` | `config.themeColor` (default `#0a1228`) | Always |
 | `<meta name="color-scheme" content="light dark">` | constant | Always |
-| `<link rel="canonical">` | `${siteUrl}/${page.htmlRelPath}` | Only when `siteUrl` is set |
+| `<link rel="canonical">` | `${siteUrl}/${page.htmlRelPath}` — `index.html` collapses to its directory URL (`/`, `/guides/`) | Only when `siteUrl` is set |
 | `<meta property="og:type|title|description|site_name|url|image">` | Cascade from config + frontmatter | Always (some fields conditional) |
 | `<meta name="twitter:card|title|description|image">` | Mirror of OG | Always; card type bumps to `summary_large_image` when image set |
+
+> **Title & description, without the duplicates.** The browser/`og`/`twitter` title is `<page title> — <site title>`, but when the page title already equals `config.title` (typical on the homepage) Markbook uses it once — no `My Site — My Site`. And if your custom layout hand-writes its own `<meta name="description" content="{{ description }}">`, Markbook skips its built-in one so the tag isn't emitted twice (the `og:`/`twitter:description` variants are still injected).
 
 ### Configure once
 

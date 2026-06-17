@@ -39,9 +39,9 @@ HTML-escaped — safe to interpolate into attributes.
 | Token | Source |
 | --- | --- |
 | `{{ title }}` | Page title (frontmatter `title` → first H1 → file ID) |
-| `{{ description }}` | Effective description (frontmatter `description` → `config.description` → empty) |
+| `{{ description }}` | Effective description (frontmatter `description` → `config.description` → empty). Safe to drop into a `<meta name="description">` in your layout — Markbook detects it and skips its own so the tag isn't duplicated. |
 | `{{ siteTitle }}` | `config.title` (empty if unset) |
-| `{{ browserTitle }}` | Effective `<title>` value — `${pageTitle} — ${siteTitle}` when both set, else just one |
+| `{{ browserTitle }}` | Effective `<title>` value — `${pageTitle} — ${siteTitle}`, collapsed to just one when the page title already equals the site title |
 
 ## Arbitrary frontmatter
 

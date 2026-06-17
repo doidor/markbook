@@ -601,6 +601,86 @@ describe('writePages — SEO + Open Graph meta', () => {
     expect(html).toContain('<meta property="og:url" content="https://example.com/about.html">');
   });
 
+  it('collapses index.html to the directory URL for canonical + og:url', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+      'docs/guides/index.md': '---\ntitle: Guides\n---\n# Guides\n',
+      'docs/guides/intro.md': '---\ntitle: Intro\n---\n# Intro\n',
+    });
+    const ctx = await createContext({ root: fx.root, siteUrl: 'https://example.com' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+
+    // Root index → bare origin with trailing slash.
+    const home = await fx.read('index.html');
+    expect(home).toContain('<link rel="canonical" href="https://example.com/">');
+    expect(home).toContain('<meta property="og:url" content="https://example.com/">');
+    expect(home).not.toMatch(/canonical" href="[^"]*index\.html"/);
+
+    // Section index → directory URL.
+    const guides = await fx.read('guides/index.html');
+    expect(guides).toContain('<link rel="canonical" href="https://example.com/guides/">');
+    expect(guides).toContain('<meta property="og:url" content="https://example.com/guides/">');
+
+    // Non-index page keeps its .html path.
+    const intro = await fx.read('guides/intro.html');
+    expect(intro).toContain('<link rel="canonical" href="https://example.com/guides/intro.html">');
+  });
+
+  it('does not duplicate the site title when the page title already equals it', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Tudor Popa\n---\n# Tudor Popa\n',
+      'docs/about.md': '---\ntitle: About\n---\n# About\n',
+    });
+    const ctx = await createContext({ root: fx.root, title: 'Tudor Popa' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+
+    // Page title === site title → no `Tudor Popa — Tudor Popa`.
+    const home = await fx.read('index.html');
+    expect(home).toContain('<title>Tudor Popa</title>');
+    expect(home).toContain('<meta property="og:title" content="Tudor Popa">');
+    expect(home).not.toContain('Tudor Popa — Tudor Popa');
+
+    // Page title !== site title → suffix still applied.
+    const about = await fx.read('about.html');
+    expect(about).toContain('<title>About — Tudor Popa</title>');
+    expect(about).toContain('<meta property="og:title" content="About — Tudor Popa">');
+  });
+
+  it('skips the built-in <meta name="description"> when the layout supplies its own', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: Page description\n---\n# Home\n',
+      'layouts/default.html': `<!doctype html><html><head><title>{{ browserTitle }}</title>
+<meta name="description" content="{{ description }}">
+{{ head }}</head>
+<body><article data-pagefind-body>{{ content }}</article>{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+
+    // Exactly one `<meta name="description">` (the layout's), not two.
+    const matches = html.match(/<meta\s+name="description"/g) ?? [];
+    expect(matches).toHaveLength(1);
+    expect(html).toContain('<meta name="description" content="Page description">');
+    // og:/twitter:description are still injected (layouts rarely hand-write those).
+    expect(html).toContain('<meta property="og:description" content="Page description">');
+    expect(html).toContain('<meta name="twitter:description" content="Page description">');
+  });
+
+  it('still injects the description meta when the layout does not provide one', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\ndescription: Page description\n---\n# Home\n',
+      'layouts/default.html': `<!doctype html><html><head><title>{{ browserTitle }}</title>{{ head }}</head>
+<body><article data-pagefind-body>{{ content }}</article>{{ bodyEnd }}</body></html>`,
+    });
+    const ctx = await createContext({ root: fx.root, layout: 'default' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    const matches = html.match(/<meta\s+name="description"/g) ?? [];
+    expect(matches).toHaveLength(1);
+    expect(html).toContain('<meta name="description" content="Page description">');
+  });
+
   it('honours frontmatter `ogImage` (per-page) + config.ogImage (default) and bumps twitter:card to summary_large_image', async () => {
     fx = await setupFixture({
       'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
@@ -643,7 +723,9 @@ describe('writePages — SEO + Open Graph meta', () => {
     expect(html).toContain('<title>Home</title>');
     // Markbook injected the SEO meta via {{ head }}.
     expect(html).toContain('<meta name="description" content="Layout SEO test">');
-    expect(html).toContain('<link rel="canonical" href="https://example.com/index.html">');
+    // Homepage canonical collapses `index.html` to the directory URL.
+    expect(html).toContain('<link rel="canonical" href="https://example.com/">');
+    expect(html).toContain('<meta property="og:url" content="https://example.com/">');
     expect(html).toContain('<meta property="og:title" content="Home">');
   });
 
