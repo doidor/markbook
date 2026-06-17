@@ -46,6 +46,10 @@ inner content already-parsed as HTML.
 :::
 ```
 
+:::callout{type=warning}
+**Both `youtube` handlers above return a bare HTML string** — so the literal `::youtube{id=…}` line is what lands in the page's `llms.txt` markdown mirror. Any directive that produces _meaningful content_ should return the `{ html, markdown }` object form instead, so AI assistants and the "Copy as Markdown" button get clean text. This is essential, not advanced — see [Handler return values](#handler-return-values) below.
+:::
+
 ## Handlers in external files
 
 Inline handlers are fine for one-liners. Once you have more than a couple, or once a handler needs its own helper functions / constants / fixtures, extract it into its own file:
@@ -239,22 +243,70 @@ interface DirectiveContext {
 
 ## Handler return values
 
-Three shapes, depending on how much control you want:
+Every Markbook page is emitted **twice**: as the HTML a browser renders, and as a plain-markdown mirror at `/llms/<page>.txt` (the [`llms.txt` feature](search-and-seo.html) — what AI assistants fetch, what the per-page **"Copy as Markdown"** button copies, and a clean text view of the page). A handler can describe itself differently for each output.
 
 ```ts
-// Shorthand: just HTML
+// Shorthand: just HTML. The llms.txt mirror keeps the raw `::name{...}` source.
 ({ attributes }) => `<x>${attributes.foo}</x>`
 
-// Object form: HTML + optional llms.txt markdown fallback + dependencies
+// Object form: HTML for the page + a clean markdown fallback for llms.txt
+// (+ optional file dependencies for dev-mode re-rendering).
 ({ attributes }) => ({
   html: '<x></x>',
-  markdown: '(embedded x)',       // shown in /llms/<page>.txt instead of the directive source
-  dependencies: ['/data/x.json'], // dev mode re-renders when these files change
+  markdown: '(embedded x)',
+  dependencies: ['/data/x.json'],
 })
 
-// null or undefined: drop the directive entirely (no replacement)
+// null or undefined: drop the directive entirely (no replacement in either output).
 () => null
 ```
+
+### The markdown fallback — why every real directive needs it
+
+When a handler returns a **bare HTML string**, Markbook has no text version to put in the `/llms/<page>.txt` mirror, so it falls back to your **raw directive source**. A page containing `::youtube{id=dQw4w9WgXcQ}` ends up with this literal line in its `.txt`:
+
+```text
+::youtube{id=dQw4w9WgXcQ}
+```
+
+That's noise to everything that reads the markdown mirror — AI assistants ingesting `llms.txt`, the "Copy as Markdown" button, anyone viewing the plain-text page. The fix is the object form: return the HTML **and** a markdown description.
+
+```ts
+import { escapeAttribute, defineConfig } from '@doidor/markbook-core';
+
+export default defineConfig({
+  directives: {
+    youtube: ({ attributes }) => ({
+      html: `<iframe src="https://youtube.com/embed/${escapeAttribute(attributes.id ?? '')}" allowfullscreen></iframe>`,
+      markdown: `[▶ Watch on YouTube](https://youtu.be/${attributes.id})`,
+    }),
+  },
+});
+```
+
+Now the HTML page gets the iframe, and the `.txt` mirror gets a real, followable link instead of directive syntax:
+
+```text
+[▶ Watch on YouTube](https://youtu.be/dQw4w9WgXcQ)
+```
+
+**How each field is consumed:**
+
+| Field | Consumed by | When omitted |
+| --- | --- | --- |
+| `html` | The rendered HTML page **and** the Pagefind search index | Required — the object form must include `html` |
+| `markdown` | `/llms/<page>.txt`, the top-level `llms.txt`, and the "Copy as Markdown" button | The raw `::name{...}` directive source is kept verbatim |
+| `dependencies` | `markbook dev` — re-renders the page whenever a listed file changes | No file-watching for this directive |
+
+`markdown` has three modes:
+
+- **Omitted** — keep the original directive source in the mirror. Fine only when the `::name{...}` source already reads naturally on its own.
+- **A string** — replace the directive with that markdown (a link, `(embedded tweet)`, a real `| table |`, …). This is what most content directives want.
+- **`''` (empty string)** — drop the directive from the mirror entirely. Good for purely-decorative HTML that carries no textual meaning.
+
+:::callout{type=info}
+**Rule of thumb:** if a directive produces meaningful content — a video, an embed, a data table, a card — give it a `markdown` fallback. If it's purely decorative, return `markdown: ''`. Reserve the omit-and-keep-source default for leaf directives whose source is already self-explanatory.
+:::
 
 ## Async + file I/O
 
