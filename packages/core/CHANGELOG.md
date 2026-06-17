@@ -1,5 +1,31 @@
 # @doidor/markbook-core
 
+## 0.4.2
+
+### Patch Changes
+
+- [#31](https://github.com/doidor/markbook/pull/31) [`6739377`](https://github.com/doidor/markbook/commit/67393778ef892000c8746519143fc722f43dd0e6) Thanks [@doidor](https://github.com/doidor)! - **Resolve nested directive markdown fallbacks in a container's `innerMarkdown`** ([#30](https://github.com/doidor/markbook/issues/30)).
+
+  The HTML path already resolved nested directives ([#20](https://github.com/doidor/markbook/issues/20)), but `innerMarkdown` still
+  held the raw `::name{...}` source — so a container handler that built its
+  `markdown` fallback from `innerMarkdown` leaked unresolved directive syntax into
+  the `llms/<page>.txt` mirror.
+
+  Now `innerMarkdown` substitutes each nested directive's `markdown` fallback (same
+  recursion + contract as `innerHtml`):
+
+  ```md
+  :::section{label=Currently}
+  ::about-item{label="Role:" text="Principal Engineering Manager"}
+  :::
+  ```
+
+  With `about-item` returning `{ html, markdown: '**Role:** …' }`, the section's
+  `innerMarkdown` is now `**Role:** Principal Engineering Manager` instead of the
+  literal `::about-item{...}`. Nested containers compose recursively; a nested
+  directive that returns no `markdown` keeps its raw source (same as top-level),
+  and `markdown: ''` drops it.
+
 ## 0.4.1
 
 ### Patch Changes
