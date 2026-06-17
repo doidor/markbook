@@ -3,6 +3,21 @@ import fs from 'node:fs/promises';
 import type { PageRecord } from './build.js';
 
 /**
+ * Build the canonical absolute URL for a page. `index.html` files collapse to
+ * their directory URL — the site root becomes `https://site.com/` and a
+ * section index `guides/index.html` becomes `https://site.com/guides/` — so
+ * the `<link rel="canonical">`, `og:url`, and `sitemap.xml` forms all agree.
+ * Non-index pages (`about.html`) are returned unchanged.
+ *
+ * `siteUrl` must already be normalized (no trailing slash) via
+ * `normalizeSiteUrl`.
+ */
+export function canonicalPageUrl(siteUrl: string, htmlRelPath: string): string {
+  const url = `${siteUrl}/${htmlRelPath.replace(/\\/g, '/')}`;
+  return url.endsWith('/index.html') ? url.slice(0, -'index.html'.length) : url;
+}
+
+/**
  * Normalize a user-supplied `siteUrl` for canonical/OG/sitemap use:
  *   - Returns `null` if unset.
  *   - Strips any trailing slash so concatenation with page paths is clean.
@@ -48,9 +63,7 @@ export async function emitSitemapAndRobots(
   const today = new Date().toISOString().slice(0, 10);
   const urls = pages
     .map((p) => {
-      const url = `${siteUrl}/${p.htmlRelPath.replace(/\\/g, '/')}`;
-      // index.html → canonical URL ends at the directory (cleaner sitemap entry).
-      const canonical = url.endsWith('/index.html') ? url.slice(0, -'index.html'.length) : url;
+      const canonical = canonicalPageUrl(siteUrl, p.htmlRelPath);
       return `  <url>\n    <loc>${escapeXml(canonical)}</loc>\n    <lastmod>${today}</lastmod>\n  </url>`;
     })
     .join('\n');

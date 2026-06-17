@@ -3,6 +3,7 @@ import { escapeHtml, escapeAttribute } from './directive-utils.js';
 import { stringify } from './placeholder.js';
 import { getInlineAssets } from './assets.js';
 import { applyHtmlLayout, type HtmlLayoutSubstitutions } from './template.js';
+import { canonicalPageUrl } from './sitemap.js';
 import type { PageRecord, BuildContext } from './build.js';
 import type { NavGroup } from './nav.js';
 
@@ -75,7 +76,11 @@ export function buildPageRenderContext(
   })();
 
   const pageTitle = page.parsed.title;
-  const browserTitle = ctx.siteTitle ? `${pageTitle} — ${ctx.siteTitle}` : pageTitle;
+  // Avoid `Foo — Foo` when the page title already equals the site title
+  // (common on the homepage). Only append the site title as a suffix when it
+  // differs from the page title.
+  const browserTitle =
+    ctx.siteTitle && ctx.siteTitle !== pageTitle ? `${pageTitle} — ${ctx.siteTitle}` : pageTitle;
   const brandText = ctx.siteTitle ?? pageTitle;
 
   // Description / OG image: per-page frontmatter wins, falls back to config.
@@ -90,11 +95,10 @@ export function buildPageRenderContext(
       : undefined;
   const effectiveOgImage = fmOgImage ?? ctx.ogImage;
 
-  // Canonical URL — only emit when siteUrl is set; build from absolute path
-  // so URL is portable regardless of resolveHref's relative output.
-  const canonicalUrl = ctx.siteUrl
-    ? `${ctx.siteUrl}/${page.htmlRelPath.replace(/\\/g, '/')}`
-    : null;
+  // Canonical URL — only emit when siteUrl is set. `index.html` collapses to
+  // its directory URL (matching sitemap.xml) so the homepage canonical is
+  // `https://site.com/`, not `…/index.html`.
+  const canonicalUrl = ctx.siteUrl ? canonicalPageUrl(ctx.siteUrl, page.htmlRelPath) : null;
 
   return {
     page,
@@ -127,7 +131,10 @@ export function buildPageRenderContext(
  * viewport>` — those are the layout author's call. Use
  * `{{ browserTitle }}` for the title string.
  */
-function buildHeadInjections(prc: PageRenderContext): string {
+function buildHeadInjections(
+  prc: PageRenderContext,
+  opts: { skipDescriptionMeta?: boolean } = {},
+): string {
   const assets = getInlineAssets();
   const pagefindLink = prc.searchEnabled
     ? `<link href="${prc.pagefindBase}/pagefind-ui.css" rel="stylesheet">`
@@ -147,7 +154,7 @@ function buildHeadInjections(prc: PageRenderContext): string {
   if (prc.userCss) parts.push(`<style data-markbook-user-css>${prc.userCss}</style>`);
   // SEO + browser-chrome meta. Always emitted; per-page values come from
   // the PageRenderContext (frontmatter > config defaults).
-  parts.push(buildSeoMeta(prc));
+  parts.push(buildSeoMeta(prc, opts));
   return parts.join('\n');
 }
 
@@ -160,13 +167,21 @@ function buildHeadInjections(prc: PageRenderContext): string {
  * Per-page values cascade frontmatter > config defaults. Tags that
  * require a canonical URL (canonical, og:url) are emitted only when
  * `siteUrl` is set in the config.
+ *
+ * `skipDescriptionMeta` suppresses the plain `<meta name="description">` when
+ * the HTML layout already provides its own (avoids a duplicate tag). The
+ * `og:`/`twitter:description` variants are always emitted — layouts rarely
+ * hand-write those.
  */
-function buildSeoMeta(prc: PageRenderContext): string {
+function buildSeoMeta(
+  prc: PageRenderContext,
+  opts: { skipDescriptionMeta?: boolean } = {},
+): string {
   const lines: string[] = [];
   // Per-page description — first-class SEO requirement. Skip if empty
   // (don't emit `<meta content="">` — Lighthouse flags it as "no
   // description").
-  if (prc.effectiveDescription) {
+  if (prc.effectiveDescription && !opts.skipDescriptionMeta) {
     lines.push(`<meta name="description" content="${escapeAttribute(prc.effectiveDescription)}">`);
   }
   // Browser chrome tinting + dark-mode hint. theme-color works on mobile
@@ -338,15 +353,25 @@ ${bodyEndInjections}
  * layout supplies its own `<article ... data-pagefind-body>` wrapper if
  * it wants Pagefind to index the page.
  */
+/**
+ * Matches a `<meta name="description" …>` tag in a raw layout body (before
+ * placeholder substitution). Used to avoid emitting Markbook's own
+ * description meta when the layout already provides one. Deliberately strict:
+ * `name="description"` only — `og:description` / `twitter:description` use
+ * different attribute names and never collide.
+ */
+const LAYOUT_DESCRIPTION_META = /<meta\s+[^>]*name=["']description["']/i;
+
 export function renderLayout(
   prc: PageRenderContext,
   layoutName: string,
   layoutBody: string,
 ): string {
+  const layoutHasDescriptionMeta = LAYOUT_DESCRIPTION_META.test(layoutBody);
   const subs: HtmlLayoutSubstitutions = {
     raw: {
       content: prc.page.parsed.html,
-      head: buildHeadInjections(prc),
+      head: buildHeadInjections(prc, { skipDescriptionMeta: layoutHasDescriptionMeta }),
       bodyEnd: buildBodyEndInjections(prc),
       pageActions: prc.llmsButtons ? renderPageActions(prc.page, prc.resolveHref) : '',
       search: buildSearchSlot(prc),
