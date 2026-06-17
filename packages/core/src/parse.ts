@@ -430,14 +430,18 @@ export async function parseMarkdown(
       if (pendingUserDirectiveTasks.length > 0) {
         await Promise.all(
           pendingUserDirectiveTasks.map(async (task) => {
-            const innerHtml =
-              task.formInSource === 'container'
-                ? await renderChildrenToHtml(task.childrenSnapshot, nestedDirectiveContext)
-                : null;
-            const innerMarkdown =
-              task.formInSource === 'container'
-                ? extractInnerMarkdown(content, task.slot.start, task.slot.end)
-                : null;
+            let innerHtml: string | null = null;
+            let innerMarkdown: string | null = null;
+            if (task.formInSource === 'container') {
+              const inner = await resolveContainerInner(
+                task.childrenSnapshot,
+                task.slot.start,
+                task.slot.end,
+                nestedDirectiveContext,
+              );
+              innerHtml = inner.html;
+              innerMarkdown = inner.markdown;
+            }
             const out = await runDirectiveHandler({
               name: task.name,
               handler: task.handler,
@@ -572,19 +576,50 @@ interface NestedDirectiveContext {
 }
 
 /**
- * Render a snapshot of mdast container-directive children into HTML using
- * the same plugin stack the top-level pipeline uses. Nested USER directives
- * (leaf or container, at any depth) are resolved through their handlers
- * first, so a `::about-item{...}` inside a `:::section{...}` renders the
- * handler's output rather than an empty `<div>`. Built-in directives
- * (`story` / `stories` / `props`) are NOT run when nested — they stay
- * top-level-only.
+ * One nested directive's markdown substitution: replace the directive's raw
+ * source span (`[start, end)`, absolute offsets into `content`) with `markdown`
+ * — its handler's `markdown` fallback, or the raw source when the handler
+ * provides none (mirrors the top-level `buildPlainMarkdown` contract).
  */
-async function renderChildrenToHtml(
+interface MarkdownSub {
+  start: number;
+  end: number;
+  markdown: string;
+}
+
+/** Inner HTML + inner markdown of a container, both with nested directives resolved. */
+interface ResolvedInner {
+  html: string;
+  markdown: string;
+}
+
+/**
+ * Resolve a container directive's children once and return BOTH views: the
+ * inner HTML (nested handlers' `html`, for `innerHtml`) and the inner markdown
+ * (nested handlers' `markdown` fallback substituted into the raw source, for
+ * `innerMarkdown`). Nested USER directives (leaf or container, any depth) run
+ * exactly once; a nested container resolves its own inner views first, so a
+ * handler that builds its markdown from `innerMarkdown` composes recursively.
+ * Built-in directives (`story` / `stories` / `props`) never run when nested.
+ */
+async function resolveContainerInner(
   children: unknown[],
+  start: number,
+  end: number,
   ctx: NestedDirectiveContext,
-): Promise<string> {
-  await resolveNestedUserDirectives(children, ctx);
+): Promise<ResolvedInner> {
+  const mdSubs: MarkdownSub[] = [];
+  await resolveNestedUserDirectives(children, ctx, mdSubs);
+  const html = await stringifyChildrenToHtml(children);
+  const markdown = buildInnerMarkdown(ctx.content, start, end, mdSubs);
+  return { html, markdown };
+}
+
+/**
+ * Stringify mdast children (with nested directives already resolved to raw-html
+ * nodes) into HTML using the same plugin stack the top-level pipeline uses.
+ */
+async function stringifyChildrenToHtml(children: unknown[]): Promise<string> {
   const processor = unified()
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(() => async (tree: unknown) => {
@@ -598,15 +633,17 @@ async function renderChildrenToHtml(
 
 /**
  * Walk a list of mdast nodes and replace every nested user-directive node
- * (leaf or container) with a raw-html node carrying its handler output.
- * Containers recurse (their body is resolved before the handler runs, so
- * `innerHtml` already contains resolved grandchildren). Unknown directives
- * are left untouched but still descended into, so a registered directive
- * buried inside an unhandled wrapper still renders.
+ * (leaf or container) with a raw-html node carrying its handler output, while
+ * recording a `MarkdownSub` for each so the container's `innerMarkdown` gets
+ * the handler's markdown fallback (not the raw `::name{...}` syntax).
+ * Containers recurse (their inner views are resolved before the handler runs).
+ * Unknown directives are left untouched but still descended into, so a
+ * registered directive buried inside an unhandled wrapper still renders.
  */
 async function resolveNestedUserDirectives(
   nodes: unknown[],
   ctx: NestedDirectiveContext,
+  mdSubs: MarkdownSub[],
 ): Promise<void> {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i] as {
@@ -631,15 +668,14 @@ async function resolveNestedUserDirectives(
       if (handler) {
         const actualForm: 'leaf' | 'container' = isContainer ? 'container' : 'leaf';
         validatePinnedType(handler, name, actualForm, ctx.pageFile, node.position?.start);
+        const start = node.position?.start?.offset ?? 0;
+        const end = node.position?.end?.offset ?? 0;
         let innerHtml: string | null = null;
         let innerMarkdown: string | null = null;
         if (isContainer) {
-          innerHtml = await renderChildrenToHtml(node.children ?? [], ctx);
-          innerMarkdown = extractInnerMarkdown(
-            ctx.content,
-            node.position?.start?.offset ?? 0,
-            node.position?.end?.offset ?? 0,
-          );
+          const inner = await resolveContainerInner(node.children ?? [], start, end, ctx);
+          innerHtml = inner.html;
+          innerMarkdown = inner.markdown;
         }
         const out = await runDirectiveHandler({
           name,
@@ -656,13 +692,24 @@ async function resolveNestedUserDirectives(
         });
         for (const dep of out.dependencies) ctx.dependencies.push(dep);
         nodes[i] = { type: 'html', value: out.html };
+        // Record the markdown substitution for the enclosing container's
+        // `innerMarkdown`. `undefined` => keep the raw directive source (same
+        // contract as the top-level `buildPlainMarkdown`).
+        mdSubs.push({
+          start,
+          end,
+          markdown:
+            out.markdownReplacement !== undefined
+              ? out.markdownReplacement
+              : ctx.content.slice(start, end),
+        });
         continue;
       }
       // Unhandled directive — fall through to descend into its children.
     }
 
     if (Array.isArray(node.children)) {
-      await resolveNestedUserDirectives(node.children, ctx);
+      await resolveNestedUserDirectives(node.children, ctx, mdSubs);
     }
   }
 }
@@ -764,18 +811,42 @@ async function runDirectiveHandler(inv: DirectiveInvocation): Promise<DirectiveO
 }
 
 /**
- * Return the raw markdown source between the opening `:::` and closing
- * `:::` of a container directive — without the directive's own header
- * line. Used so user handlers can ALSO see the original markdown text
- * (some need it: e.g. `mermaid` wants the source verbatim, not parsed).
- * `content` is the frontmatter-stripped body the mdast was parsed from, so
- * `start` / `end` (node position offsets) line up.
+ * Build a container directive's inner markdown: the raw source between its
+ * opening `:::name{...}` and closing `:::` lines, with each nested directive's
+ * source span replaced by its markdown fallback (`subs`). With no subs this is
+ * just the verbatim inner source (what `mermaid`-style handlers want). `content`
+ * is the frontmatter-stripped body the mdast was parsed from, so `start` / `end`
+ * (node position offsets) and `subs` offsets line up.
  */
-function extractInnerMarkdown(content: string, start: number, end: number): string {
+function buildInnerMarkdown(
+  content: string,
+  start: number,
+  end: number,
+  subs: MarkdownSub[],
+): string {
   const raw = content.slice(start, end);
+  let substituted = raw;
+  if (subs.length > 0) {
+    // Splice each nested directive's markdown over its source span (offsets
+    // are absolute → rebase to the container start). Nested directives never
+    // touch the fence lines, so line-stripping below stays correct.
+    const sorted = [...subs].sort((a, b) => a.start - b.start);
+    let out = '';
+    let cursor = 0;
+    for (const sub of sorted) {
+      const relStart = sub.start - start;
+      const relEnd = sub.end - start;
+      if (relStart < cursor || relStart < 0 || relEnd > raw.length) continue;
+      out += raw.slice(cursor, relStart);
+      out += sub.markdown;
+      cursor = relEnd;
+    }
+    out += raw.slice(cursor);
+    substituted = out;
+  }
   // Strip the leading `:::name{...}` line + trailing `:::` line. Be lenient
   // about line endings.
-  const lines = raw.split('\n');
+  const lines = substituted.split('\n');
   if (lines.length <= 2) return '';
   return lines.slice(1, -1).join('\n').trim();
 }
