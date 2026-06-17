@@ -1,5 +1,36 @@
 # @doidor/markbook-core
 
+## 0.4.0
+
+### Minor Changes
+
+- [#24](https://github.com/doidor/markbook/pull/24) [`65a9def`](https://github.com/doidor/markbook/commit/65a9defbaca630bc09d1ba7dbe3b7a1cb9c30130) Thanks [@doidor](https://github.com/doidor)! - **Nested directives now compose inside container bodies** ([#20](https://github.com/doidor/markbook/issues/20)).
+
+  Leaf and container directives written inside a `:::` container are resolved
+  through their handlers instead of rendering as empty `<div>` elements:
+
+  ```md
+  :::section{label=Currently}
+  ::about-item{label="Role:" text="Principal Engineer"}
+  ::about-item{label="Team:" text="Core"}
+  :::
+  ```
+
+  The `section` handler receives each `about-item`'s rendered output as
+  `innerHtml`. Containers nest too (add more colons to the outer fence, like
+  nested code fences). Nested-handler `dependencies` roll up into the page's
+  dev-mode watch set, and a thrown nested handler is wrapped with the same
+  `file:line:col` context as a top-level one. Built-in directives
+  (`story` / `stories` / `props`) remain top-level only.
+
+  Also fixes a latent bug where `innerMarkdown` returned the page's frontmatter
+  text (instead of the container body) when frontmatter was present — offsets
+  now index the frontmatter-stripped content.
+
+  Directives are still not parsed inside raw HTML blocks (`<ul>…</ul>`) — that's
+  a CommonMark rule; use a container directive (e.g. a `link-list` wrapping
+  `link` children) to build the same structure.
+
 ## 0.3.0
 
 ### Minor Changes
@@ -53,10 +84,11 @@
            - `prefers-reduced-motion` disables the slide; `overscroll-behavior:
 
       contain` prevents scroll-chaining behind the open menu.
-     - Mobile nav rows get bigger padding (`0.6rem 0.85rem`) + 1rem font for
-       tap-friendliness.
-     - Layout authors (`layoutsDir`) opt in by adding the same data attributes
-       to their own markup — the boot script ships via `{{ head }}` for free.
+
+  - Mobile nav rows get bigger padding (`0.6rem 0.85rem`) + 1rem font for
+    tap-friendliness.
+  - Layout authors (`layoutsDir`) opt in by adding the same data attributes
+    to their own markup — the boot script ships via `{{ head }}` for free.
 
   2.  **Agent-first docs surface.** The six skills shipped via
       `markbook skills install` (`markbook-init`, `markbook-add-component-page`,

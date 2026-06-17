@@ -1,6 +1,6 @@
 {
   "name": "@doidor/markbook-adapter-shared",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Shared browser-side runtime helpers for Markbook framework adapters (CSS injection, shadow-root mounting, story parameters)",
   "keywords": [
     "markbook",
