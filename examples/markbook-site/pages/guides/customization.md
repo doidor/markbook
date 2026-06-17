@@ -148,6 +148,16 @@ The callback gets:
 
 Use sparingly. If you find yourself doing more than a regex or two, you probably want a layout instead.
 
+:::callout{type=info}
+**You probably don't need `transformHtml` for SEO URLs or titles.** The three most common uses are now automatic:
+
+- The canonical URL and `og:url` collapse `index.html` to the directory URL — the homepage is `https://site.com/`, a section index is `https://site.com/guides/` (no more string-replacing `/index.html` away).
+- The `<title>` / `og:title` drops the duplicated site title, so a homepage whose title equals `config.title` is `My Site`, not `My Site — My Site`.
+- The built-in `<meta name="description">` is skipped when your layout already hand-writes one (no duplicate tag).
+
+See [Search & SEO](./search-and-seo.html). Reach for `transformHtml` only for things Markbook can't know about — analytics snippets, custom structured data, third-party widget markup.
+:::
+
 ## A worked example
 
 [`examples/marketing-demo/`](https://github.com/doidor/markbook/tree/main/examples/marketing-demo) in the Markbook repo combines layers 2 + 3:

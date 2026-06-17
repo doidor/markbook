@@ -43,7 +43,7 @@ export default defineConfig({
 | --- | --- | --- | --- |
 | `css` | `string \| string[]` | (none) | CSS files inlined into every page after `BASE_CSS`. Use for `--mb-*` token overrides. |
 | `disableBaseCss` | `boolean` | `false` | Skip Markbook's built-in chrome stylesheet entirely. Pair with `layoutsDir` to own the entire shell. |
-| `transformHtml` | `(html, page) => string \| Promise<string>` | (none) | Post-process every page's final HTML. Runs LAST — after layout substitution. |
+| `transformHtml` | `(html, page) => string \| Promise<string>` | (none) | Post-process every page's final HTML. Runs LAST — after layout substitution. Not needed for the common SEO fixes (`index.html`-free canonical / `og:url`, de-duplicated title, de-duplicated `<meta description>`) — those are automatic. |
 
 ## Adapter (component stories)
 
