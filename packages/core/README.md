@@ -54,6 +54,29 @@ Handlers can be inline (as above), or imported from external modules (jiti loads
 
 See the [custom directives guide](https://doidor.github.io/markbook/guides/custom-directives.html) for the full surface (descriptor form, type pinning, llms.txt fallback, dev-mode dependency tracking, etc.) and ADR-0025 for the design rationale.
 
+#### Nesting directives
+
+A container directive's body is itself parsed for directives, so leaf (and container) directives **compose**:
+
+```md
+:::section{label=Currently}
+::about-item{label="Role:" text="Principal Engineer"}
+::about-item{label="Team:" text="Core"}
+:::
+```
+
+The `section` handler receives the rendered children — including each `about-item`'s handler output — as `innerHtml`. To nest a container inside a container, add **more colons to the outer fence** (same rule as nested code fences):
+
+```md
+::::group
+:::inner
+::leaf{}
+:::
+::::
+```
+
+> **Directives are not parsed inside raw HTML blocks.** A `::link` written between `<ul>` … `</ul>` is left as literal text — that's a CommonMark rule (the block is opaque raw HTML), not a Markbook limitation. Build the structure with a container directive instead (e.g. a `link-list` whose handler wraps `innerHtml` in `<ul>`, with `link` leaf children rendering `<li>`). Built-in directives (`story` / `stories` / `props`) only run at the top level, never nested.
+
 ### `:::story` — single story per file (built-in)
 
 ```

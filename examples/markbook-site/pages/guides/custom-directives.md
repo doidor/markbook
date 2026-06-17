@@ -188,6 +188,38 @@ directives: {
 },
 ```
 
+## Nesting directives
+
+A container's body is parsed for directives too, so directives **compose**. Put leaf directives inside a container and each one's handler runs — the container sees the combined output as `innerHtml`:
+
+```md
+:::section{label=Currently}
+::about-item{label="Role:" text="Principal Engineer"}
+::about-item{label="Team:" text="Core"}
+:::
+```
+
+```ts
+directives: {
+  section: ({ attributes, innerHtml }) =>
+    `<section data-label="${escapeAttribute(attributes.label ?? '')}">${innerHtml ?? ''}</section>`,
+  'about-item': ({ attributes }) =>
+    `<div class="item"><b>${escapeHtml(attributes.label ?? '')}</b> ${escapeHtml(attributes.text ?? '')}</div>`,
+},
+```
+
+To nest a **container inside a container**, add more colons to the outer fence — the same rule as nested code fences:
+
+```md
+::::group
+:::inner
+::leaf{}
+:::
+::::
+```
+
+> **Directives are not parsed inside raw HTML blocks.** A `::link` written between `<ul>` … `</ul>` stays literal text — CommonMark treats the HTML block as opaque, so remark-directive never sees it. Build the structure with a container directive instead: a `link-list` whose handler wraps `innerHtml` in `<ul>`, with `link` leaf children that render `<li>`. The built-in `story` / `stories` / `props` directives only run at the top level, never nested.
+
 ## Handler context
 
 Every handler receives a single `ctx` object:

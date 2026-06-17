@@ -7,7 +7,8 @@ import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import rehypeSlug from 'rehype-slug';
-import { visit } from 'unist-util-visit';
+import { SKIP, visit } from 'unist-util-visit';
+import type { DirectiveHandler, DirectiveResult } from './config.js';
 import { applyTemplate } from './template.js';
 import { humanizeExportName } from './exports.js';
 import { resolveSpec } from './resolve.js';
@@ -190,18 +191,29 @@ export async function parseMarkdown(
   interface PendingUserDirectiveTask {
     slot: UserDirectiveSlot;
     name: string;
-    handler: import('./config.js').DirectiveHandler;
+    handler: DirectiveHandler;
     formInSource: 'leaf' | 'container';
     attributes: Record<string, string | undefined>;
     childrenSnapshot: unknown[];
-    /** Raw markdown source between the opening `:::` and closing `:::`. */
-    innerMarkdownSource: string | null;
     line?: number;
     column?: number;
   }
   const pendingUserDirectiveTasks: PendingUserDirectiveTask[] = [];
 
   const userDirectives = options.userDirectives ?? {};
+
+  // Shared context for resolving nested user directives inside container
+  // bodies. `content` (not the raw `source`) is the offset base — the mdast
+  // is parsed from `content`, so node positions index into it.
+  const nestedDirectiveDependencies: string[] = [];
+  const nestedDirectiveContext: NestedDirectiveContext = {
+    userDirectives,
+    content,
+    pageFile,
+    root: options.root ?? path.dirname(pageFile),
+    frontmatter,
+    dependencies: nestedDirectiveDependencies,
+  };
 
   const file = await unified()
     .use(remarkParse)
@@ -269,7 +281,8 @@ export async function parseMarkdown(
           } else {
             slots.push({ kind: 'props', parent, index, start, end });
           }
-          return;
+          // Built-in container bodies are not re-scanned for directives.
+          return SKIP;
         }
 
         // User directives — registered via config.directives.
@@ -279,17 +292,14 @@ export async function parseMarkdown(
         const attrs = (node.attributes ?? {}) as Record<string, string | undefined>;
         // Validate pinned `type` against actual source form (clearer error
         // than silently letting the handler see an unexpected innerHtml).
-        const descriptor = isDirectiveDescriptor(handler) ? handler : { handler };
-        const pinned = descriptor.type;
         const actualForm: 'leaf' | 'container' = isContainer ? 'container' : 'leaf';
-        if (pinned && pinned !== actualForm) {
-          const pos = node.position?.start;
-          throw new Error(
-            `Markbook: directive '${node.name}' in ${pageFile}` +
-              (pos ? `:${pos.line}:${pos.column}` : '') +
-              ` was written as ${actualForm} (${actualForm === 'leaf' ? '::' : ':::'}${node.name}…) but the handler is pinned to ${pinned}.`,
-          );
-        }
+        validatePinnedType(
+          handler,
+          node.name as string,
+          actualForm,
+          pageFile,
+          node.position?.start,
+        );
 
         // Pre-allocate the slot — `html` / `markdownReplacement` are filled
         // after the user handler resolves in the async pass below.
@@ -311,10 +321,14 @@ export async function parseMarkdown(
           formInSource: actualForm,
           attributes: attrs,
           childrenSnapshot: isContainer ? (node.children ?? []) : [],
-          innerMarkdownSource: isContainer ? source.slice(start, end) : null,
           line: node.position?.start?.line,
           column: node.position?.start?.column,
         });
+        // Claimed container: its body is resolved (incl. nested user
+        // directives) when we compute `innerHtml` below — don't let `visit`
+        // descend and create overlapping top-level slots for those nested
+        // directives.
+        if (isContainer) return SKIP;
       });
 
       // Fan out `:::stories` slots first — they create StoryRefs that the
@@ -418,50 +432,30 @@ export async function parseMarkdown(
           pendingUserDirectiveTasks.map(async (task) => {
             const innerHtml =
               task.formInSource === 'container'
-                ? await renderChildrenToHtml(task.childrenSnapshot)
+                ? await renderChildrenToHtml(task.childrenSnapshot, nestedDirectiveContext)
                 : null;
             const innerMarkdown =
-              task.formInSource === 'container' ? extractInnerMarkdown(source, task.slot) : null;
-            const descriptor = isDirectiveDescriptor(task.handler)
-              ? task.handler
-              : { handler: task.handler };
-            let result: import('./config.js').DirectiveResult;
-            try {
-              result = await Promise.resolve(
-                descriptor.handler({
-                  name: task.name,
-                  attributes: task.attributes,
-                  type: task.formInSource,
-                  innerHtml,
-                  innerMarkdown,
-                  pageFile,
-                  root: options.root ?? path.dirname(pageFile),
-                  frontmatter,
-                }),
-              );
-            } catch (err) {
-              const where = `${pageFile}${task.line ? `:${task.line}:${task.column ?? 0}` : ''}`;
-              throw new Error(
-                `Markbook: directive '${task.name}' in ${where} threw: ${(err as Error).message}`,
-                { cause: err as Error },
-              );
+              task.formInSource === 'container'
+                ? extractInnerMarkdown(content, task.slot.start, task.slot.end)
+                : null;
+            const out = await runDirectiveHandler({
+              name: task.name,
+              handler: task.handler,
+              type: task.formInSource,
+              attributes: task.attributes,
+              innerHtml,
+              innerMarkdown,
+              pageFile,
+              root: options.root ?? path.dirname(pageFile),
+              frontmatter,
+              line: task.line,
+              column: task.column,
+            });
+            task.slot.html = out.html;
+            if (out.markdownReplacement !== undefined) {
+              task.slot.markdownReplacement = out.markdownReplacement;
             }
-            if (result == null) {
-              task.slot.html = '';
-              task.slot.markdownReplacement = '';
-            } else if (typeof result === 'string') {
-              task.slot.html = result;
-            } else {
-              task.slot.html = result.html;
-              if (typeof result.markdown === 'string') {
-                task.slot.markdownReplacement = result.markdown;
-              }
-              if (Array.isArray(result.dependencies)) {
-                task.slot.dependencies = result.dependencies.filter(
-                  (d): d is string => typeof d === 'string',
-                );
-              }
-            }
+            task.slot.dependencies = out.dependencies;
           }),
         );
       }
@@ -542,8 +536,12 @@ export async function parseMarkdown(
   const title = fmTitle ?? h1Text ?? fileId;
 
   // Roll user-directive dependencies up into a deduped list for the watcher.
+  // Includes deps reported by nested directives inside container bodies.
   const directiveDependencies = [
-    ...new Set(slots.flatMap((s) => (s.kind === 'user' ? s.dependencies : []))),
+    ...new Set([
+      ...slots.flatMap((s) => (s.kind === 'user' ? s.dependencies : [])),
+      ...nestedDirectiveDependencies,
+    ]),
   ];
 
   return {
@@ -558,23 +556,35 @@ export async function parseMarkdown(
   };
 }
 
-/** Type-guard distinguishing the `{ type, handler }` descriptor form from the function shorthand. */
-function isDirectiveDescriptor(
-  h: import('./config.js').DirectiveHandler,
-): h is import('./config.js').DirectiveHandlerDescriptor {
-  return typeof h !== 'function' && typeof (h as { handler?: unknown }).handler === 'function';
+/**
+ * Context threaded through nested user-directive resolution inside container
+ * bodies. `content` is the offset base (the mdast is parsed from it, so node
+ * positions index into it). `dependencies` accumulates absolute file paths
+ * reported by nested handlers so they roll up into the page's watch set.
+ */
+interface NestedDirectiveContext {
+  userDirectives: Record<string, DirectiveHandler>;
+  content: string;
+  pageFile: string;
+  root: string;
+  frontmatter: Record<string, unknown>;
+  dependencies: string[];
 }
 
 /**
  * Render a snapshot of mdast container-directive children into HTML using
- * the same plugin stack the top-level pipeline uses. Built-in directives
- * inside the children DON'T run (we'd hit recursion semantics that aren't
- * defined yet); plain markdown and any nested user directives in the
- * original tree DO render because they're already part of the snapshot's
- * AST. For v1, scope is "render rich markdown inside callouts," not
- * "nest custom directives inside callouts."
+ * the same plugin stack the top-level pipeline uses. Nested USER directives
+ * (leaf or container, at any depth) are resolved through their handlers
+ * first, so a `::about-item{...}` inside a `:::section{...}` renders the
+ * handler's output rather than an empty `<div>`. Built-in directives
+ * (`story` / `stories` / `props`) are NOT run when nested — they stay
+ * top-level-only.
  */
-async function renderChildrenToHtml(children: unknown[]): Promise<string> {
+async function renderChildrenToHtml(
+  children: unknown[],
+  ctx: NestedDirectiveContext,
+): Promise<string> {
+  await resolveNestedUserDirectives(children, ctx);
   const processor = unified()
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(() => async (tree: unknown) => {
@@ -587,13 +597,182 @@ async function renderChildrenToHtml(children: unknown[]): Promise<string> {
 }
 
 /**
+ * Walk a list of mdast nodes and replace every nested user-directive node
+ * (leaf or container) with a raw-html node carrying its handler output.
+ * Containers recurse (their body is resolved before the handler runs, so
+ * `innerHtml` already contains resolved grandchildren). Unknown directives
+ * are left untouched but still descended into, so a registered directive
+ * buried inside an unhandled wrapper still renders.
+ */
+async function resolveNestedUserDirectives(
+  nodes: unknown[],
+  ctx: NestedDirectiveContext,
+): Promise<void> {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i] as {
+      type?: string;
+      name?: string;
+      attributes?: Record<string, string | undefined>;
+      children?: unknown[];
+      position?: {
+        start?: { offset?: number; line?: number; column?: number };
+        end?: { offset?: number };
+      };
+    } | null;
+    if (!node || typeof node !== 'object') continue;
+
+    const isContainer = node.type === 'containerDirective';
+    const isLeaf = node.type === 'leafDirective';
+    if (isContainer || isLeaf) {
+      const name = node.name ?? '';
+      // Built-ins never run nested — leave them as-is.
+      const isBuiltin = name === 'story' || name === 'stories' || name === 'props';
+      const handler = isBuiltin ? undefined : ctx.userDirectives[name];
+      if (handler) {
+        const actualForm: 'leaf' | 'container' = isContainer ? 'container' : 'leaf';
+        validatePinnedType(handler, name, actualForm, ctx.pageFile, node.position?.start);
+        let innerHtml: string | null = null;
+        let innerMarkdown: string | null = null;
+        if (isContainer) {
+          innerHtml = await renderChildrenToHtml(node.children ?? [], ctx);
+          innerMarkdown = extractInnerMarkdown(
+            ctx.content,
+            node.position?.start?.offset ?? 0,
+            node.position?.end?.offset ?? 0,
+          );
+        }
+        const out = await runDirectiveHandler({
+          name,
+          handler,
+          type: actualForm,
+          attributes: (node.attributes ?? {}) as Record<string, string | undefined>,
+          innerHtml,
+          innerMarkdown,
+          pageFile: ctx.pageFile,
+          root: ctx.root,
+          frontmatter: ctx.frontmatter,
+          line: node.position?.start?.line,
+          column: node.position?.start?.column,
+        });
+        for (const dep of out.dependencies) ctx.dependencies.push(dep);
+        nodes[i] = { type: 'html', value: out.html };
+        continue;
+      }
+      // Unhandled directive — fall through to descend into its children.
+    }
+
+    if (Array.isArray(node.children)) {
+      await resolveNestedUserDirectives(node.children, ctx);
+    }
+  }
+}
+
+/** Type-guard distinguishing the `{ type, handler }` descriptor form from the function shorthand. */
+function isDirectiveDescriptor(
+  h: import('./config.js').DirectiveHandler,
+): h is import('./config.js').DirectiveHandlerDescriptor {
+  return typeof h !== 'function' && typeof (h as { handler?: unknown }).handler === 'function';
+}
+
+/**
+ * Throw with source position when a `{ type }`-pinned handler is used with
+ * the wrong directive form (`::` leaf vs `:::` container). Shared by the
+ * top-level visitor and nested resolution so the error is identical either
+ * way.
+ */
+function validatePinnedType(
+  handler: DirectiveHandler,
+  name: string,
+  actualForm: 'leaf' | 'container',
+  pageFile: string,
+  position: { line?: number; column?: number } | undefined,
+): void {
+  const descriptor = isDirectiveDescriptor(handler) ? handler : { handler };
+  const pinned = descriptor.type;
+  if (pinned && pinned !== actualForm) {
+    throw new Error(
+      `Markbook: directive '${name}' in ${pageFile}` +
+        (position?.line ? `:${position.line}:${position.column ?? 0}` : '') +
+        ` was written as ${actualForm} (${actualForm === 'leaf' ? '::' : ':::'}${name}…) but the handler is pinned to ${pinned}.`,
+    );
+  }
+}
+
+interface DirectiveInvocation {
+  name: string;
+  handler: DirectiveHandler;
+  type: 'leaf' | 'container';
+  attributes: Record<string, string | undefined>;
+  innerHtml: string | null;
+  innerMarkdown: string | null;
+  pageFile: string;
+  root: string;
+  frontmatter: Record<string, unknown>;
+  line?: number;
+  column?: number;
+}
+
+interface DirectiveOutput {
+  html: string;
+  /** `undefined` => keep original source in the llms.txt mirror. */
+  markdownReplacement: string | undefined;
+  dependencies: string[];
+}
+
+/**
+ * Call a user directive handler and normalize its return value (string /
+ * `{ html, markdown, dependencies }` / null) into a `DirectiveOutput`.
+ * Thrown errors get a `file:line:column` prefix and chain the original via
+ * `Error.cause`. Shared by the top-level pass and nested resolution.
+ */
+async function runDirectiveHandler(inv: DirectiveInvocation): Promise<DirectiveOutput> {
+  const descriptor = isDirectiveDescriptor(inv.handler) ? inv.handler : { handler: inv.handler };
+  let result: DirectiveResult;
+  try {
+    result = await Promise.resolve(
+      descriptor.handler({
+        name: inv.name,
+        attributes: inv.attributes,
+        type: inv.type,
+        innerHtml: inv.innerHtml,
+        innerMarkdown: inv.innerMarkdown,
+        pageFile: inv.pageFile,
+        root: inv.root,
+        frontmatter: inv.frontmatter,
+      }),
+    );
+  } catch (err) {
+    const where = `${inv.pageFile}${inv.line ? `:${inv.line}:${inv.column ?? 0}` : ''}`;
+    throw new Error(
+      `Markbook: directive '${inv.name}' in ${where} threw: ${(err as Error).message}`,
+      { cause: err as Error },
+    );
+  }
+  if (result == null) {
+    return { html: '', markdownReplacement: '', dependencies: [] };
+  }
+  if (typeof result === 'string') {
+    return { html: result, markdownReplacement: undefined, dependencies: [] };
+  }
+  return {
+    html: result.html,
+    markdownReplacement: typeof result.markdown === 'string' ? result.markdown : undefined,
+    dependencies: Array.isArray(result.dependencies)
+      ? result.dependencies.filter((d): d is string => typeof d === 'string')
+      : [],
+  };
+}
+
+/**
  * Return the raw markdown source between the opening `:::` and closing
  * `:::` of a container directive — without the directive's own header
  * line. Used so user handlers can ALSO see the original markdown text
  * (some need it: e.g. `mermaid` wants the source verbatim, not parsed).
+ * `content` is the frontmatter-stripped body the mdast was parsed from, so
+ * `start` / `end` (node position offsets) line up.
  */
-function extractInnerMarkdown(source: string, slot: BaseSlot): string {
-  const raw = source.slice(slot.start, slot.end);
+function extractInnerMarkdown(content: string, start: number, end: number): string {
+  const raw = content.slice(start, end);
   // Strip the leading `:::name{...}` line + trailing `:::` line. Be lenient
   // about line endings.
   const lines = raw.split('\n');
