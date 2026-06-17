@@ -297,6 +297,128 @@ Some **bold** prose.
   });
 });
 
+describe('user directives — nested markdown fallback (innerMarkdown)', () => {
+  it("resolves a nested leaf's markdown fallback in the container's innerMarkdown", async () => {
+    let innerMd: string | null = null;
+    const result = await call(
+      `:::section{label=Currently}
+::about-item{label="Role:" text="Principal Engineering Manager"}
+
+::about-item{label="Team:" text="Core"}
+:::`,
+      {
+        section: ({ attributes, innerHtml, innerMarkdown }) => {
+          innerMd = innerMarkdown;
+          return {
+            html: `<section>${innerHtml ?? ''}</section>`,
+            markdown: `## ${attributes.label}\n\n${innerMarkdown ?? ''}`,
+          };
+        },
+        'about-item': ({ attributes }) => ({
+          html: `<div><b>${attributes.label}</b> ${attributes.text}</div>`,
+          markdown: `**${attributes.label}** ${attributes.text}`,
+        }),
+      },
+    );
+    // innerMarkdown carries the nested handler's markdown, not the raw directive.
+    expect(innerMd).toBe('**Role:** Principal Engineering Manager\n\n**Team:** Core');
+    // The llms.txt mirror reflects it too.
+    expect(result.plainMarkdown).toContain('## Currently');
+    expect(result.plainMarkdown).toContain('**Role:** Principal Engineering Manager');
+    expect(result.plainMarkdown).toContain('**Team:** Core');
+    expect(result.plainMarkdown).not.toContain('::about-item');
+    // HTML path remains correct.
+    expect(result.html).toContain('<b>Role:</b> Principal Engineering Manager');
+  });
+
+  it('resolves nested markdown recursively (container inside container)', async () => {
+    let groupMd: string | null = null;
+    await call(
+      `::::group
+:::card{title=A}
+::pill{v=1}
+:::
+::::`,
+      {
+        group: ({ innerMarkdown }) => {
+          groupMd = innerMarkdown;
+          return { html: '<g></g>', markdown: innerMarkdown ?? '' };
+        },
+        card: ({ attributes, innerMarkdown }) => ({
+          html: '<c></c>',
+          markdown: `### ${attributes.title}\n${innerMarkdown ?? ''}`,
+        }),
+        pill: ({ attributes }) => ({ html: '<p></p>', markdown: `- pill ${attributes.v}` }),
+      },
+    );
+    expect(groupMd).toContain('### A');
+    expect(groupMd).toContain('- pill 1');
+    expect(groupMd).not.toContain(':::');
+    expect(groupMd).not.toContain('::pill');
+  });
+
+  it('drops a nested directive from innerMarkdown when it returns markdown:""', async () => {
+    let innerMd: string | null = null;
+    await call(
+      `:::wrap
+Intro line.
+
+::deco{}
+
+Outro line.
+:::`,
+      {
+        wrap: ({ innerMarkdown }) => {
+          innerMd = innerMarkdown;
+          return { html: '<w></w>', markdown: innerMarkdown ?? '' };
+        },
+        deco: () => ({ html: '<hr>', markdown: '' }),
+      },
+    );
+    expect(innerMd).toContain('Intro line.');
+    expect(innerMd).toContain('Outro line.');
+    expect(innerMd).not.toContain('::deco');
+  });
+
+  it('keeps the raw source for a nested directive that returns no markdown', async () => {
+    let innerMd: string | null = null;
+    await call(
+      `:::wrap
+::bare{x=1}
+:::`,
+      {
+        wrap: ({ innerMarkdown }) => {
+          innerMd = innerMarkdown;
+          return { html: '<w></w>', markdown: innerMarkdown ?? '' };
+        },
+        // Bare HTML string return → no markdown fallback → source kept verbatim.
+        bare: () => '<span>bare</span>',
+      },
+    );
+    expect(innerMd).toBe('::bare{x=1}');
+  });
+
+  it('leaves innerMarkdown verbatim when there are no nested directives', async () => {
+    let innerMd: string | null = null;
+    await call(
+      `:::note
+- one
+- two
+
+A [link](https://example.com).
+:::`,
+      {
+        note: ({ innerMarkdown }) => {
+          innerMd = innerMarkdown;
+          return '';
+        },
+      },
+    );
+    expect(innerMd).toContain('- one');
+    expect(innerMd).toContain('A [link](https://example.com).');
+  });
+});
+
 describe('user directives — handler descriptor with pinned type', () => {
   it('throws when a leaf-pinned handler is used as a container', async () => {
     await expect(
