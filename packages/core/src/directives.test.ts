@@ -106,6 +106,32 @@ Paragraph with [link](https://example.com).
     expect(capturedMd).toContain('Paragraph with [link]');
   });
 
+  it('captures the body (not frontmatter) as innerMarkdown when frontmatter is present', async () => {
+    let capturedMd: string | null = null;
+    await parseMarkdown(
+      `---
+title: Hello
+author: Someone
+---
+
+:::callout{type=info}
+The real body line.
+:::`,
+      'fid',
+      {
+        pageFile: '/tmp/test/page.md',
+        root: '/tmp/test',
+        userDirectives: {
+          callout: ({ innerMarkdown }) => {
+            capturedMd = innerMarkdown;
+            return '';
+          },
+        },
+      },
+    );
+    expect(capturedMd).toBe('The real body line.');
+  });
+
   it('substitutes the handler output (with rendered inner HTML wrapped)', async () => {
     const result = await call(
       `:::callout{type=warning}
@@ -134,6 +160,140 @@ body
       },
     );
     expect(capturedType).toBe('container');
+  });
+});
+
+describe('user directives — nested inside containers', () => {
+  it('runs a nested leaf directive handler (not an empty <div>)', async () => {
+    const result = await call(
+      `:::section{label=Currently}
+::about-item{label="Role:" text="Principal Engineer"}
+:::`,
+      {
+        section: ({ attributes, innerHtml }) =>
+          `<section data-label="${attributes.label}">${innerHtml ?? ''}</section>`,
+        'about-item': ({ attributes }) =>
+          `<div class="item"><b>${attributes.label}</b> ${attributes.text}</div>`,
+      },
+    );
+    expect(result.html).toContain('<section data-label="Currently">');
+    expect(result.html).toContain('<div class="item"><b>Role:</b> Principal Engineer</div>');
+    // Regression: the nested leaf used to drop its attributes and render as <div></div>.
+    expect(result.html).not.toContain('<div></div>');
+  });
+
+  it('interleaves nested directives with plain markdown', async () => {
+    const result = await call(
+      `:::section
+::item{n=1}
+
+Some **bold** prose.
+
+::item{n=2}
+:::`,
+      {
+        section: ({ innerHtml }) => `<section>${innerHtml ?? ''}</section>`,
+        item: ({ attributes }) => `<i>${attributes.n}</i>`,
+      },
+    );
+    expect(result.html).toContain('<i>1</i>');
+    expect(result.html).toContain('<i>2</i>');
+    expect(result.html).toContain('<strong>bold</strong>');
+  });
+
+  it('composes a list from a container + leaf children (HTML-block alternative)', async () => {
+    const result = await call(
+      `:::link-list
+::link{href="https://a.com" text=A}
+::link{href="https://b.com" text=B}
+:::`,
+      {
+        'link-list': ({ innerHtml }) => `<ul class="links">${innerHtml ?? ''}</ul>`,
+        link: ({ attributes }) => `<li><a href="${attributes.href}">${attributes.text}</a></li>`,
+      },
+    );
+    expect(result.html).toContain('<ul class="links">');
+    expect(result.html).toContain('<a href="https://a.com">A</a>');
+    expect(result.html).toContain('<a href="https://b.com">B</a>');
+  });
+
+  it('resolves containers nested inside containers (more colons on the outer fence)', async () => {
+    const result = await call(
+      `::::group
+::leaf{v=1}
+
+:::inner
+::leaf{v=2}
+:::
+::::`,
+      {
+        group: ({ innerHtml }) => `<g>${innerHtml ?? ''}</g>`,
+        inner: ({ innerHtml }) => `<n>${innerHtml ?? ''}</n>`,
+        leaf: ({ attributes }) => `<l>${attributes.v}</l>`,
+      },
+    );
+    expect(result.html).toContain('<g>');
+    expect(result.html).toContain('<n><l>2</l></n>');
+    expect(result.html).toContain('<l>1</l>');
+  });
+
+  it('rolls nested directive dependencies up into directiveDependencies', async () => {
+    const result = await call(
+      `:::wrap
+::data{}
+:::`,
+      {
+        wrap: ({ innerHtml }) => `<w>${innerHtml ?? ''}</w>`,
+        data: () => ({ html: '<d></d>', dependencies: ['/abs/data.json'] }),
+      },
+    );
+    expect(result.directiveDependencies).toContain('/abs/data.json');
+  });
+
+  it('leaves an unknown nested directive untouched while still rendering known siblings', async () => {
+    const result = await call(
+      `:::section
+::known{}
+::unknown{}
+:::`,
+      {
+        section: ({ innerHtml }) => `<section>${innerHtml ?? ''}</section>`,
+        known: () => '<span class="known"></span>',
+      },
+    );
+    expect(result.html).toContain('<span class="known"></span>');
+    // Unknown directive falls through to remark-rehype's default rendering.
+    expect(result.html).toContain('<section>');
+  });
+
+  it('wraps a throwing nested handler with file context', async () => {
+    await expect(
+      call(
+        `:::section
+::boom{}
+:::`,
+        {
+          section: ({ innerHtml }) => `<section>${innerHtml ?? ''}</section>`,
+          boom: () => {
+            throw new Error('nested failure');
+          },
+        },
+      ),
+    ).rejects.toThrow(/directive 'boom' in .* threw: nested failure/);
+  });
+
+  it('enforces pinned type for a nested directive', async () => {
+    await expect(
+      call(
+        `:::section
+::card{}
+:::`,
+        {
+          section: ({ innerHtml }) => `<section>${innerHtml ?? ''}</section>`,
+          card: { type: 'container', handler: () => '<div></div>' },
+        },
+      ),
+    ).rejects.toThrow(/written as leaf .* but the handler is pinned to container/);
   });
 });
 
