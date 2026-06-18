@@ -27,6 +27,8 @@ export interface PageRenderContext {
   searchEnabled: boolean;
   userCss: string;
   disableBaseCss: boolean;
+  /** Whether to emit the cross-document View Transitions stylesheet. */
+  viewTransitions: boolean;
   llmsButtons: boolean;
   /** Site-wide description (frontmatter overrides per-page). */
   siteDescription: string | undefined;
@@ -108,6 +110,7 @@ export function buildPageRenderContext(
     searchEnabled,
     userCss: ctx.userCss,
     disableBaseCss: ctx.disableBaseCss,
+    viewTransitions: ctx.viewTransitions,
     llmsButtons: ctx.llmsButtons,
     siteDescription: ctx.siteDescription,
     siteUrl: ctx.siteUrl,
@@ -155,6 +158,12 @@ function buildHeadInjections(
   if (prc.searchEnabled) parts.push(`<script>${assets.searchKbdBoot}</script>`);
   if (pagefindLink) parts.push(pagefindLink);
   if (!prc.disableBaseCss) parts.push(`<style>${assets.baseCss}</style>`);
+  // Cross-document View Transitions ride alongside the base chrome and are
+  // toggled by `config.viewTransitions` (default on). Kept as a separate
+  // `<style>` so it can be omitted without touching the rest of BASE_CSS.
+  if (!prc.disableBaseCss && prc.viewTransitions) {
+    parts.push(`<style>${assets.viewTransitionsCss}</style>`);
+  }
   if (prc.userCss) parts.push(`<style data-markbook-user-css>${prc.userCss}</style>`);
   // SEO + browser-chrome meta. Always emitted; per-page values come from
   // the PageRenderContext (frontmatter > config defaults).

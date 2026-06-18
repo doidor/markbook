@@ -213,6 +213,22 @@ export interface MarkbookConfig {
    */
   search?: boolean;
   /**
+   * Whether to enable cross-document View Transitions for SPA-like page
+   * navigation. Default: `false` (opt-in).
+   *
+   * When `true`, a small stylesheet emits `@view-transition { navigation: auto; }`
+   * plus an instant `root` cut, so the browser holds the old frame until the
+   * next page has painted and swaps with no blank/white flash (a crisp,
+   * ghost-free route change). It is pure progressive enhancement — unsupported
+   * browsers just navigate normally.
+   *
+   * Left unset (or `false`), pages navigate with the browser's default
+   * behaviour and no View Transitions stylesheet is emitted. The stylesheet is
+   * also never emitted when `disableBaseCss` is set — custom-chrome sites add
+   * `@view-transition` to their own `css` if they want it.
+   */
+  viewTransitions?: boolean;
+  /**
    * Markbook ships with an internal `staticAdapter()` (no framework, no
    * Vite plugins) for markdown-only sites. Supply an explicit adapter
    * (`reactAdapter`) when pages use `:::story` or `:::stories` directives —

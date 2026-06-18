@@ -101,6 +101,27 @@ let NAV_TOGGLE_BOOT_SCRIPT = `(function(){function setOpen(o){var b=document.bod
  */
 const SPECULATION_RULES = `{"prefetch":[{"where":{"href_matches":"/*"},"eagerness":"moderate"}]}`;
 
+/**
+ * Cross-document View Transitions CSS. Injected as its own `<style>` so it can
+ * be toggled independently of the rest of the chrome via
+ * `MarkbookConfig.viewTransitions` (default on). `navigation: auto` opts every
+ * same-origin page load into the View Transitions API (Chromium 126+, Safari
+ * 18.2+); unsupported browsers (Firefox today) just navigate normally — pure
+ * progressive enhancement, no client-side router.
+ *
+ * The page is **cut over instantly** (`::view-transition-old/new(root) {
+ * animation: none }`) rather than cross-faded: opacity-fading two different
+ * pages superimposes their text into a muddy "double exposure" that itself
+ * reads as a flash. The browser still holds the old frame until the new page
+ * has painted, then swaps with no blank/white repaint, so the chrome (identical
+ * between pages) appears to stay put while the content changes. An instant cut
+ * also leaves nothing to animate for prefers-reduced-motion.
+ */
+let VIEW_TRANSITIONS_CSS = `@view-transition { navigation: auto; }
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }`;
+
 let BASE_CSS = `
 :root {
   --mb-bg: #ffffff;
@@ -136,22 +157,6 @@ let BASE_CSS = `
   color-scheme: dark;
 }
 *,*::before,*::after { box-sizing: border-box; }
-/* View Transitions — make a full cross-document navigation feel SPA-like.
-   'navigation: auto' opts every same-origin page load into the browser's
-   View Transitions API (Chromium 126+, Safari 18.2+); unsupported browsers
-   (Firefox today) just navigate normally — pure progressive enhancement, no
-   client-side router. Cut cleanly between pages instead of cross-fading:
-   opacity-fading two different pages superimposes their text — a muddy "double
-   exposure" that reads as a flash even with view transitions on. With an instant
-   cut the API simply holds the old frame until the new page has painted, then
-   swaps without the blank/white repaint of a normal navigation — the chrome
-   (identical between pages) appears to stay put while the content changes, a
-   crisp SPA-style route change. No animation also means nothing to undo for
-   prefers-reduced-motion. */
-@view-transition { navigation: auto; }
-::view-transition-group(root),
-::view-transition-old(root),
-::view-transition-new(root) { animation: none; }
 /* The 'scrollbar-gutter: stable' rule reserves space for the vertical
    scrollbar even on short pages, so navigation between long and short
    pages doesn't cause the layout to jitter horizontally (the viewport
@@ -848,6 +853,8 @@ export interface InlineAssets {
   navToggleBoot: string;
   /** Speculation Rules JSON for `<script type="speculationrules">` (prefetch). */
   speculationRules: string;
+  /** Cross-document View Transitions CSS (toggled by `config.viewTransitions`). */
+  viewTransitionsCss: string;
   baseCss: string;
 }
 
@@ -874,6 +881,7 @@ async function doMinify(): Promise<void> {
     copyMdMin,
     navToggleMin,
     baseCssMin,
+    viewTransitionsMin,
   ] = await Promise.all([
     minifyJs(THEME_BOOT_SCRIPT),
     minifyJs(TABS_BOOT_SCRIPT),
@@ -884,6 +892,7 @@ async function doMinify(): Promise<void> {
     minifyJs(COPY_MD_BOOT_SCRIPT),
     minifyJs(NAV_TOGGLE_BOOT_SCRIPT),
     minifyCss(BASE_CSS),
+    minifyCss(VIEW_TRANSITIONS_CSS),
   ]);
   THEME_BOOT_SCRIPT = themeMin;
   TABS_BOOT_SCRIPT = tabsMin;
@@ -894,6 +903,7 @@ async function doMinify(): Promise<void> {
   COPY_MD_BOOT_SCRIPT = copyMdMin;
   NAV_TOGGLE_BOOT_SCRIPT = navToggleMin;
   BASE_CSS = baseCssMin;
+  VIEW_TRANSITIONS_CSS = viewTransitionsMin;
 }
 
 /** Current snapshot of the inline assets (minified once the minify resolves). */
@@ -908,6 +918,7 @@ export function getInlineAssets(): InlineAssets {
     copyMdBoot: COPY_MD_BOOT_SCRIPT,
     navToggleBoot: NAV_TOGGLE_BOOT_SCRIPT,
     speculationRules: SPECULATION_RULES,
+    viewTransitionsCss: VIEW_TRANSITIONS_CSS,
     baseCss: BASE_CSS,
   };
 }

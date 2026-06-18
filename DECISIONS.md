@@ -695,8 +695,10 @@ techniques that fix it (the same ones Starlight uses) are the **View Transitions
 API** to hold the old frame and swap cleanly to the new page, and **link
 prefetch** so the next page is already cached when clicked.
 
-**Decision.** Add both as zero-config progressive enhancements, with **no
-client-side router** and **no new `MarkbookConfig` field**:
+**Decision.** Add both as progressive enhancements that need **no client-side
+router**. As finally shipped, hover prefetch is on by default and View
+Transitions are **opt-in** (`viewTransitions: true`); the two Update stanzas
+below record how that default evolved. The mechanism:
 
 1. `BASE_CSS` emits `@view-transition { navigation: auto; }`, opting every
    same-origin navigation into cross-document view transitions, and **cuts the
@@ -735,11 +737,12 @@ Rules are Chromium-only and a no-op on `file:` pages), so nothing regresses.
   forward) that contradicts Markbook's static-first / KISS constitution and adds
   a large always-shipped script. Native cross-document View Transitions deliver
   the same "full load feels SPA-like" perception with one CSS at-rule.
-- **A `viewTransitions` / `prefetch` config opt-out.** Rejected for now as config
-  burden — these degrade gracefully and are visual polish, like the existing
-  `scrollbar-gutter: stable` default. Opting out is already possible
-  (`@view-transition { navigation: none; }` via `css`). A knob can be added later
-  without breaking changes if a real need appears.
+- **A `viewTransitions` / `prefetch` config opt-out.** Initially deferred as
+  config burden — these degrade gracefully and are visual polish, like the
+  existing `scrollbar-gutter: stable` default, and opting out was already
+  possible (`@view-transition { navigation: none; }` via `css`). The
+  `viewTransitions` opt-out was added shortly after on request (see the Update);
+  a `prefetch` opt-out is still deferred until a concrete need appears.
 - **`<link rel="prefetch">` for every link.** Rejected — eager, bandwidth-wasteful,
   and requires enumerating URLs. Speculation Rules with `moderate` eagerness is
   declarative and hover-scoped.
@@ -748,10 +751,31 @@ Rules are Chromium-only and a no-op on `file:` pages), so nothing regresses.
   conservative middle ground.
 
 **Consequences.**
-- No public-API change: `speculationRules` is a field on the internal
-  `InlineAssets`, not exported from `index.ts`. Captured by the changeset, not a
-  semver event.
+- The only new public-API surface is the `viewTransitions?: boolean`
+  `MarkbookConfig` field (see Update). `speculationRules` / `viewTransitionsCss`
+  are fields on the internal `InlineAssets`, not exported from `index.ts`.
 - `disableBaseCss` sites get the prefetch (head-injected) but not the VT CSS — an
   intentional split documented in the core README's "Navigation feel" section.
 - Browser support will broaden over time (Firefox is implementing cross-document
   VT); the feature improves for free as it does, with no Markbook change needed.
+
+**Update (2026-06-18).** Added `viewTransitions?: boolean` to `MarkbookConfig`
+(default `true`); resolved onto `BuildContext.viewTransitions` in `createContext`
+and threaded into `PageRenderContext`. When `false`, the View Transitions
+stylesheet is omitted and pages navigate with the browser's default behaviour.
+The stylesheet was extracted from `BASE_CSS` into its own `VIEW_TRANSITIONS_CSS`
+inline asset so it can be toggled (and minified) independently, injected as a
+separate `<style>` from `buildHeadInjections` when
+`viewTransitions !== false && !disableBaseCss`. The instant-cut default is
+unchanged; this only adds the escape hatch. Prefetch stays non-configurable for
+now.
+
+**Update (2026-06-19).** Flipped the `viewTransitions` default from `true` to
+`false` — View Transitions are now **opt-in** (`createContext` resolves
+`config.viewTransitions === true`). Rationale: silently imposing a
+(Chromium-mostly) cross-document navigation behaviour on every Markbook consumer
+is more than a static-site engine should assume by default; a site that wants
+the SPA feel asks for it with one flag. For everyone else the default is exactly
+the pre-VT behaviour plus the on-by-default hover prefetch. None of the shipped
+examples opt in (the docs site included), so they navigate normally. Prefetch is
+unaffected (still on by default).

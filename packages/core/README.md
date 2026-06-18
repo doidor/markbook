@@ -189,10 +189,14 @@ export default defineConfig({
   // Dev server
   dev: { port: 5173, host: '0.0.0.0' },
 
-  // Feature toggles (all default ON)
+  // Feature toggles (default ON)
   search: true,                      // build the Pagefind search index
                                      //   (set false to skip Pagefind entirely)
   llmsButtons: true,                 // "View / Copy as Markdown" page buttons
+
+  // Opt-in features (default OFF)
+  viewTransitions: true,             // SPA-style cross-document page swaps
+                                     //   (instant-cut navigation; off by default)
 
   // Bundle (`markbook bundle`) options
   bundle: {
@@ -446,16 +450,17 @@ The fenced-code background pulls from `--mb-code-bg` so a single token
 override re-skins every code block in light + dark mode without touching
 Shiki's syntax colors.
 
-## Navigation feel (View Transitions + prefetch)
+## Navigation feel (prefetch + opt-in View Transitions)
 
 A built site is a classic multi-page app — every link is a full document
-navigation. Two zero-config, progressive-enhancement layers make that feel
-SPA-like instead of flashing on each click. Both degrade to plain navigation
-where unsupported; there is no config knob and no client-side router (ADR-0032).
+navigation. Two progressive-enhancement layers smooth that over: hover prefetch
+(on by default) and opt-in cross-document View Transitions. Both degrade to
+plain navigation where unsupported; neither needs a client-side router
+(ADR-0032).
 
-- **Cross-document View Transitions.** `BASE_CSS` emits
-  `@view-transition { navigation: auto; }`, so same-origin navigations go
-  through the [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
+- **Cross-document View Transitions (opt-in).** Set `viewTransitions: true` in
+  your config to emit `@view-transition { navigation: auto; }`, so same-origin
+  navigations go through the [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
   (Chromium 126+, Safari 18.2+). The page content is **cut over instantly**
   (`::view-transition-old/new(root) { animation: none }`) rather than
   cross-faded: opacity-fading two different pages superimposes their text into a
@@ -464,9 +469,9 @@ where unsupported; there is no config knob and no client-side router (ADR-0032).
   without the blank/white repaint of a normal navigation — the chrome (identical
   between pages) appears to stay put while the content changes, a crisp SPA-style
   route change. No animation also means nothing to undo for
-  `prefers-reduced-motion`. Because this rides in `BASE_CSS`, it is **off when
-  `disableBaseCss` is set** — custom-chrome sites own their own transitions (add
-  `@view-transition { navigation: auto; }` to your `css` to opt back in).
+  `prefers-reduced-motion`. It is **off by default**, and never emitted when
+  `disableBaseCss` is set — custom-chrome sites add `@view-transition` to their
+  own `css`.
 - **Hover prefetch.** A `<script type="speculationrules">` block
   (`eagerness: "moderate"`) prefetches same-origin pages on hover/pointerdown
   via the [Speculation Rules API](https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API),
