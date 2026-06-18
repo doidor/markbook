@@ -446,6 +446,35 @@ The fenced-code background pulls from `--mb-code-bg` so a single token
 override re-skins every code block in light + dark mode without touching
 Shiki's syntax colors.
 
+## Navigation feel (View Transitions + prefetch)
+
+A built site is a classic multi-page app — every link is a full document
+navigation. Two zero-config, progressive-enhancement layers make that feel
+SPA-like instead of flashing on each click. Both degrade to plain navigation
+where unsupported; there is no config knob and no client-side router (ADR-0032).
+
+- **Cross-document View Transitions.** `BASE_CSS` emits
+  `@view-transition { navigation: auto; }`, so same-origin navigations go
+  through the [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
+  (Chromium 126+, Safari 18.2+). The page content is **cut over instantly**
+  (`::view-transition-old/new(root) { animation: none }`) rather than
+  cross-faded: opacity-fading two different pages superimposes their text into a
+  muddy double-exposure that itself reads as a flash. With the instant cut the
+  browser simply holds the old frame until the new page has painted, then swaps
+  without the blank/white repaint of a normal navigation — the chrome (identical
+  between pages) appears to stay put while the content changes, a crisp SPA-style
+  route change. No animation also means nothing to undo for
+  `prefers-reduced-motion`. Because this rides in `BASE_CSS`, it is **off when
+  `disableBaseCss` is set** — custom-chrome sites own their own transitions (add
+  `@view-transition { navigation: auto; }` to your `css` to opt back in).
+- **Hover prefetch.** A `<script type="speculationrules">` block
+  (`eagerness: "moderate"`) prefetches same-origin pages on hover/pointerdown
+  via the [Speculation Rules API](https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API),
+  so the next page is already cached when clicked (which keeps the held-frame
+  window short). Injected through `{{ head }}`, so **custom HTML layouts get it
+  too** (independent of `disableBaseCss`). Chromium-only today; a no-op on
+  `file:` pages and where unsupported.
+
 ## See also
 
 - [Repo README](../../README.md) — overview, install, hello-world

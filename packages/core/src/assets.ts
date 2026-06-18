@@ -82,6 +82,25 @@ let COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=
  */
 let NAV_TOGGLE_BOOT_SCRIPT = `(function(){function setOpen(o){var b=document.body;var btns=document.querySelectorAll('[data-markbook-nav-toggle]');if(o){b.dataset.markbookNavOpen='true';}else{delete b.dataset.markbookNavOpen;}for(var i=0;i<btns.length;i++){btns[i].setAttribute('aria-expanded',o?'true':'false');}}document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;var btn=t.closest('[data-markbook-nav-toggle]');if(btn){e.preventDefault();setOpen(document.body.dataset.markbookNavOpen!=='true');return;}var bd=t.closest('[data-markbook-nav-backdrop]');if(bd){setOpen(false);return;}var link=t.closest('.markbook-sidebar a');if(link){setOpen(false);}});document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(document.body.dataset.markbookNavOpen!=='true')return;setOpen(false);var btn=document.querySelector('[data-markbook-nav-toggle]');if(btn&&btn.focus)btn.focus();});})();`;
 
+/**
+ * Speculation Rules — hover/pointerdown prefetch of same-origin pages so the
+ * next page is already in cache by the time the user clicks, which (paired
+ * with the View Transitions base CSS) is what makes a full page load feel
+ * SPA-like / "cached". Injected as `<script type="speculationrules">` in
+ * `{{ head }}`.
+ *
+ *   - `eagerness: "moderate"` → prefetch on hover (~200ms) or pointerdown,
+ *     not eagerly on render, so it only fetches what the user is about to
+ *     click. One small HTML doc per hovered link.
+ *   - `href_matches: "/*"` restricts to same-origin links (works under a
+ *     base path like `/markbook/...` — `*` spans path segments).
+ *
+ * Chromium-only today; Firefox/Safari ignore the block, and it is a no-op on
+ * `file:` pages — pure progressive enhancement. Already-minified JSON, so it
+ * skips `doMinify` (esbuild's JS loader would mis-parse a bare object).
+ */
+const SPECULATION_RULES = `{"prefetch":[{"where":{"href_matches":"/*"},"eagerness":"moderate"}]}`;
+
 let BASE_CSS = `
 :root {
   --mb-bg: #ffffff;
@@ -117,6 +136,22 @@ let BASE_CSS = `
   color-scheme: dark;
 }
 *,*::before,*::after { box-sizing: border-box; }
+/* View Transitions — make a full cross-document navigation feel SPA-like.
+   'navigation: auto' opts every same-origin page load into the browser's
+   View Transitions API (Chromium 126+, Safari 18.2+); unsupported browsers
+   (Firefox today) just navigate normally — pure progressive enhancement, no
+   client-side router. Cut cleanly between pages instead of cross-fading:
+   opacity-fading two different pages superimposes their text — a muddy "double
+   exposure" that reads as a flash even with view transitions on. With an instant
+   cut the API simply holds the old frame until the new page has painted, then
+   swaps without the blank/white repaint of a normal navigation — the chrome
+   (identical between pages) appears to stay put while the content changes, a
+   crisp SPA-style route change. No animation also means nothing to undo for
+   prefers-reduced-motion. */
+@view-transition { navigation: auto; }
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
 /* The 'scrollbar-gutter: stable' rule reserves space for the vertical
    scrollbar even on short pages, so navigation between long and short
    pages doesn't cause the layout to jitter horizontally (the viewport
@@ -811,6 +846,8 @@ export interface InlineAssets {
   searchKbdBoot: string;
   copyMdBoot: string;
   navToggleBoot: string;
+  /** Speculation Rules JSON for `<script type="speculationrules">` (prefetch). */
+  speculationRules: string;
   baseCss: string;
 }
 
@@ -870,6 +907,7 @@ export function getInlineAssets(): InlineAssets {
     searchKbdBoot: SEARCH_KBD_BOOT_SCRIPT,
     copyMdBoot: COPY_MD_BOOT_SCRIPT,
     navToggleBoot: NAV_TOGGLE_BOOT_SCRIPT,
+    speculationRules: SPECULATION_RULES,
     baseCss: BASE_CSS,
   };
 }

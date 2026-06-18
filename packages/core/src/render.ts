@@ -146,6 +146,10 @@ function buildHeadInjections(
     `<script>${assets.copyBoot}</script>`,
     `<script>${assets.permalinkBoot}</script>`,
     `<script>${assets.navToggleBoot}</script>`,
+    // Hover-prefetch same-origin pages so navigation feels instant. Paired
+    // with the View Transitions base CSS, this is what gives the SPA-like
+    // feel on a full page load. Ignored where unsupported (progressive).
+    `<script type="speculationrules">${assets.speculationRules}</script>`,
   ];
   if (prc.llmsButtons) parts.push(`<script>${assets.copyMdBoot}</script>`);
   if (prc.searchEnabled) parts.push(`<script>${assets.searchKbdBoot}</script>`);

@@ -677,3 +677,81 @@ Default stays `true` (opt-out, not opt-in) so existing sites are unaffected.
 - New public-API field on `MarkbookConfig` — part of the documented config surface (`packages/core/README.md` config block + new "Full-text search (Pagefind)" subsection).
 - `BuildContext` gains a `searchEnabled` field. The integration tests (which call `writePages` directly, bypassing Vite) keep passing explicit `searchEnabled`; `build()`/`dev()` now source it from config.
 - The marketing-demo example is left search-ON deliberately — it exists to demonstrate the `{{ search }}` slot.
+
+---
+
+## ADR-0032 — SPA-like navigation via View Transitions + Speculation-Rules prefetch (no router)
+
+**Status:** Accepted (2026-06-18).
+
+**Context.** A built Markbook site is a multi-page app: every link is a full
+document navigation. Even though pages are well-cached (the live docs site
+returns `cache-control: max-age=600` and inlines all chrome CSS/JS, so there is
+nothing slow to download), a cross-document navigation still tears down the old
+DOM and paints the new one — the header + sidebar visibly clip/jump on each
+click. Starlight feels SPA-like by comparison. Inspecting live headers ruled out
+a caching cause; the flash is inherent to cross-document repaint. The two
+techniques that fix it (the same ones Starlight uses) are the **View Transitions
+API** to hold the old frame and swap cleanly to the new page, and **link
+prefetch** so the next page is already cached when clicked.
+
+**Decision.** Add both as zero-config progressive enhancements, with **no
+client-side router** and **no new `MarkbookConfig` field**:
+
+1. `BASE_CSS` emits `@view-transition { navigation: auto; }`, opting every
+   same-origin navigation into cross-document view transitions, and **cuts the
+   page over instantly** — `::view-transition-old(root)` /
+   `::view-transition-new(root) { animation: none }` — rather than using the UA
+   default cross-fade. The browser still holds the old frame until the new page
+   has painted (no blank/white repaint), then swaps atomically, so the chrome —
+   identical between pages — appears to stay put while the content changes.
+   Living in `BASE_CSS` means it is naturally **off under `disableBaseCss`**
+   (custom-chrome sites own their transitions). An instant cut also means there
+   is nothing to animate for `prefers-reduced-motion`.
+2. A `SPECULATION_RULES` inline asset
+   (`{"prefetch":[{"where":{"href_matches":"/*"},"eagerness":"moderate"}]}`) is
+   injected as `<script type="speculationrules">` from `buildHeadInjections`, so
+   it rides `{{ head }}` into custom layouts too. `eagerness: "moderate"`
+   prefetches on hover/pointerdown only — it fetches what the user is about to
+   click, one small doc at a time.
+
+Both are inert where unsupported (Firefox cross-document VT today; Speculation
+Rules are Chromium-only and a no-op on `file:` pages), so nothing regresses.
+
+**Alternatives considered.**
+- **The UA-default cross-fade (or a shorter one) with a `view-transition-name`
+  on the header + sidebar to hold the chrome steady.** Implemented and tested
+  first, then rejected. Opacity-cross-fading two different pages superimposes
+  their text into a muddy double-exposure that itself reads as a flash —
+  shortening the duration only makes it briefer, not cleaner (verified frame-by-
+  frame with a Chrome CDP screencast). Naming the chrome also bit back: with an
+  instant content cut, the named sidebar's *transparent* snapshot let the old
+  active-highlight bleed through the new one. Dropping the names and letting the
+  whole page ride the opaque `root` snapshot gives a single clean cut with no
+  double-exposure, no highlight bleed, and no content/highlight lag.
+- **A JS client-side router that intercepts clicks and swaps `<main>`** (what
+  Astro's `ClientRouter` does). Rejected — it is a framework-grade feature
+  (history, scroll restoration, focus management, re-running page scripts, back/
+  forward) that contradicts Markbook's static-first / KISS constitution and adds
+  a large always-shipped script. Native cross-document View Transitions deliver
+  the same "full load feels SPA-like" perception with one CSS at-rule.
+- **A `viewTransitions` / `prefetch` config opt-out.** Rejected for now as config
+  burden — these degrade gracefully and are visual polish, like the existing
+  `scrollbar-gutter: stable` default. Opting out is already possible
+  (`@view-transition { navigation: none; }` via `css`). A knob can be added later
+  without breaking changes if a real need appears.
+- **`<link rel="prefetch">` for every link.** Rejected — eager, bandwidth-wasteful,
+  and requires enumerating URLs. Speculation Rules with `moderate` eagerness is
+  declarative and hover-scoped.
+- **Eager prefetch (`eagerness: "eager"`).** Rejected — prefetches links that may
+  never be clicked. `moderate` (hover/pointerdown) is the instant-feeling but
+  conservative middle ground.
+
+**Consequences.**
+- No public-API change: `speculationRules` is a field on the internal
+  `InlineAssets`, not exported from `index.ts`. Captured by the changeset, not a
+  semver event.
+- `disableBaseCss` sites get the prefetch (head-injected) but not the VT CSS — an
+  intentional split documented in the core README's "Navigation feel" section.
+- Browser support will broaden over time (Firefox is implementing cross-document
+  VT); the feature improves for free as it does, with no Markbook change needed.
