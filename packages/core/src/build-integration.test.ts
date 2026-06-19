@@ -167,6 +167,55 @@ describe('writePages — built-in shell (no layout)', () => {
     expect(html).toMatch(/@media[^{]*max-width:\s*700px/);
     expect(html).toContain('data-markbook-nav-open');
   });
+
+  it('does not emit View Transitions by default (opt-in)', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Off by default — pages navigate with the browser's default behaviour.
+    expect(html).not.toMatch(/@view-transition/);
+    // The rest of the base chrome is unaffected.
+    expect(html).toMatch(/--mb-bg/);
+  });
+
+  it('opts into a clean instant-cut View Transition when viewTransitions: true', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+    });
+    let ctx = await createContext({ root: fx.root, viewTransitions: true });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    // Opts every same-origin navigation into the View Transitions API.
+    expect(html).toMatch(/@view-transition\s*\{\s*navigation:\s*auto/);
+    // The page is cut over instantly (animation: none) rather than cross-faded:
+    // opacity-fading two different pages superimposes their text into a muddy
+    // double-exposure that reads as a flash. An instant cut also leaves nothing
+    // to animate for prefers-reduced-motion.
+    expect(html).toMatch(/::view-transition-old\(root\)[\s\S]{0,120}animation:\s*none/);
+    expect(html).toMatch(/::view-transition-new\(root\)/);
+
+    // Even opted in, disableBaseCss drops it — custom-chrome sites own their
+    // transitions.
+    ctx = await createContext({ root: fx.root, viewTransitions: true, disableBaseCss: true });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    expect(await fx.read('index.html')).not.toMatch(/@view-transition/);
+  });
+
+  it('injects a speculation-rules prefetch block so navigation feels instant', async () => {
+    fx = await setupFixture({
+      'docs/index.md': '---\ntitle: Home\n---\n# Home\n',
+      'docs/about.md': '---\ntitle: About\n---\n# About\n',
+    });
+    const ctx = await createContext({ root: fx.root });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+    expect(html).toContain('<script type="speculationrules">');
+    expect(html).toContain('"prefetch"');
+    expect(html).toContain('"eagerness":"moderate"');
+  });
 });
 
 describe('writePages — HTML layout dispatch', () => {
@@ -202,6 +251,9 @@ describe('writePages — HTML layout dispatch', () => {
       // Layout markup present
       expect(html).toContain('<header>HOME-LINK</header>');
       expect(html).toContain('<article data-pagefind-body>');
+      // The prefetch block rides along in `{{ head }}`, so custom layouts get
+      // the same instant-navigation behaviour as the built-in shell.
+      expect(html).toContain('<script type="speculationrules">');
     }
   });
 

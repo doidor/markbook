@@ -677,3 +677,105 @@ Default stays `true` (opt-out, not opt-in) so existing sites are unaffected.
 - New public-API field on `MarkbookConfig` — part of the documented config surface (`packages/core/README.md` config block + new "Full-text search (Pagefind)" subsection).
 - `BuildContext` gains a `searchEnabled` field. The integration tests (which call `writePages` directly, bypassing Vite) keep passing explicit `searchEnabled`; `build()`/`dev()` now source it from config.
 - The marketing-demo example is left search-ON deliberately — it exists to demonstrate the `{{ search }}` slot.
+
+---
+
+## ADR-0032 — SPA-like navigation via View Transitions + Speculation-Rules prefetch (no router)
+
+**Status:** Accepted (2026-06-18).
+
+**Context.** A built Markbook site is a multi-page app: every link is a full
+document navigation. Even though pages are well-cached (the live docs site
+returns `cache-control: max-age=600` and inlines all chrome CSS/JS, so there is
+nothing slow to download), a cross-document navigation still tears down the old
+DOM and paints the new one — the header + sidebar visibly clip/jump on each
+click. Starlight feels SPA-like by comparison. Inspecting live headers ruled out
+a caching cause; the flash is inherent to cross-document repaint. The two
+techniques that fix it (the same ones Starlight uses) are the **View Transitions
+API** to hold the old frame and swap cleanly to the new page, and **link
+prefetch** so the next page is already cached when clicked.
+
+**Decision.** Add both as progressive enhancements that need **no client-side
+router**. As finally shipped, hover prefetch is on by default and View
+Transitions are **opt-in** (`viewTransitions: true`); the two Update stanzas
+below record how that default evolved. The mechanism:
+
+1. `BASE_CSS` emits `@view-transition { navigation: auto; }`, opting every
+   same-origin navigation into cross-document view transitions, and **cuts the
+   page over instantly** — `::view-transition-old(root)` /
+   `::view-transition-new(root) { animation: none }` — rather than using the UA
+   default cross-fade. The browser still holds the old frame until the new page
+   has painted (no blank/white repaint), then swaps atomically, so the chrome —
+   identical between pages — appears to stay put while the content changes.
+   Living in `BASE_CSS` means it is naturally **off under `disableBaseCss`**
+   (custom-chrome sites own their transitions). An instant cut also means there
+   is nothing to animate for `prefers-reduced-motion`.
+2. A `SPECULATION_RULES` inline asset
+   (`{"prefetch":[{"where":{"href_matches":"/*"},"eagerness":"moderate"}]}`) is
+   injected as `<script type="speculationrules">` from `buildHeadInjections`, so
+   it rides `{{ head }}` into custom layouts too. `eagerness: "moderate"`
+   prefetches on hover/pointerdown only — it fetches what the user is about to
+   click, one small doc at a time.
+
+Both are inert where unsupported (Firefox cross-document VT today; Speculation
+Rules are Chromium-only and a no-op on `file:` pages), so nothing regresses.
+
+**Alternatives considered.**
+- **The UA-default cross-fade (or a shorter one) with a `view-transition-name`
+  on the header + sidebar to hold the chrome steady.** Implemented and tested
+  first, then rejected. Opacity-cross-fading two different pages superimposes
+  their text into a muddy double-exposure that itself reads as a flash —
+  shortening the duration only makes it briefer, not cleaner (verified frame-by-
+  frame with a Chrome CDP screencast). Naming the chrome also bit back: with an
+  instant content cut, the named sidebar's *transparent* snapshot let the old
+  active-highlight bleed through the new one. Dropping the names and letting the
+  whole page ride the opaque `root` snapshot gives a single clean cut with no
+  double-exposure, no highlight bleed, and no content/highlight lag.
+- **A JS client-side router that intercepts clicks and swaps `<main>`** (what
+  Astro's `ClientRouter` does). Rejected — it is a framework-grade feature
+  (history, scroll restoration, focus management, re-running page scripts, back/
+  forward) that contradicts Markbook's static-first / KISS constitution and adds
+  a large always-shipped script. Native cross-document View Transitions deliver
+  the same "full load feels SPA-like" perception with one CSS at-rule.
+- **A `viewTransitions` / `prefetch` config opt-out.** Initially deferred as
+  config burden — these degrade gracefully and are visual polish, like the
+  existing `scrollbar-gutter: stable` default, and opting out was already
+  possible (`@view-transition { navigation: none; }` via `css`). The
+  `viewTransitions` opt-out was added shortly after on request (see the Update);
+  a `prefetch` opt-out is still deferred until a concrete need appears.
+- **`<link rel="prefetch">` for every link.** Rejected — eager, bandwidth-wasteful,
+  and requires enumerating URLs. Speculation Rules with `moderate` eagerness is
+  declarative and hover-scoped.
+- **Eager prefetch (`eagerness: "eager"`).** Rejected — prefetches links that may
+  never be clicked. `moderate` (hover/pointerdown) is the instant-feeling but
+  conservative middle ground.
+
+**Consequences.**
+- The only new public-API surface is the `viewTransitions?: boolean`
+  `MarkbookConfig` field (see Update). `speculationRules` / `viewTransitionsCss`
+  are fields on the internal `InlineAssets`, not exported from `index.ts`.
+- `disableBaseCss` sites get the prefetch (head-injected) but not the VT CSS — an
+  intentional split documented in the core README's "Navigation feel" section.
+- Browser support will broaden over time (Firefox is implementing cross-document
+  VT); the feature improves for free as it does, with no Markbook change needed.
+
+**Update (2026-06-18).** Added `viewTransitions?: boolean` to `MarkbookConfig`
+(default `true`); resolved onto `BuildContext.viewTransitions` in `createContext`
+and threaded into `PageRenderContext`. When `false`, the View Transitions
+stylesheet is omitted and pages navigate with the browser's default behaviour.
+The stylesheet was extracted from `BASE_CSS` into its own `VIEW_TRANSITIONS_CSS`
+inline asset so it can be toggled (and minified) independently, injected as a
+separate `<style>` from `buildHeadInjections` when
+`viewTransitions !== false && !disableBaseCss`. The instant-cut default is
+unchanged; this only adds the escape hatch. Prefetch stays non-configurable for
+now.
+
+**Update (2026-06-19).** Flipped the `viewTransitions` default from `true` to
+`false` — View Transitions are now **opt-in** (`createContext` resolves
+`config.viewTransitions === true`). Rationale: silently imposing a
+(Chromium-mostly) cross-document navigation behaviour on every Markbook consumer
+is more than a static-site engine should assume by default; a site that wants
+the SPA feel asks for it with one flag. For everyone else the default is exactly
+the pre-VT behaviour plus the on-by-default hover prefetch. None of the shipped
+examples opt in (the docs site included), so they navigate normally. Prefetch is
+unaffected (still on by default).

@@ -45,6 +45,7 @@ A new wiki entry must:
 | [`biome-jsx-expression-in-html-templates`](biome-jsx-expression-in-html-templates.md) | Biome's HTML linter treats `{{ }}` placeholders in `.html` files as JSX text expressions — exclude the templating directory in `biome.json` |
 | [`align-self-on-fixed-children`](align-self-on-fixed-children.md) | `align-self: start` cascades through `position: fixed`, collapsing the element to intrinsic height — explicitly reset `align-self: stretch` in the media-query rule |
 | [`yaml-frontmatter-bracket-values`](yaml-frontmatter-bracket-values.md) | SKILL.md `argument-hint:` values starting with `[` get parsed as YAML flow sequences — quote them as a string |
+| [`view-transition-cross-fade-double-exposure`](view-transition-cross-fade-double-exposure.md) | A cross-document View Transition cross-fade of two different pages superimposes their text into a muddy "double exposure" that reads as a flash — cut the `root` over instantly instead |
 
 ## Session-end discipline
 

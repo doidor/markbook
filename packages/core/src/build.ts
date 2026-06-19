@@ -114,6 +114,13 @@ export interface BuildContext {
    */
   searchEnabled: boolean;
   /**
+   * Whether the cross-document View Transitions stylesheet is emitted (instant
+   * SPA-style page swaps). Resolved from `MarkbookConfig.viewTransitions`
+   * (`=== true`, so the default is `false` / opt-in). Also requires base CSS —
+   * it is never emitted when `disableBaseCss` is set.
+   */
+  viewTransitions: boolean;
+  /**
    * Resolved user-directive registry, validated for built-in conflicts.
    * Keyed by directive name. Empty record means no user directives.
    */
@@ -276,6 +283,7 @@ export async function createContext(config: MarkbookConfig): Promise<BuildContex
     playground: config.playground === false || !config.playground ? undefined : config.playground,
     llmsButtons: config.llmsButtons !== false,
     searchEnabled: config.search !== false,
+    viewTransitions: config.viewTransitions === true,
     userDirectives,
   };
 }

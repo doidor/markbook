@@ -82,6 +82,46 @@ let COPY_MD_BOOT_SCRIPT = `(function(){if(location.protocol==='file:'){var btns=
  */
 let NAV_TOGGLE_BOOT_SCRIPT = `(function(){function setOpen(o){var b=document.body;var btns=document.querySelectorAll('[data-markbook-nav-toggle]');if(o){b.dataset.markbookNavOpen='true';}else{delete b.dataset.markbookNavOpen;}for(var i=0;i<btns.length;i++){btns[i].setAttribute('aria-expanded',o?'true':'false');}}document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;var btn=t.closest('[data-markbook-nav-toggle]');if(btn){e.preventDefault();setOpen(document.body.dataset.markbookNavOpen!=='true');return;}var bd=t.closest('[data-markbook-nav-backdrop]');if(bd){setOpen(false);return;}var link=t.closest('.markbook-sidebar a');if(link){setOpen(false);}});document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(document.body.dataset.markbookNavOpen!=='true')return;setOpen(false);var btn=document.querySelector('[data-markbook-nav-toggle]');if(btn&&btn.focus)btn.focus();});})();`;
 
+/**
+ * Speculation Rules — hover/pointerdown prefetch of same-origin pages so the
+ * next page is already in cache by the time the user clicks, which (paired
+ * with the View Transitions base CSS) is what makes a full page load feel
+ * SPA-like / "cached". Injected as `<script type="speculationrules">` in
+ * `{{ head }}`.
+ *
+ *   - `eagerness: "moderate"` → prefetch on hover (~200ms) or pointerdown,
+ *     not eagerly on render, so it only fetches what the user is about to
+ *     click. One small HTML doc per hovered link.
+ *   - `href_matches: "/*"` restricts to same-origin links (works under a
+ *     base path like `/markbook/...` — `*` spans path segments).
+ *
+ * Chromium-only today; Firefox/Safari ignore the block, and it is a no-op on
+ * `file:` pages — pure progressive enhancement. Already-minified JSON, so it
+ * skips `doMinify` (esbuild's JS loader would mis-parse a bare object).
+ */
+const SPECULATION_RULES = `{"prefetch":[{"where":{"href_matches":"/*"},"eagerness":"moderate"}]}`;
+
+/**
+ * Cross-document View Transitions CSS. Injected as its own `<style>` so it can
+ * be toggled independently of the rest of the chrome via
+ * `MarkbookConfig.viewTransitions` (default on). `navigation: auto` opts every
+ * same-origin page load into the View Transitions API (Chromium 126+, Safari
+ * 18.2+); unsupported browsers (Firefox today) just navigate normally — pure
+ * progressive enhancement, no client-side router.
+ *
+ * The page is **cut over instantly** (`::view-transition-old/new(root) {
+ * animation: none }`) rather than cross-faded: opacity-fading two different
+ * pages superimposes their text into a muddy "double exposure" that itself
+ * reads as a flash. The browser still holds the old frame until the new page
+ * has painted, then swaps with no blank/white repaint, so the chrome (identical
+ * between pages) appears to stay put while the content changes. An instant cut
+ * also leaves nothing to animate for prefers-reduced-motion.
+ */
+let VIEW_TRANSITIONS_CSS = `@view-transition { navigation: auto; }
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }`;
+
 let BASE_CSS = `
 :root {
   --mb-bg: #ffffff;
@@ -811,6 +851,10 @@ export interface InlineAssets {
   searchKbdBoot: string;
   copyMdBoot: string;
   navToggleBoot: string;
+  /** Speculation Rules JSON for `<script type="speculationrules">` (prefetch). */
+  speculationRules: string;
+  /** Cross-document View Transitions CSS (toggled by `config.viewTransitions`). */
+  viewTransitionsCss: string;
   baseCss: string;
 }
 
@@ -837,6 +881,7 @@ async function doMinify(): Promise<void> {
     copyMdMin,
     navToggleMin,
     baseCssMin,
+    viewTransitionsMin,
   ] = await Promise.all([
     minifyJs(THEME_BOOT_SCRIPT),
     minifyJs(TABS_BOOT_SCRIPT),
@@ -847,6 +892,7 @@ async function doMinify(): Promise<void> {
     minifyJs(COPY_MD_BOOT_SCRIPT),
     minifyJs(NAV_TOGGLE_BOOT_SCRIPT),
     minifyCss(BASE_CSS),
+    minifyCss(VIEW_TRANSITIONS_CSS),
   ]);
   THEME_BOOT_SCRIPT = themeMin;
   TABS_BOOT_SCRIPT = tabsMin;
@@ -857,6 +903,7 @@ async function doMinify(): Promise<void> {
   COPY_MD_BOOT_SCRIPT = copyMdMin;
   NAV_TOGGLE_BOOT_SCRIPT = navToggleMin;
   BASE_CSS = baseCssMin;
+  VIEW_TRANSITIONS_CSS = viewTransitionsMin;
 }
 
 /** Current snapshot of the inline assets (minified once the minify resolves). */
@@ -870,6 +917,8 @@ export function getInlineAssets(): InlineAssets {
     searchKbdBoot: SEARCH_KBD_BOOT_SCRIPT,
     copyMdBoot: COPY_MD_BOOT_SCRIPT,
     navToggleBoot: NAV_TOGGLE_BOOT_SCRIPT,
+    speculationRules: SPECULATION_RULES,
+    viewTransitionsCss: VIEW_TRANSITIONS_CSS,
     baseCss: BASE_CSS,
   };
 }
