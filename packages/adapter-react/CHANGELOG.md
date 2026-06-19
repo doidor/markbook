@@ -1,5 +1,13 @@
 # @doidor/markbook-adapter-react
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`b3b1e8e`](https://github.com/doidor/markbook/commit/b3b1e8e1a5c943518ed540a4fd6a509949f60972)]:
+  - @doidor/markbook-core@0.5.0
+  - @doidor/markbook-adapter-shared@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

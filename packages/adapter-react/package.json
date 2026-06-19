@@ -1,6 +1,6 @@
 {
   "name": "@doidor/markbook-adapter-react",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "React mount adapter for Markbook",
   "keywords": [
     "markbook",
