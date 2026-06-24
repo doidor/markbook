@@ -7,6 +7,8 @@ description: Mount React component examples inside your markdown pages.
 
 This is what makes Markbook a Storybook alternative when you need one — the same engine that renders your docs can also mount live framework components into the page.
 
+> **See it live:** the [Pixie component demo](../demos/react-demo/) is this guide's payoff — a small component library rendered by Markbook, with stories, props tables, "show code" disclosures, and search. It's built from [`examples/react-demo`](https://github.com/doidor/markbook/tree/main/examples/react-demo) in the repo.
+
 ## Pick an adapter
 
 Markbook ships one adapter today: `@doidor/markbook-adapter-react` (mounts React components; `react` + `react-dom` as peer deps). Vue and Web Components adapters are on the [roadmap](https://github.com/doidor/markbook/blob/main/ROADMAP.md) — the core engine is framework-agnostic, so they're purely additive.
