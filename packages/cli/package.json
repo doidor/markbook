@@ -1,6 +1,6 @@
 {
   "name": "@doidor/markbook",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Markbook CLI — build static documentation sites from markdown + component stories",
   "keywords": [
     "markbook",
