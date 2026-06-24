@@ -29,6 +29,7 @@
     "example:marketing:dev": "pnpm --filter @markbook/example-marketing-demo dev",
     "example:marketing:preview": "pnpm --filter @markbook/example-marketing-demo exec markbook preview",
     "example:site:build": "pnpm --filter @markbook/site build",
+    "example:site:build:demos": "pnpm example:site:build && pnpm example:build && node scripts/mount-demo.mjs",
     "example:site:dev": "pnpm --filter @markbook/site dev",
     "example:site:preview": "pnpm --filter @markbook/site exec markbook preview",
     "examples:dev": "node scripts/examples-dev.mjs",

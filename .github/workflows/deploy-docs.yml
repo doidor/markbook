@@ -7,6 +7,10 @@ name: Deploy docs site
 # @doidor/markbook-* packages are compiled first (`pnpm build`). The built output uses
 # relative asset/link paths, so it works correctly under the /markbook/ project
 # sub-path.
+#
+# `example:site:build:demos` also builds the React component demo
+# (examples/react-demo) and mounts it at /demos/react-demo/, so the docs site's
+# "live demo" links resolve. Same script runs locally — see scripts/mount-demo.mjs.
 
 on:
   push:
@@ -47,16 +51,8 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Build the Markbook docs site
-        run: pnpm example:site:build
-
-      - name: Build React demo site
-        run: pnpm example:build
-
-      - name: Copy React demo into docs site
-        run: |
-          mkdir -p examples/markbook-site/dist/demos/react-demo
-          cp -R examples/react-demo/dist/* examples/markbook-site/dist/demos/react-demo/
+      - name: Build the Markbook docs site (with the React demo mounted)
+        run: pnpm example:site:build:demos
 
       - uses: actions/configure-pages@v6
 

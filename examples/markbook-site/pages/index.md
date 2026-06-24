@@ -22,8 +22,14 @@ layout: landing
     built-in search, dark mode, llms.txt, sitemap, and OG tags. A thin React
     adapter lets you mount component stories into the same pages — turning the
     same engine into a Storybook alternative when you need one. (Vue and
-    web-component adapters are on the roadmap.)
+    web-component adapters are on the roadmap.) And this very site is itself a
+    Markbook build — markdown pages plus a single custom landing layout, no
+    bespoke glue code.
   </p>
+
+  <div class="site-hero-spotlight">
+    <p>Markbook is a Storybook alternative when you need one — the same engine renders a live component showcase with stories, props tables, "show code" disclosures, and full-text search. <a href="./demos/react-demo/">Open the Pixie demo →</a></p>
+  </div>
 
   <div class="site-feature-grid">
     <div class="site-feature">
@@ -34,7 +40,7 @@ layout: landing
     <div class="site-feature">
       <div class="site-feature-icon">🧩</div>
       <h3>Component stories, optional</h3>
-      <p>Drop a <code>:::story</code> directive in any page to mount a React component story. Skip the directive — and the adapter — for pure docs sites.</p>
+      <p>Drop a <code>:::story</code> directive in any page to mount a React component story. Skip the directive — and the adapter — for pure docs sites. <a href="./demos/react-demo/">See the live Pixie demo →</a></p>
     </div>
     <div class="site-feature">
       <div class="site-feature-icon">🔍</div>
