@@ -47,11 +47,22 @@ let COPY_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e
 let PERMALINK_BOOT_SCRIPT = `(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-markbook-permalink]');if(!a)return;if(e.metaKey||e.ctrlKey||e.shiftKey)return;if(!navigator.clipboard)return;var h=a.getAttribute('href')||'';var url=location.origin+location.pathname+h;navigator.clipboard.writeText(url).catch(function(){});});})();`;
 
 /**
- * Cmd-K / Ctrl-K opens the Pagefind search input. Slash key also works
- * (Algolia DocSearch / GitHub convention). Only active when search is
- * enabled — handler is omitted from the HTML in dev mode.
+ * Search keyboard support for the Pagefind UI:
+ *   - Cmd-K / Ctrl-K (and `/`, the Algolia DocSearch / GitHub convention)
+ *     focus the search input from anywhere on the page.
+ *   - ArrowDown / ArrowUp move focus through the result links once the
+ *     drawer is open (input → first result → … → wrap; ArrowUp off the first
+ *     result returns to the input). Enter activates the focused result and
+ *     Escape returns to the input.
+ * Pagefind's default UI ships none of this — results were mouse / Tab only.
+ * Moving real focus (not a synthetic highlight) keeps screen-reader
+ * semantics native; Enter is handled explicitly (preventDefault + click) so
+ * activation doesn't depend on the browser synthesising anchor default
+ * actions. The `:focus-visible` ring is styled in BASE_CSS. Ships whenever
+ * search is enabled — i.e. always unless `config.search: false` (search runs
+ * in `dev` too, so this is testable on the dev server).
  */
-let SEARCH_KBD_BOOT_SCRIPT = `(function(){function focus(){var input=document.querySelector('.pagefind-ui input, #markbook-search-ui input');if(input){input.focus();input.select&&input.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focus();return;}if(e.key==='/'&&!inField){e.preventDefault();focus();}});})();`;
+let SEARCH_KBD_BOOT_SCRIPT = `(function(){var UI='#markbook-search-ui';function root(){return document.querySelector(UI);}function input(){var r=root();return r&&r.querySelector('input');}function links(){var r=root();return r?Array.prototype.slice.call(r.querySelectorAll('.pagefind-ui__result-link')):[];}function focusInput(){var el=input();if(el){el.focus();el.select&&el.select();return true;}return false;}document.addEventListener('keydown',function(e){var t=e.target;var inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);if((e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey)){e.preventDefault();focusInput();return;}if(e.key==='/'&&!inField){e.preventDefault();focusInput();return;}if(!t||!t.closest||!t.closest(UI))return;if(e.key==='Escape'){focusInput();return;}if(e.key==='Enter'){var cl=links();var ci=cl.indexOf(document.activeElement);if(ci>-1){e.preventDefault();cl[ci].click();}return;}if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;var list=links();if(!list.length)return;e.preventDefault();var cur=list.indexOf(document.activeElement);var next;if(e.key==='ArrowDown'){next=cur+1>=list.length?0:cur+1;}else{if(cur===0){focusInput();return;}next=cur<0?list.length-1:cur-1;}var el=list[next];el.focus();if(el.scrollIntoView)el.scrollIntoView({block:'nearest'});});})();`;
 
 /**
  * "Copy as Markdown" button handler. Delegated click reads the button's
@@ -371,6 +382,12 @@ body[data-markbook-nav-open] .markbook-nav-toggle .markbook-icon-close { display
   text-decoration: none;
 }
 .markbook-search-ui .pagefind-ui__result-link:hover { color: var(--mb-link); }
+.markbook-search-ui .pagefind-ui__result-link:focus-visible {
+  outline: 2px solid var(--mb-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+  color: var(--mb-link);
+}
 .markbook-search-ui .pagefind-ui__result-nested {
   padding-left: 0.875rem;
   padding-top: 0.4rem;

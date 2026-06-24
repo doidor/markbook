@@ -240,6 +240,13 @@ By default Markbook builds a [Pagefind](https://pagefind.app) full-text
 index over the static output (`build`) — and over the dev server's working
 tree (`dev`) — and wires the search box into the chrome.
 
+**Keyboard navigation** is built in. `Cmd/Ctrl-K` or `/` focuses the search
+input from anywhere on the page; once results appear, `ArrowDown` / `ArrowUp`
+move focus through them (wrapping at the ends, and `ArrowUp` off the first
+result returns to the input), `Enter` opens the focused result, and `Escape`
+returns to the input. Focus lands on the real result `<a>` elements, so a
+`:focus-visible` ring marks the active result and screen readers announce it.
+
 Set `search: false` to turn it off:
 
 ```ts
