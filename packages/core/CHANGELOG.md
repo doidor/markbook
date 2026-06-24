@@ -1,5 +1,25 @@
 # @doidor/markbook-core
 
+## 0.6.0
+
+### Minor Changes
+
+- [#36](https://github.com/doidor/markbook/pull/36) [`a151f7d`](https://github.com/doidor/markbook/commit/a151f7d306a960af79361a6b6c8a056482b76ae6) Thanks [@doidor](https://github.com/doidor)! - **Keyboard navigation for Pagefind search results.**
+
+  The built-in search box now supports full keyboard navigation, on top of the
+  existing `Cmd/Ctrl-K` and `/` focus shortcuts:
+
+  - **ArrowDown / ArrowUp** move focus through the result links once the drawer
+    is open — `input → first result → … →` wrapping at the ends; `ArrowUp` off
+    the first result returns to the search input.
+  - **Enter** activates the focused result.
+  - **Escape** returns focus to the input.
+
+  Focus moves to the real result `<a>` elements (not a synthetic highlight), so
+  activation and screen-reader semantics stay native; a `:focus-visible` ring
+  marks the active result. No configuration — it ships whenever search is
+  enabled (the Pagefind default UI provides none of this on its own).
+
 ## 0.5.0
 
 ### Minor Changes
