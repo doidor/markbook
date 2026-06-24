@@ -400,6 +400,37 @@ describe('writePages — HTML layout dispatch', () => {
     expect(html).not.toContain('new PagefindUI(');
   });
 
+  it('ships keyboard result-navigation in the search script when search is enabled', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root, title: 'KbdNav' });
+    await writePages(ctx, { clean: true, searchEnabled: true });
+    const html = await fx.read('index.html');
+
+    // Arrow keys walk the Pagefind result links; Enter activates, Escape
+    // returns to the input. These string literals survive JS minification.
+    expect(html).toContain('ArrowDown');
+    expect(html).toContain('ArrowUp');
+    expect(html).toContain('Enter');
+    expect(html).toContain('Escape');
+    expect(html).toContain('pagefind-ui__result-link');
+    // The keyboard-focus ring for the active result ships in BASE_CSS.
+    expect(html).toContain('pagefind-ui__result-link:focus-visible');
+    // The original Cmd/Ctrl-K + "/" focus shortcuts are preserved.
+    expect(html).toContain('metaKey');
+  });
+
+  it('omits the search keyboard script when search is disabled', async () => {
+    fx = await setupFixture({ 'docs/index.md': '# Home\n' });
+    const ctx = await createContext({ root: fx.root, title: 'NoKbd' });
+    await writePages(ctx, { clean: true, searchEnabled: false });
+    const html = await fx.read('index.html');
+
+    // ArrowDown only appears in the search-kbd boot script (the tabs script
+    // uses ArrowLeft/Right), so its absence proves the script was dropped.
+    expect(html).not.toContain('ArrowDown');
+    expect(html).not.toContain('#markbook-search-ui');
+  });
+
   it('contentDir alias works end-to-end (pages/ instead of docs/)', async () => {
     fx = await setupFixture({
       'pages/index.md': '---\ntitle: PageDir\n---\n# Hi\n',

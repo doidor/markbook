@@ -34,6 +34,19 @@ The built-in shell drops it into the header automatically. In a custom HTML layo
 
 `{{ search }}` expands to `<div id="markbook-search-ui">` which Pagefind UI mounts into.
 
+### Keyboard navigation
+
+The search box is fully keyboard-driven — no mouse required:
+
+| Key | Action |
+| --- | --- |
+| `Cmd/Ctrl-K` or `/` | Focus the search input from anywhere on the page |
+| `ArrowDown` / `ArrowUp` | Move through the results (wraps at the ends; `ArrowUp` off the first result returns to the input) |
+| `Enter` | Open the focused result |
+| `Escape` | Return focus to the input |
+
+Focus moves to the actual result links, so each shows a `:focus-visible` ring and screen readers announce it as you go. This is layered on top of Pagefind's default UI automatically whenever search is enabled.
+
 ### What gets indexed
 
 Pagefind walks every `.html` file in the output directory and indexes the text inside elements marked `data-pagefind-body`. The built-in shell puts that attribute on the `<article>` wrapper automatically. In a custom layout, you write it yourself:
