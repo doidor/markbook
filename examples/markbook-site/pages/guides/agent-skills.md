@@ -6,7 +6,7 @@ order: 2
 
 # Agent skills
 
-Markbook is **agent-first by default**. The `markbook` npm package ships six procedural skills designed for AI coding agents — Claude Code, Codex, OpenCode, Cursor, Copilot CLI, and anything else that auto-discovers skills from `.claude/`, `.codex/`, `.opencode/`, or `.agents/`.
+Markbook is **agent-first by default**. The `@doidor/markbook` npm package ships six procedural skills designed for AI coding agents — Claude Code, Codex, OpenCode, Cursor, Copilot CLI, and anything else that auto-discovers skills from `.claude/`, `.codex/`, `.opencode/`, or `.agents/`.
 
 These aren't an afterthought. They're how we expect most Markbook setups to happen:
 
@@ -25,18 +25,18 @@ No `markbook.config.ts` to hand-edit. No directives to memorise. The agent alrea
 
 ## Install
 
-After installing the `markbook` package, drop the shipped skills into your project's agent vendor surfaces:
+From your project root, install the skills shipped with `@doidor/markbook` into your project's agent vendor surfaces:
 
 ```bash
-npx markbook skills install
+npx @doidor/markbook skills install
 ```
 
 Markbook **detects which surfaces exist** (`.claude/`, `.codex/`, `.opencode/`, `.agents/`) and copies skill content into each. Each skill lands at `<surface>/skills/markbook-<name>/SKILL.md` (flat namespace, cross-vendor portable).
 
 ```bash
-npx markbook skills install --surface .codex   # limit to one surface
-npx markbook skills install --update           # refresh after upgrading markbook
-npx markbook skills list                       # see installed + drift state
+npx @doidor/markbook skills install --surface .codex  # limit to one surface
+npx @doidor/markbook skills install --update          # refresh after upgrading @doidor/markbook
+npx @doidor/markbook skills list                      # see installed + drift state
 ```
 
 :::callout{type=tip}

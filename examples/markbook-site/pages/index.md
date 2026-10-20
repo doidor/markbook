@@ -7,12 +7,21 @@ layout: landing
 <section class="site-section">
   <h2>Agent-first by default</h2>
   <p class="site-section-lede">
-    Markbook ships six built-in <a href="./guides/agent-skills.html">agent skills</a> for Claude Code, Codex, OpenCode, Cursor, and any agent CLI that auto-discovers skills. Setting up docs is a one-line conversation, not a config-file safari.
+    Markbook ships six built-in <a href="./guides/agent-skills.html">agent skills</a> for Claude Code, Codex, OpenCode, Cursor, and any agent CLI that auto-discovers skills. Copy this prompt into your agent at the root of your project to get started.
   </p>
 
-  <div class="site-hero-spotlight">
-    <p>One <code>npx markbook skills install</code> and then: <em>"Set up Markbook in this project"</em> → <em>"Generate docs for everything under <code>src/components</code>"</em> → <em>"Apply the github preset, accent <code>#0969da</code>"</em> → done. <a href="./guides/agent-skills.html">See the skills →</a></p>
+  <div class="site-hero-spotlight site-agent-prompt markbook-code-pre-wrap">
+    <div class="site-agent-prompt-header">
+      <p>Try it in your project</p>
+      <button type="button" class="markbook-code-copy" data-markbook-copy data-pagefind-ignore="all" aria-label="Copy setup prompt"><span class="markbook-copy-label" aria-live="polite">Copy prompt</span></button>
+    </div>
+    <pre><code>Set up Markbook documentation in this project.
+First run npx @doidor/markbook skills install, then read and follow the installed SKILL.md files.
+Install the required @doidor/markbook packages using this project's package manager.
+Create a markdown-first docs site. If the project uses React, document its existing components with props tables and live stories.
+Preserve existing files, run the docs build to verify the result, and tell me how to preview it.</code></pre>
   </div>
+  <p><a href="./guides/agent-skills.html">Explore the six agent skills →</a></p>
 </section>
 
 <section class="site-section">

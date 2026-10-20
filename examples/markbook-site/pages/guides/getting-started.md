@@ -65,7 +65,7 @@ This is **markdown**. It becomes HTML.
 ## 4. Run the dev server
 
 ```bash
-npx markbook dev
+npx @doidor/markbook dev
 ```
 
 ```
@@ -78,13 +78,13 @@ Open the URL. You'll see your page with the default Markbook chrome (header, sid
 ## 5. Build for production
 
 ```bash
-npx markbook build
+npx @doidor/markbook build
 ```
 
 The output lands in `./dist/`. To verify it looks right:
 
 ```bash
-npx markbook preview     # serves dist/ over HTTP at :4173
+npx @doidor/markbook preview  # serves dist/ over HTTP at :4173
 ```
 
 Don't open `dist/*.html` directly in the browser via `file://` — Pagefind UI loads its runtime via dynamic `import()`, which browsers block for `file://` pages. `markbook preview` (or any other static-file HTTP server) is what you want.
