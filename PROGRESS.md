@@ -1941,3 +1941,13 @@ Not touched: `Tudor` / `Tudor Popa` strings inside placeholder sample data (Avat
 **Why:** Direct request — the search module lacked keyboard navigation. Pagefind's default UI deliberately stays markup-only and leaves interaction to the host, so this is the host's job. Chose roving real-focus over an `aria-activedescendant` virtual cursor because Pagefind's result DOM isn't a labelled combobox/listbox — moving actual focus to the anchors gets correct Enter activation, focus-ring, and AT announcement for free, with far less state to keep in sync across Pagefind's async re-renders (no stale-highlight bookkeeping; the browser owns "what's focused"). Verified beyond the unit assertions: ran the **actual minified `searchKbdBoot`** (read via `getInlineAssets()` after `ensureInlineAssetsMinified()`) under jsdom against a synthetic Pagefind result tree — 11/11 behaviour checks pass (`/` + `Cmd-K` focus; ArrowDown walks input→A→A-sub→B→wrap; ArrowUp first→input and input→wrap-last; Enter fires the focused link's click; Escape→input). Full `pnpm --filter @doidor/markbook-core test` green (282, +2).
 
 **Next:** None required. If a future site wants a DocSearch-style modal or `aria-activedescendant` combobox semantics, that would be a larger opt-in feature (and likely a config field); today's roving-focus default is the right zero-config behaviour and degrades cleanly where `:focus-visible` is unsupported (focus still moves; only the custom ring is missing).
+
+---
+
+## 2026-10-20 — copyable agent setup prompt and scoped CLI commands
+
+**What changed:** Replaced the landing page's agent walkthrough with a self-contained setup prompt and an always-visible, keyboard-accessible "Copy prompt" button that reuses Markbook's existing clipboard handler, with responsive styling in `examples/markbook-site/markbook.css`. Corrected every `npx markbook` invocation across the documentation website to `npx @doidor/markbook`, clarified the package-versus-executable distinction in the CLI reference, and updated the site README.
+
+**Why:** Visitors need a real prompt they can paste into their coding agent, and the old unscoped commands could resolve the wrong npm package instead of `@doidor/markbook`.
+
+**Next:** None required; these website changes ship with the next docs deployment.

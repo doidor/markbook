@@ -5,7 +5,7 @@ description: Every flag of every shipped agent skill. Use this when writing an A
 
 # Skills reference
 
-Markbook ships six agent skills via `npx markbook skills install`. This page is the deep-dive for each one. For the why and the at-a-glance overview, see the [agent skills guide](../guides/agent-skills.html); for `markbook skills install` itself, see the [CLI reference](./cli.html#markbook-skills-install).
+Markbook ships six agent skills via `npx @doidor/markbook skills install`. This page is the deep-dive for each one. For the why and the at-a-glance overview, see the [agent skills guide](../guides/agent-skills.html); for `markbook skills install` itself, see the [CLI reference](./cli.html#markbook-skills-install).
 
 Every skill is invoked the same way as any agent skill — `/markbook-<name>` in Claude Code, `@markbook-<name>` in Codex, etc. (exact syntax depends on the agent).
 

@@ -6,8 +6,10 @@ description: Every command, every flag.
 # CLI reference
 
 ```bash
-npx markbook <command> [options]
+npx @doidor/markbook <command> [options]
 ```
+
+The npm package is `@doidor/markbook`; its executable is still named `markbook`. The examples below use the executable directly, as you would in a package script or through your package manager's local runner.
 
 ## `markbook build`
 
@@ -102,7 +104,7 @@ Produces `dist/packages/<slug>/` — a publishable npm package directory with th
 
 ## `markbook skills install`
 
-Install the user-facing agent skills shipped with the `markbook` npm package into your project's vendor surfaces (`.claude/`, `.codex/`, `.opencode/`, `.agents/`).
+Install the user-facing agent skills shipped with the `@doidor/markbook` npm package into your project's vendor surfaces (`.claude/`, `.codex/`, `.opencode/`, `.agents/`).
 
 ```bash
 markbook skills install

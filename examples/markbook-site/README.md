@@ -4,7 +4,7 @@ The official [Markbook](https://github.com/doidor/markbook) website, built with 
 
 ## What's in here
 
-- **Home** (`pages/index.md`) — landing page with a hero, feature grid, and links to the guides. Uses a custom `layouts/landing.html`.
+- **Home** (`pages/index.md`) — landing page with a hero, a copyable agent setup prompt, feature grid, and links to the guides. Uses a custom `layouts/landing.html`; the prompt reuses Markbook's built-in code-copy button and clipboard handler.
 - **Guides** (`pages/guides/*.md`) — getting started, adding stories, customization, search & SEO. Uses the **default Markbook chrome** (header + sidebar + content + TOC) with `--mb-*` token overrides in `markbook.css`.
 - **Reference** (`pages/reference/*.md`) — config, CLI, frontmatter, layout placeholders, directives. Same default chrome.
 - **Live demo** (`demos/react-demo/`) — not authored here; the [`react-demo`](../react-demo) Pixie showcase is built and copied in at deploy time (and by `pnpm example:site:build:demos`), so the site can link to a real component showcase rendered by the same engine.

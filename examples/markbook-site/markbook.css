@@ -309,6 +309,41 @@
   margin: 0;
 }
 
+.site-agent-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.site-agent-prompt-header p {
+  color: var(--mb-fg);
+  font-weight: 600;
+}
+.site-agent-prompt .markbook-code-copy {
+  position: static;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.85rem;
+  opacity: 1;
+}
+.site-agent-prompt pre {
+  margin: 0;
+  color: var(--mb-fg);
+  font-family: var(--mb-font-mono);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.site-agent-prompt pre code {
+  font: inherit;
+  background: transparent;
+  padding: 0;
+}
+
 .site-footer {
   border-top: 1px solid var(--mb-border);
   padding: 2.5rem 2rem;
